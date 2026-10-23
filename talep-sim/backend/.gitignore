@@ -1,0 +1,5 @@
+.mirofish_world.json
+.env
+.venv/
+__pycache__/
+.pytest_cache/

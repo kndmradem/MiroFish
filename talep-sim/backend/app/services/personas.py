@@ -3,8 +3,9 @@
 `prompt` alanı gerçek LLM / MiroFish entegrasyonunda sistem promptu olarak
 kullanılacak. Diğer alanlar mock simülasyonun parametreleri.
 """
+import re
 from dataclasses import dataclass
-from typing import Dict
+from typing import Dict, List
 
 
 @dataclass(frozen=True)
@@ -63,3 +64,68 @@ PERSONAS: Dict[str, RegionPersona] = {
         price_multiplier=2.8,
     ),
 }
+
+
+# MiroFish dünyasını kurmak için seed doküman. Her bölgeden adlandırılmış
+# tüketiciler; MiroFish bunlardan Zep grafiği ve ajan profilleri üretir.
+# İsimler ajan -> bölge eşlemesinde de kullanılır.
+SEED_CONSUMERS: Dict[str, List[str]] = {
+    "EU": [
+        "Lena Hoffmann, 31, Berlin, UX tasarımcı; kapsül gardırop, ikinci el ve sertifikalı kumaş arar",
+        "Jonas Weber, 27, Hamburg, bisikletle işe gider; işlevsellik ve dayanıklılık ister, logo sevmez",
+        "Camille Laurent, 38, Lyon, öğretmen; doğal lif, sade kesim, makul fiyat",
+        "Sofia Rossi, 24, Milano, moda öğrencisi; trendleri takip eder ama hızlı modaya karşıdır",
+        "Pieter de Vries, 45, Amsterdam, mimar; minimalist, uzun ömürlü parçalar için fazla ödemeye hazır",
+    ],
+    "MENA": [
+        "Fatima Al Mansoori, 29, Dubai, pazarlama yöneticisi; lüks markalar, parlak kumaşlar, gösterişli detay",
+        "Omar Haddad, 35, Riyad, girişimci; statü gösteren premium parçalar, AVM alışverişi",
+        "Layla Nasser, 26, Doha, influencer; fotoğrafta iyi duran, dikkat çeken ürünler",
+        "Khalid Al Farsi, 42, Abu Dabi, banka müdürü; klimalı ortamlar için ince, kaliteli kumaş",
+        "Noor Saleh, 33, Kuveyt, diş hekimi; muhafazakâr kesim, ipek ve saten sever",
+    ],
+    "CIS": [
+        "Aigerim Seitkali, 30, Almatı, mühendis; -25°C kışlar, ısı yalıtımı her şeyden önce gelir",
+        "Dmitri Volkov, 41, Novosibirsk, saha çalışanı; rüzgar ve kar geçirmezlik, dayanıklılık",
+        "Nino Beridze, 28, Tiflis, grafik tasarımcı; sıcak tutan ama şık parçalar",
+        "Rustam Aliyev, 36, Bakü, satış müdürü; rüzgarlı şehir, su itici dış giyim, fiyat/performans",
+        "Olga Smirnova, 52, Yekaterinburg, muhasebeci; uzun yıllar giyilecek kalın, sağlam kumaş",
+    ],
+    "US": [
+        "Emily Carter, 29, New York, ürün yöneticisi; rahat oversize kesim, marka hikâyesi önemli",
+        "Marcus Johnson, 34, Chicago, öğretmen; soğuk rüzgar, fiyat/performans, kolay bakım",
+        "Ashley Nguyen, 23, Los Angeles, üniversite öğrencisi; TikTok trendleri, uygun fiyat",
+        "Daniel Brooks, 46, Seattle, yazılımcı; yağmura dayanıklı, sade ve teknik giyim",
+        "Rachel Kim, 38, Austin, emlakçı; şık ama rahat, online alışveriş, kolay iade",
+    ],
+}
+
+SIMULATION_REQUIREMENT = (
+    "Dört bölgesel pazardaki (EU, MENA, CIS, US) tüketicilerin yeni moda/tekstil ürünlerini "
+    "nasıl değerlendirdiğini simüle et. Her tüketici kendi şehrinin iklimini, kültürünü ve "
+    "satın alma önceliklerini korumalı. Tüketiciler ürünler hakkında fikir paylaşır, fiyat "
+    "algılarını ve itirazlarını tartışır."
+)
+
+
+def build_seed_document() -> str:
+    lines = ["# Bölgesel Tüketici Panelleri", ""]
+    for region, people in SEED_CONSUMERS.items():
+        persona = PERSONAS[region]
+        lines += [f"## {region} paneli ({persona.city} ve çevresi)", "", f"Bölge profili: {persona.prompt}", ""]
+        lines += [f"- {p} ({region} bölgesi tüketicisi)" for p in people]
+        lines.append("")
+    return "\n".join(lines)
+
+
+def region_of(profile_text: str) -> str | None:
+    """Ajan profil metninden bölgeyi bulur: önce seed isimleri, sonra şehir/bölge kodu."""
+    text = profile_text.lower()
+    for region, people in SEED_CONSUMERS.items():
+        if any(p.split(",")[0].lower() in text for p in people):
+            return region
+    for region, people in SEED_CONSUMERS.items():
+        cities = {p.split(",")[2].strip().lower() for p in people}
+        if any(c in text for c in cities) or re.search(rf"\b{region.lower()}\b", text):
+            return region
+    return None

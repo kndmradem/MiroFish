@@ -35,25 +35,41 @@ ve backend'e `CORS_ORIGINS=http://localhost:3100` ver.
 | `backend/app/services/personas.py` | EU/MENA/CIS/US persona promptları ve mock parametreleri |
 | `frontend/src/app/page.tsx` | Girdi paneli + dashboard (skor kartları, ECharts fiyat grafiği, üretim tablosu, itirazlar) |
 
-## MiroFish ile entegrasyon planı
+## MiroFish entegrasyonu
 
-MiroFish (Flask, port 5001) bir "seed doküman → Zep bilgi grafiği → OASIS
-persona'ları → sosyal medya simülasyonu → rapor" hattı. Bizim ihtiyacımız
-olan parçalar:
+`SIM_ENGINE=mirofish` ile mock yerine MiroFish ajan sürüsü kullanılır
+(`backend/app/services/mirofish_engine.py`). `main.py`, fiyat analizi,
+bütçe dağıtımı ve dashboard değişmez; anahtar yoksa `SIM_ENGINE=mock` kalır.
+MiroFish ya da vision servisine ulaşılamazsa API 502 döner (sessizce mock'a
+düşmez, çünkü sahte sonuç gerçek sanılmasın).
 
-1. **Persona üretimi:** `services/oasis_profile_generator.py` Zep grafiğindeki
-   varlıklardan detaylı ajan profili üretir. Bölge persona'larımızı seed
-   doküman olarak verip `POST /api/graph/build` → `POST /api/simulation/create`
-   → `/prepare` ile bölge başına ajan havuzu kurulabilir.
-2. **Fiyat ve itiraz soruları:** `POST /api/simulation/interview/batch`
-   simülasyondaki ajanlara toplu soru sorar. Van Westendorp'un dört sorusu ve
-   "bu üründe neyi beğenmedin?" sorusu buradan sorulur; cevaplar
-   `AgentPriceAnswer` listesine ve itiraz listesine çevrilir.
-3. **Bağlantı noktası:** `SimulationEngine` arayüzünü uygulayan bir
-   `MiroFishSimulationEngine` yazmak yeterli; `main.py` ve dashboard değişmez.
+Akış:
+1. **Dünya kurulumu (ilk istekte, bir kez, `.mirofish_world.json`'a kaydedilir):**
+   `personas.py` içindeki 20 adlandırılmış tüketici (bölge başına 5) seed doküman
+   olarak `POST /api/graph/ontology/generate` → `/api/graph/build` (Zep grafiği)
+   → `/api/simulation/create` → `/prepare` (OASIS profilleri) → `/start`
+   (kısa simülasyon, ortam komut bekler). Ajanlar profildeki isim/şehirden bölgelere eşlenir.
+   İlk istek dakikalar sürebilir; sonrakiler saklanan dünyayı kullanır.
+2. **Her tahmin:** vision modeli (ya da mock) ürün kartını çıkarır; bölgedeki ajanlara
+   `POST /api/simulation/interview/batch` ile kart + bölge persona'sı sorulur. Ajan JSON
+   döner: ilgi (0-100), dört Van Westendorp eşiği, en büyük itiraz.
+3. Talep skoru = ilgi ortalaması, fiyat eğrileri = ajan eşikleri, itirazlar = en sık 3 cevap.
 
-Gereken anahtarlar (MiroFish `.env`): `LLM_API_KEY`, `LLM_BASE_URL`,
-`LLM_MODEL_NAME` (OpenAI uyumlu herhangi bir model) ve `ZEP_API_KEY`.
+### Gerekli anahtarlar ve yerleri
+
+| Anahtar | Nereye | Ne için |
+|---|---|---|
+| `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL_NAME` | MiroFish kökündeki `.env` | Persona üretimi, simülasyon, röportaj cevapları (OpenAI uyumlu herhangi bir model) |
+| `ZEP_API_KEY` | MiroFish kökündeki `.env` | Zep Cloud bilgi grafiği (ücretsiz kota yeterli) |
+| `VISION_API_KEY` (+ `VISION_BASE_URL`, `VISION_MODEL`) | `talep-sim/backend/.env` | Görsel + metin füzyonu. Opsiyonel; boşsa metin tabanlı mock |
+
+Çalıştırma: MiroFish için `cp .env.example .env`, anahtarları yaz, `npm run setup:all && npm run backend`
+(Python 3.11-3.12 gerekir). Sonra `SIM_ENGINE=mirofish uvicorn app.main:app --port 8000`.
+MiroFish simülasyonu LLM tüketir; `MIROFISH_MAX_ROUNDS` düşük tutuldu.
+
+Not: Bu entegrasyon gerçek MiroFish'e karşı henüz çalıştırılmadı (anahtar yok). Testler
+MiroFish API'sini taklit eden bir sahte sunucuyla çalışıyor; gerçek ajan cevaplarının
+JSON formatına uyma oranı ilk gerçek denemede ölçülmeli.
 
 **Lisans notu:** MiroFish AGPL-3.0. Bu kodu MiroFish ile birlikte ağ
 üzerinden hizmet olarak sunarsan kaynak kodunu kullanıcılara açma
