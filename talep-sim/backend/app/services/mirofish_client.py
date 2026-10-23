@@ -30,7 +30,7 @@ class MiroFishClient:
         try:
             resp = await self.client.request(method, path, **kwargs)
         except httpx.HTTPError as e:
-            raise MiroFishError(f"MiroFish'e ulaşılamadı ({path}): {e}") from e
+            raise MiroFishError(f"MiroFish'e ulaşılamadı ({path}): {type(e).__name__}: {e}") from e
         try:
             body = resp.json()
         except ValueError:

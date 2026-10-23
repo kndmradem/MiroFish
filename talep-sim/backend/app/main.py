@@ -88,7 +88,7 @@ async def predict(req: PredictionRequest, engine: SimulationEngine = Depends(get
         # Bölge simülasyonları birbirinden bağımsız, paralel koşar.
         sims = await asyncio.gather(*(engine.simulate_region(card, r, unit_cost, brand) for r in req.target_regions))
     except (MiroFishError, LLMError, httpx.HTTPError) as e:
-        raise HTTPException(status_code=502, detail=f"Simülasyon servisi hatası: {e}") from e
+        raise HTTPException(status_code=502, detail=f"Simülasyon servisi hatası: {type(e).__name__}: {e}") from e
 
     priced = {s.region: (s, *analyze(s.price_answers, unit_cost)) for s in sims}
     allocations = allocate_production_budget(

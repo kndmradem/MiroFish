@@ -13,6 +13,11 @@ class LLMError(RuntimeError):
     pass
 
 
+def http_error_text(resp: httpx.Response) -> str:
+    """Sunucunun cevap gövdesini de içeren hata metni (Ollama 400'ün nedenini gövdede yazar)."""
+    return f"HTTP {resp.status_code} {resp.request.url}: {resp.text.strip()[:600] or '(boş cevap)'}"
+
+
 def extract_json(text: str):
     """Cevabın içindeki ilk JSON nesnesini ya da dizisini çıkarır."""
     text = re.sub(r"<think>.*?</think>", "", text or "", flags=re.S)  # düşünen modellerin izi
@@ -46,8 +51,11 @@ class LLMClient:
                           "messages": [{"role": "system", "content": system},
                                        {"role": "user", "content": prompt}]},
                 )
-                resp.raise_for_status()
+                if resp.status_code >= 400:
+                    raise LLMError(http_error_text(resp))
                 return extract_json(resp.json()["choices"][0]["message"]["content"])
-            except (httpx.HTTPError, KeyError, IndexError, LLMError) as e:
-                last = e
+            except (httpx.HTTPError, KeyError, IndexError, LLMError, ValueError) as e:
+                last = e if str(e) else LLMError(type(e).__name__)
+                if isinstance(e, LLMError) and str(e).startswith("HTTP 4"):
+                    break  # istemci hatası tekrarla düzelmez
         raise LLMError(f"LLM çağrısı başarısız: {last}") from last
