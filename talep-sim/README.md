@@ -80,6 +80,19 @@ JSON formatına uyma oranı ilk gerçek denemede ölçülmeli.
 `qwen2.5vl:7b`. 7B altı metin modelleri ajan JSON'unu sık bozar; motor geçersiz cevap veren
 ajanlara bir kez tekrar sorar (`retries`). **Zep yine buluttan gelir**, aşağıya bak.
 
+#### macOS (MacBook, Docker olmadan)
+
+```bash
+cd talep-sim/local-llm && ./setup-mac.sh
+```
+
+Betik RAM'e göre model seçer: 8 GB → `qwen2.5:3b-instruct` + `qwen2.5vl:3b`, 16 GB →
+`qwen2.5:7b-instruct` + `qwen2.5vl:7b`, 24 GB+ → `qwen2.5:14b-instruct` + `qwen2.5vl:7b`.
+Ollama'yı Homebrew ile kurar, indirir ve `.env`'e yazılacak satırları basar. 8 GB'ta 3B model
+JSON'u sık bozar ve simülasyon yavaş olur; ilk deneme için `MIROFISH_MAX_ROUNDS=2` kullan,
+sonuç güvenilmezse bulut LLM'e geç. MiroFish backend'i Python 3.11-3.12 ister; macOS'un
+varsayılan Python'u daha yeniyse `uv` kullan (`npm run setup:backend` zaten uv ile kurar).
+
 ### Zep ne yapıyor?
 
 MiroFish, seed dokümanı (bizde 20 tüketicilik panel) Zep Cloud'a yükler. Zep metinden
