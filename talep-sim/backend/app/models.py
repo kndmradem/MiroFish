@@ -1,11 +1,54 @@
 """API sözleşmesi (teknik doküman §4). Dokümandaki modellere ek olarak
 dashboard'un Van Westendorp grafiğini çizebilmesi için fiyat eğrisi alanları var."""
 from decimal import Decimal
-from typing import List, Literal
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
 Region = Literal["EU", "MENA", "CIS", "US"]
+
+
+PriceTier = Literal["budget", "mass", "upper_mass", "premium", "luxury"]
+ALL_REGIONS = ("EU", "MENA", "CIS", "US")
+
+
+class BrandProfile(BaseModel):
+    """Markanın fiyat ve konumlandırma profili. LLM üretir, kullanıcı düzenleyebilir."""
+    name: str
+    positioning: str = Field("", description="Markanın konumlandırması, kısa metin")
+    price_tier: PriceTier = "mass"
+    price_multiple: float = Field(2.7, ge=1.2, le=30, description="Tipik perakende fiyatı / birim üretim maliyeti")
+    price_sensitivity: float = Field(0.5, ge=0, le=1, description="Müşterinin fiyata duyarlılığı (1 = çok duyarlı)")
+    brand_pull: int = Field(50, ge=0, le=100, description="Marka çekim gücü / bilinirlik")
+    typical_customer: str = ""
+    margin_norm_pct: float = Field(55, ge=10, le=95, description="Markanın tipik brüt kâr marjı (%)")
+    regional_strength: Dict[str, int] = Field(default_factory=lambda: {r: 50 for r in ALL_REGIONS})
+    known_brand: bool = False
+    confidence: Literal["low", "medium", "high"] = "low"
+    source: Literal["llm_knowledge", "user_notes", "generic_default"] = "generic_default"
+    edited: bool = Field(False, description="Kullanıcı üretilen profili elle düzenledi")
+    warning: Optional[str] = None
+
+
+class BrandProfileRequest(BaseModel):
+    brand: str = Field(..., min_length=1, examples=["Ipekyol"])
+    notes: Optional[str] = Field(None, description="Marka hakkında kullanıcı notları (profile öncelik verilir)")
+
+
+class Explanation(BaseModel):
+    key: Literal["demand", "price", "margin", "quantity"]
+    label: str
+    value: str
+    how: str = Field(..., description="Değerin nasıl türetildiği, sade Türkçe")
+    assumptions: List[str] = []
+
+
+class Recommendation(BaseModel):
+    category: Literal["fiyat", "bölge", "tasarım", "üretim", "marka"]
+    title: str
+    detail: str
+    based_on: str = ""
+    source: Literal["model", "kural"] = "kural"
 
 
 # --- Girdi (Request) Modeli ---
@@ -16,6 +59,9 @@ class PredictionRequest(BaseModel):
     unit_cost: Decimal = Field(..., gt=0, examples=[25.50])
     total_production_budget: int = Field(..., gt=0, examples=[100000])
     target_regions: List[Region] = Field(..., min_length=1, examples=[["EU", "MENA", "CIS"]])
+    brand: Optional[str] = Field(None, examples=["Ipekyol"], description="Marka adı; fiyat politikası markaya göre belirlenir")
+    brand_notes: Optional[str] = Field(None, description="Marka profili üretilirken kullanılacak kullanıcı notları")
+    brand_profile: Optional[BrandProfile] = Field(None, description="Hazır/düzenlenmiş profil; verilirse yeniden üretilmez")
 
     @field_validator("target_regions")
     @classmethod
@@ -50,6 +96,7 @@ class RegionPredictionResult(BaseModel):
     estimated_margin_percentage: float = Field(..., description="Brüt kâr marjı yüzdesi")
     key_objections: List[str] = Field(..., description="Ajanlardan gelen top 3 eleştiri")
     van_westendorp: VanWestendorpResult
+    explanations: List[Explanation] = []
 
 
 class PredictionResponse(BaseModel):
@@ -58,4 +105,8 @@ class PredictionResponse(BaseModel):
     total_produced_qty: int
     unallocated_budget: Decimal = Field(..., description="Aşağı yuvarlamadan artan bütçe")
     product_card: dict = Field(..., description="Vision+Text füzyonundan çıkan ürün kartı")
+    engine: str = "mock"
+    brand_profile: Optional[BrandProfile] = None
+    recommendations: List[Recommendation] = []
+    methodology_notes: List[str] = []
     regional_breakdown: List[RegionPredictionResult]

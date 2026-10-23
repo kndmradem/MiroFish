@@ -35,6 +35,24 @@ ve backend'e `CORS_ORIGINS=http://localhost:3100` ver.
 | `backend/app/services/personas.py` | EU/MENA/CIS/US persona promptları ve mock parametreleri |
 | `frontend/src/app/page.tsx` | Girdi paneli + dashboard (skor kartları, ECharts fiyat grafiği, üretim tablosu, itirazlar) |
 
+## Marka profiline göre fiyatlama
+
+Marka adı yazıldığında (herhangi bir marka; sabit liste yok) `POST /api/brand-profile` bir LLM'e
+markanın konumlandırmasını, fiyat segmentini, tipik fiyat çarpanını (satış ÷ maliyet), fiyat
+duyarlılığını, bölgesel gücünü ve brüt marj normunu sordurur. Profil arayüzde düzenlenebilir;
+düzenlenmiş profil `/api/predict`'e `brand_profile` olarak gider ve yeniden üretilmez.
+
+- **Etkisi:** fiyat çarpanı ve duyarlılık ajanların fiyat bandını, bölgesel güç ve çekim gücü talep
+  endeksini kaydırır (mock motorda formülle, MiroFish motorunda ajan promptlarına marka bloğu olarak).
+- **Dürüstlük:** model markayı tanımıyorsa `confidence=low` ve uyarı döner; LLM yoksa ya da cevap
+  bozuksa nötr profil ve açık uyarı döner. Arayüz kaynağı (model bilgisi / notların / nötr varsayılan)
+  rozetle gösterir; bu bilgi doğrulanmış veri değildir.
+- **Açıklamalar ve öneriler:** her bölge için talep, fiyat, marj ve adet sayılarının nasıl
+  türetildiği gerçek sayılarla yazılır (`explanations`). Öneriler LLM'den (özet sayılarına bakarak)
+  gelir; LLM yoksa ya da cevap geçersizse veriden türeyen kurallar kullanılır (`recommendations[].source`).
+- **LLM ayarı:** `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL_NAME` (MiroFish'le aynı adlar). API, hem
+  `talep-sim/backend/.env` hem repo kökündeki `.env` dosyasını okur.
+
 ## MiroFish entegrasyonu
 
 `SIM_ENGINE=mirofish` ile mock yerine MiroFish ajan sürüsü kullanılır

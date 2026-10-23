@@ -9,10 +9,11 @@ import asyncio
 import hashlib
 import random
 import re
-from dataclasses import dataclass
-from typing import List, Protocol
+from dataclasses import dataclass, field
+from typing import List, Optional, Protocol
 
-from ..models import PredictionRequest
+from .. import brand as brandlib
+from ..models import BrandProfile, PredictionRequest
 from ..pricing import AgentPriceAnswer
 from .personas import PERSONAS
 
@@ -23,12 +24,15 @@ class RegionSimulation:
     demand_score: int
     price_answers: List[AgentPriceAnswer]
     objections: List[str]
+    # Açıklama üretimi için motorun hesap ayrıntıları (bkz. explain.py)
+    meta: dict = field(default_factory=dict)
 
 
 class SimulationEngine(Protocol):
     async def fuse_product_card(self, req: PredictionRequest) -> dict: ...
 
-    async def simulate_region(self, card: dict, region: str, unit_cost: float) -> RegionSimulation: ...
+    async def simulate_region(self, card: dict, region: str, unit_cost: float,
+                              brand: Optional[BrandProfile] = None) -> RegionSimulation: ...
 
 
 _FEATURE_KEYWORDS = {
@@ -94,29 +98,43 @@ class MockSimulationEngine:
             "source": "mock",
         }
 
-    async def simulate_region(self, card: dict, region: str, unit_cost: float) -> RegionSimulation:
+    async def simulate_region(self, card: dict, region: str, unit_cost: float,
+                              brand: Optional[BrandProfile] = None) -> RegionSimulation:
         await asyncio.sleep(self.latency_s)  # MiroFish ajan turu yerine
         persona = PERSONAS[region]
         features = card["features"]
-        rng = random.Random(_seed(card["product_name"], region))
+        rng = random.Random(_seed(card["product_name"], region, brand.name if brand else ""))
+        brand = brand or brandlib.generic_profile(None, "")
 
         fit = sum(w for f, w in persona.likes.items() if features.get(f))
         fit = max(-1.5, min(1.5, fit))
+        region_pts, pull_pts = brandlib.demand_points(brand, region)
+        noise = rng.uniform(-6, 6)
 
-        demand = 55 + fit * 22 + rng.uniform(-6, 6)
+        demand = 55 + fit * 22 + region_pts + pull_pts + noise
         demand_score = int(max(0, min(100, round(demand))))
 
+        # Fiyat merkezi: maliyet x markanın tipik çarpanı x bölgenin alım gücü faktörü.
         # Uyum fiyat algısını da kaydırır: beğenilen ürüne daha fazla ödenir.
-        center = unit_cost * persona.price_multiplier * (1 + 0.15 * fit)
+        region_factor = persona.price_multiplier / brandlib.NEUTRAL_MULTIPLE
+        center = unit_cost * brand.price_multiple * region_factor * (1 + 0.15 * fit)
+        spread, tol = brandlib.price_spread(brand), brandlib.upper_tolerance(brand)
         answers = []
         for _ in range(self.agents_per_region):
-            mid = center * rng.lognormvariate(0, 0.30)
+            mid = center * rng.lognormvariate(0, spread)
             answers.append(AgentPriceAnswer(
                 too_cheap=mid * rng.uniform(0.40, 0.55),
                 cheap=mid * rng.uniform(0.70, 0.85),
-                expensive=mid * rng.uniform(1.10, 1.30),
-                too_expensive=mid * rng.uniform(1.45, 1.75),
+                expensive=mid * rng.uniform(1.10, 1.30) * tol,
+                too_expensive=mid * rng.uniform(1.45, 1.75) * tol,
             ))
+        meta = {
+            "engine": "mock", "n_agents": self.agents_per_region, "fit_points": round(fit * 22, 1),
+            "brand_region_points": round(region_pts, 1), "brand_pull_points": round(pull_pts, 1),
+            "noise_points": round(noise, 1), "price_center": round(center, 2),
+            "region_factor": round(region_factor, 2),
+            "matched_features": [f for f, w in persona.likes.items() if features.get(f)],
+        }
 
         triggered = [
             (abs(persona.likes.get(feat, 0.3)), text)
@@ -129,4 +147,4 @@ class MockSimulationEngine:
         rng.shuffle(pool)
         objections += pool[: 3 - len(objections)]
 
-        return RegionSimulation(region, demand_score, answers, objections)
+        return RegionSimulation(region, demand_score, answers, objections, meta)

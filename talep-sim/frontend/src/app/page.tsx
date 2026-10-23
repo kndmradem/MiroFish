@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import { ImageIcon, Loader2 } from "lucide-react";
 
+import { BrandPanel, SourceBadge } from "@/components/brand-panel";
 import { VanWestendorpChart } from "@/components/price-chart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { predict, REGIONS, usd, type PredictionResponse, type RegionCode } from "@/lib/api";
+import { predict, REGIONS, TIER_LABEL, usd, type BrandProfile, type PredictionResponse, type RegionCode } from "@/lib/api";
 
 function demandTone(score: number) {
   if (score >= 70) return "text-green-600";
@@ -26,6 +27,9 @@ export default function Dashboard() {
   const [specs, setSpecs] = useState("GSM: 450g, %80 Yün %20 Polyamid, Su itici astar.");
   const [unitCost, setUnitCost] = useState("25.50");
   const [budget, setBudget] = useState("100000");
+  const [brand, setBrand] = useState("");
+  const [brandNotes, setBrandNotes] = useState("");
+  const [profile, setProfile] = useState<BrandProfile | null>(null);
   const [regions, setRegions] = useState<RegionCode[]>(["EU", "MENA", "CIS"]);
   const [image, setImage] = useState<{ name: string; dataUrl: string } | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -59,7 +63,11 @@ export default function Dashboard() {
         unit_cost: unitCost,
         total_production_budget: Math.floor(Number(budget)),
         target_regions: regions,
+        brand: brand.trim() || undefined,
+        brand_notes: brandNotes.trim() || undefined,
+        brand_profile: profile ?? undefined,
       });
+      if (res.brand_profile) setProfile(res.brand_profile);
       setResult(res);
       setChartRegion(res.regional_breakdown[0]?.region ?? null);
     } catch (err) {
@@ -105,6 +113,8 @@ export default function Dashboard() {
               <Label htmlFor="name">Ürün adı</Label>
               <Input id="name" value={productName} onChange={(e) => setProductName(e.target.value)} />
             </div>
+            <BrandPanel brand={brand} notes={brandNotes} profile={profile}
+              onBrand={setBrand} onNotes={setBrandNotes} onProfile={setProfile} />
             <div className="grid gap-2">
               <Label htmlFor="specs">Teknik detay</Label>
               <Textarea id="specs" rows={4} value={specs} onChange={(e) => setSpecs(e.target.value)}
@@ -148,6 +158,25 @@ export default function Dashboard() {
           </Card>
         ) : (
           <>
+            {result.brand_profile && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Marka profili: {result.brand_profile.name}</CardTitle>
+                  <CardDescription>
+                    {TIER_LABEL[result.brand_profile.price_tier]} segment · tipik fiyat çarpanı {result.brand_profile.price_multiple}× ·
+                    tipik marj %{result.brand_profile.margin_norm_pct} · çekim gücü {result.brand_profile.brand_pull}/100
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-3 text-sm">
+                  <SourceBadge profile={result.brand_profile} />
+                  {result.brand_profile.positioning && <p>{result.brand_profile.positioning}</p>}
+                  {result.brand_profile.typical_customer && (
+                    <p className="text-muted-foreground">Tipik müşteri: {result.brand_profile.typical_customer}</p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
               {result.regional_breakdown.map((r) => (
                 <Card key={r.region} className="gap-2 py-4">
@@ -182,6 +211,29 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>{chartRow && <VanWestendorpChart result={chartRow} />}</CardContent>
             </Card>
+
+            {chartRow && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Bu sayılar nasıl hesaplandı? ({chartRow.region})</CardTitle>
+                  <CardDescription>Bölgeyi yukarıdaki düğmelerle değiştirebilirsin.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-4">
+                  {chartRow.explanations.map((e) => (
+                    <div key={e.key} className="grid gap-1 border-b pb-3 last:border-0 last:pb-0">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="font-medium">{e.label}</span>
+                        <span className="text-lg font-semibold tabular-nums">{e.value}</span>
+                      </div>
+                      <p className="text-sm">{e.how}</p>
+                      <ul className="list-disc space-y-0.5 pl-5 text-xs text-muted-foreground">
+                        {e.assumptions.map((a) => <li key={a}>{a}</li>)}
+                      </ul>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
               <CardHeader>
@@ -239,6 +291,32 @@ export default function Dashboard() {
                 ))}
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Öneriler</CardTitle>
+                <CardDescription>
+                  Bu çalıştırmanın sayılarına ve marka profiline göre üretildi; her önerinin dayanağı yanında yazıyor.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3">
+                {result.recommendations.map((r, i) => (
+                  <div key={i} className="grid gap-1 rounded-md border p-3 text-sm">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="secondary">{r.category}</Badge>
+                      <span className="font-medium">{r.title}</span>
+                      <Badge variant="outline">{r.source === "model" ? "model önerisi" : "kural tabanlı"}</Badge>
+                    </div>
+                    <p>{r.detail}</p>
+                    {r.based_on && <p className="text-xs text-muted-foreground">Dayanak: {r.based_on}</p>}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            <ul className="list-disc space-y-1 pl-5 text-xs text-muted-foreground">
+              {result.methodology_notes.map((n) => <li key={n}>{n}</li>)}
+            </ul>
           </>
         )}
       </section>

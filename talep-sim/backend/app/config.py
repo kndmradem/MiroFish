@@ -1,7 +1,17 @@
 """Ortam değişkenlerinden okunan ayarlar. Hiçbir anahtar yoksa her şey mock çalışır."""
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Optional
+
+try:  # .env dosyaları: önce backend/.env, sonra repo kökündeki MiroFish .env (LLM_* ortak kullanılır)
+    from dotenv import load_dotenv
+
+    _here = Path(__file__).resolve()
+    load_dotenv(_here.parents[1] / ".env")
+    load_dotenv(_here.parents[3] / ".env")
+except ImportError:  # python-dotenv yoksa yalnızca süreç ortamı okunur
+    pass
 
 
 def _env(name: str, default: Optional[str] = None) -> Optional[str]:
@@ -24,6 +34,15 @@ class Settings:
     vision_api_key: Optional[str] = field(default_factory=lambda: _env("VISION_API_KEY"))
     vision_base_url: str = field(default_factory=lambda: _env("VISION_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"))
     vision_model: str = field(default_factory=lambda: _env("VISION_MODEL", "qwen-vl-plus"))
+
+    # Marka profili ve öneriler için metin LLM'i (MiroFish'in LLM_* ayarlarıyla aynı adlar)
+    llm_api_key: Optional[str] = field(default_factory=lambda: _env("LLM_API_KEY"))
+    llm_base_url: str = field(default_factory=lambda: _env("LLM_BASE_URL", "https://api.openai.com/v1"))
+    llm_model: str = field(default_factory=lambda: _env("LLM_MODEL_NAME", "gpt-4o-mini"))
+
+    @property
+    def llm_enabled(self) -> bool:
+        return bool(self.llm_api_key)
 
     @property
     def vision_enabled(self) -> bool:

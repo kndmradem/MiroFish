@@ -5,13 +5,12 @@ OpenAI uyumlu uç noktası) görseli ve metni gönderip standart bir ürün kart
 alır. Kart, mock motorun kullandığı `features` sözlüğünü de içerir; böylece
 iki motor aynı kartla çalışabilir.
 """
-import json
-import re
 from typing import Optional
 
 import httpx
 
 from ..models import PredictionRequest
+from .llm import extract_json
 from .personas import VISION_PROMPT
 
 FEATURE_KEYS = ["warmth", "waterproof", "sheen", "eco", "synthetic", "premium", "oversize", "heavy"]
@@ -27,13 +26,6 @@ _SCHEMA_HINT = (
     "eco=sürdürülebilir/geri dönüştürülmüş, synthetic=belirgin sentetik oranı, premium=lüks algısı, "
     "oversize=bol kesim, heavy=ağır/kalın kumaş."
 )
-
-
-def _extract_json(text: str) -> dict:
-    match = re.search(r"\{.*\}", text, re.S)
-    if not match:
-        raise ValueError(f"Vision modeli JSON dönmedi: {text[:200]}")
-    return json.loads(match.group(0))
 
 
 def _image_mime(b64: str) -> str:
@@ -66,7 +58,7 @@ class VisionFusion:
                   "messages": [{"role": "user", "content": content}]},
         )
         resp.raise_for_status()
-        card = _extract_json(resp.json()["choices"][0]["message"]["content"])
+        card = extract_json(resp.json()["choices"][0]["message"]["content"])
         features = card.get("features") or {}
         card["features"] = {k: bool(features.get(k, False)) for k in FEATURE_KEYS}
         card["product_name"] = req.product_name

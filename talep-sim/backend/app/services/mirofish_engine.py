@@ -16,7 +16,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Awaitable, Callable, Dict, List, Optional
 
-from ..models import PredictionRequest
+from .. import brand as brandlib
+from ..models import BrandProfile, PredictionRequest
 from ..pricing import AgentPriceAnswer
 from .engine import RegionSimulation
 from .mirofish_client import MiroFishClient, MiroFishError
@@ -25,12 +26,23 @@ from .personas import PERSONAS, SIMULATION_REQUIREMENT, build_seed_document, reg
 Fuser = Callable[[PredictionRequest], Awaitable[dict]]
 
 
-def build_interview_prompt(card: dict, region: str) -> str:
+def build_interview_prompt(card: dict, region: str, brand: Optional[BrandProfile] = None,
+                           unit_cost: Optional[float] = None) -> str:
     persona = PERSONAS[region]
     features = ", ".join(k for k, v in card.get("features", {}).items() if v) or "belirtilmemiş"
+    brand_block = ""
+    if brand is not None:
+        ref = f" Bu marka bu tür ürünleri genelde yaklaşık ${brandlib.reference_price(brand, unit_cost):.0f} civarında satar." if unit_cost else ""
+        brand_block = (
+            f"Marka: {brand.name} ({brandlib.TIER_LABEL[brand.price_tier]} segment). {brand.positioning} "
+            f"Tipik müşteri: {brand.typical_customer or '-'}.{ref} "
+            f"Markanın bu bölgedeki bilinirliği: {brandlib.region_strength(brand, region)}/100. "
+            "Ürünü ve fiyat eşiklerini bu markanın müşterisi gibi değerlendir.\n"
+        )
     return (
         f"{persona.prompt}\n\n"
         "Aşağıdaki yeni ürünü bir tüketici olarak değerlendir. Fiyatlar ABD doları.\n"
+        f"{brand_block}"
         f"Ürün: {card.get('product_name')}\n"
         f"Kumaş: {card.get('fabric_texture', '-')}; bileşim: {card.get('composition', '-')}; "
         f"gramaj: {card.get('gsm') or '-'}\n"
@@ -127,13 +139,14 @@ class MiroFishSimulationEngine:
         return {"project_id": project_id, "simulation_id": simulation_id, "agents": agents}
 
     # --- bölge simülasyonu ----------------------------------------------
-    async def simulate_region(self, card: dict, region: str, unit_cost: float) -> RegionSimulation:
+    async def simulate_region(self, card: dict, region: str, unit_cost: float,
+                              brand: Optional[BrandProfile] = None) -> RegionSimulation:
         world = await self._ensure_world()
         agent_ids = world["agents"].get(region, [])
         if not agent_ids:
             raise MiroFishError(f"{region} bölgesi için ajan bulunamadı")
 
-        prompt = build_interview_prompt(card, region)
+        prompt = build_interview_prompt(card, region, brand, unit_cost)
         parsed: Dict[int, dict] = {}
         pending = list(agent_ids)
         # Küçük/yerel modeller JSON'u bozabilir: geçersiz cevap veren ajanlara bir kez daha sor.
@@ -156,4 +169,6 @@ class MiroFishSimulationEngine:
         demand = round(sum(a["interest"] for a in parsed) / len(parsed))
         counts = Counter(a["objection"] for a in parsed if a["objection"])
         objections = [o for o, _ in counts.most_common(3)]
-        return RegionSimulation(region, demand, answers, objections)
+        meta = {"engine": "mirofish", "n_agents": len(agent_ids), "n_valid": len(parsed),
+                "mean_interest": demand, "objection_counts": counts.most_common(3)}
+        return RegionSimulation(region, demand, answers, objections, meta)

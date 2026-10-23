@@ -3,7 +3,7 @@ from decimal import Decimal
 from fastapi.testclient import TestClient
 
 from app.allocation import RegionSignal, allocate_production_budget
-from app.main import _engine, app
+from app.main import app
 
 
 def test_weighted_allocation_matches_spec_formula():
@@ -35,7 +35,6 @@ def test_all_unprofitable_returns_zero():
 
 
 def test_predict_endpoint_end_to_end():
-    _engine.latency_s = 0
     client = TestClient(app)
     body = {
         "product_name": "Kışlık Oversize Yün Kaban",
