@@ -31,6 +31,8 @@ class Settings:
     mirofish_interview_timeout: int = field(default_factory=lambda: int(_env("MIROFISH_INTERVIEW_TIMEOUT", "180")))
     # Yavaş yerel model için: grup başına ajan sayısı, zaman aşımında yeniden deneme,
     # aynı anda kaç bölge, bir bölge için gereken en az geçerli ajan cevabı
+    # Dünya kurma çağrıları (ontoloji, grafik, hazırlık) için saniye cinsinden okuma zaman aşımı
+    mirofish_build_timeout: int = field(default_factory=lambda: int(_env("MIROFISH_BUILD_TIMEOUT", "3600")))
     mirofish_batch_size: int = field(default_factory=lambda: int(_env("MIROFISH_BATCH_SIZE", "3")))
     mirofish_timeout_retries: int = field(default_factory=lambda: int(_env("MIROFISH_TIMEOUT_RETRIES", "1")))
     mirofish_concurrency: int = field(default_factory=lambda: int(_env("MIROFISH_CONCURRENCY", "1")))

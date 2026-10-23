@@ -102,6 +102,8 @@ MiroFish simülasyonu LLM tüketir; `MIROFISH_MAX_ROUNDS` düşük tutuldu.
 `MIROFISH_BATCH_SIZE` (varsayılan 3) kişilik gruplarla röportaj edilir; zaman aşımına uğrayan grup
 `MIROFISH_TIMEOUT_RETRIES` kez yeniden denenir, sonra atlanır. Bir bölge için en az `MIROFISH_MIN_VALID` ajan cevabı
 yoksa o bölge `failed_regions` içinde nedeniyle birlikte döner; diğer bölgeler ve bütçe dağıtımı yine üretilir.
+**Dünya kurulumu yavaş.** İlk çalıştırmada ontoloji, grafik ve ajan profilleri üretilir (yerel Qwen ile 10-30 dk). Bu çağrılar `MIROFISH_BUILD_TIMEOUT` (varsayılan 3600 sn) ile beklenir ve arayüz hangi adımda olduğunu gösterir. Zaman aşımı alırsan Ollama'nın önceki isteği hâlâ işliyor olabilir: `ollama ps` ile bak, bitmesini bekle. MiroFish'in kendi LLM çağrıları OpenAI SDK varsayılanını (600 sn, 2 yeniden deneme) kullanır; ayarlayan bir ortam değişkeni yoktur.
+
 **Bölge seçimi katıdır.** MiroFish dünyası yalnızca seçili bölgelerin tüketici panelleriyle kurulur (seed doküman, Zep grafiği, ajan profilleri, röportajlar); seçilmeyen bölge hiç dahil olmaz. Her bölge kombinasyonu için ayrı dünya kaydedilir (`.mirofish_world.json`), ilk kez seçilen kombinasyon dünyayı kurar, sonrakiler yeniden kullanır. Bütçe dağıtımı da yalnızca seçili (ve hesaplanan) bölgeler arasındadır.
 
 Arayüz `POST /api/predict/stream` (NDJSON) ile hangi bölgenin değerlendirildiğini canlı gösterir.

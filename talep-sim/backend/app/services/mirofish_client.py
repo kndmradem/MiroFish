@@ -30,14 +30,18 @@ _TIMEOUT_HINTS = ("timeout", "timed out", "超时")
 
 
 class MiroFishClient:
-    def __init__(self, base_url: str, client: Optional[httpx.AsyncClient] = None):
+    def __init__(self, base_url: str, client: Optional[httpx.AsyncClient] = None, build_timeout: float = 1800):
+        # Dünya kurma çağrıları (ontoloji üretimi vb.) yerel modelde onlarca dakika sürebilir: ayrı, uzun timeout.
+        self.build_timeout = build_timeout
         self.client = client or httpx.AsyncClient(base_url=base_url.rstrip("/"), timeout=300)
 
     async def _call(self, method: str, path: str, **kwargs) -> Dict[str, Any]:
         try:
             resp = await self.client.request(method, path, **kwargs)
         except httpx.TimeoutException as e:
-            raise MiroFishTimeout(f"MiroFish yanıt vermedi ({path}): {type(e).__name__}: {e}") from e
+            raise MiroFishTimeout(
+                f"MiroFish yanıt vermedi ({path}): {type(e).__name__}: {e or 'zaman aşımı'}. "
+                "Model hâlâ önceki isteği işliyor olabilir; terminalde `ollama ps` ile kontrol et.") from e
         except httpx.HTTPError as e:
             raise MiroFishError(f"MiroFish'e ulaşılamadı ({path}): {type(e).__name__}: {e}") from e
         try:
@@ -56,11 +60,12 @@ class MiroFishClient:
             "POST", "/api/graph/ontology/generate",
             files={"files": (filename, document.encode(), "text/markdown")},
             data={"simulation_requirement": requirement, "project_name": project_name},
+            timeout=self.build_timeout,
         )
         return data["project_id"]
 
     async def build_graph(self, project_id: str) -> str:
-        data = await self._call("POST", "/api/graph/build", json={"project_id": project_id})
+        data = await self._call("POST", "/api/graph/build", json={"project_id": project_id}, timeout=self.build_timeout)
         return data["task_id"]
 
     async def wait_graph_task(self, task_id: str, poll_s: float = 5, timeout_s: float = 1800) -> Dict[str, Any]:
@@ -78,11 +83,12 @@ class MiroFishClient:
 
     async def create_simulation(self, project_id: str) -> str:
         data = await self._call("POST", "/api/simulation/create", json={
-            "project_id": project_id, "enable_twitter": False, "enable_reddit": True})
+            "project_id": project_id, "enable_twitter": False, "enable_reddit": True}, timeout=self.build_timeout)
         return data["simulation_id"]
 
     async def prepare(self, simulation_id: str) -> Optional[str]:
-        data = await self._call("POST", "/api/simulation/prepare", json={"simulation_id": simulation_id})
+        data = await self._call("POST", "/api/simulation/prepare", json={"simulation_id": simulation_id},
+                                timeout=self.build_timeout)
         return None if data.get("already_prepared") else data.get("task_id")
 
     async def wait_prepared(self, simulation_id: str, task_id: Optional[str], poll_s: float = 5, timeout_s: float = 1800) -> None:
@@ -103,7 +109,8 @@ class MiroFishClient:
 
     async def start(self, simulation_id: str, max_rounds: int) -> None:
         await self._call("POST", "/api/simulation/start", json={
-            "simulation_id": simulation_id, "platform": "reddit", "max_rounds": max_rounds})
+            "simulation_id": simulation_id, "platform": "reddit", "max_rounds": max_rounds},
+            timeout=self.build_timeout)
 
     async def env_alive(self, simulation_id: str) -> bool:
         data = await self._call("POST", "/api/simulation/env-status", json={"simulation_id": simulation_id})

@@ -44,10 +44,10 @@ def build_engine(cfg: Settings) -> SimulationEngine:
     if cfg.vision_enabled:
         fuser = VisionFusion(cfg.vision_api_key, cfg.vision_base_url, cfg.vision_model).fuse_product_card
     return MiroFishSimulationEngine(
-        MiroFishClient(cfg.mirofish_url), fuser, cfg.mirofish_state_file,
+        MiroFishClient(cfg.mirofish_url, build_timeout=cfg.mirofish_build_timeout), fuser, cfg.mirofish_state_file,
         max_rounds=cfg.mirofish_max_rounds, interview_timeout=cfg.mirofish_interview_timeout,
         batch_size=cfg.mirofish_batch_size, timeout_retries=cfg.mirofish_timeout_retries,
-        max_concurrency=cfg.mirofish_concurrency, min_valid=cfg.mirofish_min_valid,
+        max_concurrency=cfg.mirofish_concurrency, env_wait_s=cfg.mirofish_build_timeout, min_valid=cfg.mirofish_min_valid,
     )
 
 

@@ -92,7 +92,7 @@ def parse_agent_answer(text: str) -> Optional[dict]:
 class MiroFishSimulationEngine:
     def __init__(self, client: MiroFishClient, fuser: Fuser, state_file: str,
                  max_rounds: int = 3, interview_timeout: int = 180,
-                 poll_s: float = 5, env_wait_s: float = 600, retries: int = 1,
+                 poll_s: float = 5, env_wait_s: float = 3600, retries: int = 1,
                  batch_size: int = 3, timeout_retries: int = 1, max_concurrency: int = 1,
                  min_valid: int = 2):
         self.client = client
@@ -116,7 +116,8 @@ class MiroFishSimulationEngine:
         return await self.fuser(req)
 
     # --- dünya kurulumu -------------------------------------------------
-    async def _ensure_world(self, scope: Optional[Sequence[str]] = None) -> dict:
+    async def _ensure_world(self, scope: Optional[Sequence[str]] = None,
+                            progress: Optional[Progress] = None) -> dict:
         """Seçili bölgelere özel dünya: yalnızca o bölgelerin tüketicileri kurulur ve kaydedilir."""
         regions = scope_of(scope)
         key = seed_hash(regions)
@@ -130,7 +131,7 @@ class MiroFishSimulationEngine:
             world = self._worlds.get(key)
             if world is not None and await self._world_alive(world):
                 return world
-            world = await self._build_world(regions)
+            world = await self._build_world(regions, progress)
             self._worlds[key] = world
             self.state_path.write_text(json.dumps(self._worlds))
             return world
@@ -141,13 +142,26 @@ class MiroFishSimulationEngine:
         except MiroFishError:
             return False
 
-    async def _build_world(self, regions: List[str]) -> dict:
+    async def _build_world(self, regions: List[str], progress: Optional[Progress] = None) -> dict:
         c = self.client
+        started = asyncio.get_running_loop().time()
+
+        async def step(n: int, text: str) -> None:
+            if progress:
+                mins = int((asyncio.get_running_loop().time() - started) // 60)
+                await progress({"stage": "world", "detail": (
+                    f"Dünya kuruluyor ({', '.join(regions)}), adım {n}/6: {text}. "
+                    f"İlk seferde yerel modelle 10-30 dk sürebilir (geçen: {mins} dk)")})
+
+        await step(1, "ontoloji üretiliyor")
         project_id = await c.generate_ontology(
             "tuketici_panelleri.md", build_seed_document(regions), simulation_requirement(regions), "talep-simulasyonu")
-        await c.wait_graph_task(await c.build_graph(project_id), poll_s=self.poll_s)
+        await step(2, "bilgi grafiği kuruluyor")
+        await c.wait_graph_task(await c.build_graph(project_id), poll_s=self.poll_s, timeout_s=self.env_wait_s)
+        await step(3, "simülasyon oluşturuluyor")
         simulation_id = await c.create_simulation(project_id)
-        await c.wait_prepared(simulation_id, await c.prepare(simulation_id), poll_s=self.poll_s)
+        await step(4, "ajan profilleri üretiliyor")
+        await c.wait_prepared(simulation_id, await c.prepare(simulation_id), poll_s=self.poll_s, timeout_s=self.env_wait_s)
 
         profiles = await c.profiles(simulation_id)
         agents: Dict[str, List[int]] = {r: [] for r in regions}
@@ -159,9 +173,11 @@ class MiroFishSimulationEngine:
         if not any(agents.values()):
             raise MiroFishError("Hiçbir ajan bir bölgeye eşlenemedi; seed doküman ve profilleri kontrol et")
 
+        await step(5, "simülasyon turları çalışıyor")
         await c.start(simulation_id, self.max_rounds)
         loop = asyncio.get_running_loop()
         deadline = loop.time() + self.env_wait_s
+        await step(6, "ortamın röportaja hazır olması bekleniyor")
         while not await c.env_alive(simulation_id):
             if loop.time() > deadline:
                 raise MiroFishError("Simülasyon ortamı röportaja hazır hale gelmedi")
@@ -189,7 +205,7 @@ class MiroFishSimulationEngine:
                 await progress({"stage": "interview", "region": region, "detail": detail})
 
         await note("Simülasyon dünyası hazırlanıyor")
-        world = await self._ensure_world(scope or [region])
+        world = await self._ensure_world(scope or [region], progress)
         agent_ids = world["agents"].get(region, [])
         if not agent_ids:
             raise RegionUnavailable(f"{region} bölgesi için ajan bulunamadı")

@@ -203,3 +203,26 @@ async def test_different_selection_builds_separate_world(tmp_path):
     assert fake.calls.count("/api/graph/ontology/generate") == 2
     await engine.simulate_region(card, "EU", 25.0, scope=["US", "EU"])  # sıra önemsiz, yeniden kurulmaz
     assert fake.calls.count("/api/graph/ontology/generate") == 2
+
+
+async def test_world_build_reports_progress_and_uses_long_timeout(tmp_path):
+    fake = FakeMiroFish()
+    engine = make_engine(tmp_path, fake)
+    card = await engine.fuse_product_card(REQ)
+    events = []
+
+    async def progress(ev):
+        events.append(ev)
+
+    await engine.simulate_region(card, "TR", 25.0, scope=["TR"], progress=progress)
+    world = [e["detail"] for e in events if e["stage"] == "world"]
+    assert len(world) == 6 and "10-30 dk" in world[0] and "TR" in world[0]
+    assert engine.client.build_timeout >= 1800
+
+
+async def test_ontology_read_timeout_is_clear_error(tmp_path):
+    def handler(request):
+        raise httpx.ReadTimeout("")
+    client = MiroFishClient("http://mf", httpx.AsyncClient(base_url="http://mf", transport=httpx.MockTransport(handler)))
+    with pytest.raises(MiroFishError, match="ollama ps"):
+        await client.generate_ontology("a.md", "x", "y", "z")
