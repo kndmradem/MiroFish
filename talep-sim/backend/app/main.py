@@ -43,11 +43,15 @@ def build_engine(cfg: Settings) -> SimulationEngine:
     fuser = mock.fuse_product_card
     if cfg.vision_enabled:
         fuser = VisionFusion(cfg.vision_api_key, cfg.vision_base_url, cfg.vision_model).fuse_product_card
+    extractor = None
+    if cfg.llm_enabled:  # ajan serbest metni, yerel/uzak LLM ile alanlara çevrilir
+        from .services.answer_extractor import AnswerExtractor
+        extractor = AnswerExtractor(LLMClient(cfg.llm_api_key, cfg.llm_base_url, cfg.llm_model))
     return MiroFishSimulationEngine(
         MiroFishClient(cfg.mirofish_url, build_timeout=cfg.mirofish_build_timeout), fuser, cfg.mirofish_state_file,
         max_rounds=cfg.mirofish_max_rounds, interview_timeout=cfg.mirofish_interview_timeout,
         batch_size=cfg.mirofish_batch_size, timeout_retries=cfg.mirofish_timeout_retries,
-        max_concurrency=cfg.mirofish_concurrency, env_wait_s=cfg.mirofish_build_timeout, min_valid=cfg.mirofish_min_valid,
+        max_concurrency=cfg.mirofish_concurrency, env_wait_s=cfg.mirofish_build_timeout, min_valid=cfg.mirofish_min_valid, extractor=extractor,
     )
 
 
@@ -117,7 +121,7 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
                 done += 1
                 reason = f"{type(e).__name__}: {e}"
                 await emit({"stage": "region_failed", "region": region, "done": done, "total": total, "detail": reason})
-                return FailedRegion(region=region, reason=reason)
+                return FailedRegion(region=region, reason=reason, raw_answers=getattr(e, "raw_answers", []))
             done += 1
             await emit({"stage": "region_done", "region": region, "done": done, "total": total,
                         "detail": f"{region} tamamlandı"})
@@ -155,6 +159,7 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
             estimated_margin_percentage=round(margin, 1),
             key_objections=sim.objections,
             van_westendorp=vw,
+            raw_answers=sim.meta.get("raw_answers", []),
             explanations=explain_region(sim, vw, best, unit_cost, alloc, total_weight,
                                         req.total_production_budget, brand, fx_rate),
             **local,

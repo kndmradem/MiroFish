@@ -32,6 +32,12 @@ def _demand(sim: RegionSimulation, region: str, brand: Optional[BrandProfile]) -
                f"cevap geldi. Talep endeksi bu ajanların 0-100 arası ilgi puanlarının ortalamasıdır ({m['mean_interest']}).")
         assumptions = ["Ajanlar bir dil modelinin canlandırdığı sentetik tüketicilerdir, gerçek satış verisi değildir.",
                        "Sonuç modelin kalitesine bağlıdır; küçük yerel modeller tutarsız puan verebilir."]
+        if m.get("n_extracted"):
+            assumptions.append(
+                f"{m['n_extracted']} ajan serbest metinle cevap verdi; ilgi ve fiyat eşikleri ayrı bir dil modeli çağrısıyla "
+                "bu metinlerden çıkarıldı (ham cevaplar 'Ham ajan cevapları' bölümünde).")
+        if m.get("n_estimated"):
+            assumptions.append(f"{m['n_estimated']} cevapta bazı fiyat eşikleri açıkça yazmıyordu, metnin tonundan tahmin edildi.")
         if m["n_valid"] < m["n_agents"]:
             assumptions.append(
                 f"{m['n_agents'] - m['n_valid']} ajan zaman aşımı ya da bozuk cevap yüzünden hesaba katılmadı; "

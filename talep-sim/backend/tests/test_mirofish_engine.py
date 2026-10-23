@@ -7,6 +7,8 @@ from app.models import PredictionRequest
 from app.pricing import analyze
 from app.services.engine import MockSimulationEngine
 from app.services.mirofish_client import MiroFishClient, MiroFishError
+from app.services.answer_extractor import AnswerExtractor
+from app.services.llm import LLMClient
 from app.services.mirofish_engine import MiroFishSimulationEngine, RegionUnavailable, parse_agent_answer
 from app.services.personas import SEED_CONSUMERS, build_seed_document, region_of
 
@@ -14,12 +16,11 @@ from app.services.personas import SEED_CONSUMERS, build_seed_document, region_of
 def test_parse_agent_answer_accepts_wrapped_json():
     text = 'Tabii: {"interest": 80, "too_cheap": 20, "cheap": 40, "expensive": 80, "too_expensive": 120, "objection": "Kalın"} bu kadar.'
     a = parse_agent_answer(text)
-    assert a == {"interest": 80.0, "prices": [20.0, 40.0, 80.0, 120.0], "objection": "Kalın"}
+    assert a == {"interest": 80.0, "prices": [20.0, 40.0, 80.0, 120.0], "objection": "Kalın", "estimated": False}
 
 
 @pytest.mark.parametrize("text", [
     "", "no json",
-    '{"interest": 50, "too_cheap": 90, "cheap": 40, "expensive": 80, "too_expensive": 120}',  # sırasız
     '{"interest": 50, "cheap": 40}',  # eksik
 ])
 def test_parse_agent_answer_rejects_bad(text):
@@ -43,6 +44,7 @@ class FakeMiroFish:
         self.interview_calls = 0
         self.calls = []
         self.bad_json = bad_json
+        self.reply_text = None  # verilirse tüm ajanlar bu serbest metni söyler
         self.started = False
         names = [(i, p.split(",")[0]) for i, p in enumerate(p for ps in SEED_CONSUMERS.values() for p in ps)]
         self.profiles = [{"user_id": i, "name": n, "bio": "", "persona": ""} for i, n in names]
@@ -77,7 +79,7 @@ class FakeMiroFish:
             if self.always_timeout or self.interview_calls in self.timeout_calls:
                 return httpx.Response(504, json={"success": False, "error": "等待IPC响应超时"})
             broken = self.bad_json or (self.fail_first and self.interview_calls == 1)
-            reply = "bozuk" if broken else json.dumps({
+            reply = self.reply_text or "bozuk" if broken or self.reply_text else json.dumps({
                 "interest": 70, "too_cheap": 30, "cheap": 55, "expensive": 90, "too_expensive": 130,
                 "objection": "Kumaş kalın"})
             return ok({"result": {"results": {
@@ -226,3 +228,69 @@ async def test_ontology_read_timeout_is_clear_error(tmp_path):
     client = MiroFishClient("http://mf", httpx.AsyncClient(base_url="http://mf", transport=httpx.MockTransport(handler)))
     with pytest.raises(MiroFishError, match="ollama ps"):
         await client.generate_ontology("a.md", "x", "y", "z")
+
+
+def fenced(obj):
+    return "Harika bir ürün!\n```json\n" + json.dumps(obj) + "\n```\nUmarım yardımcı olmuştur."
+
+
+def test_parse_handles_code_fences_and_unordered_prices():
+    a = parse_agent_answer(fenced({"interest": 60, "too_cheap": 90, "cheap": 40, "expensive": 80, "too_expensive": 120}))
+    assert a["prices"] == [40.0, 80.0, 90.0, 120.0]
+
+
+class FakeLLM:
+    """Ollama sohbet uç noktası: extractor'ın istediği JSON'u döner."""
+
+    def __init__(self, reply):
+        self.calls = 0
+        self.reply = reply
+
+    def handler(self, request):
+        self.calls += 1
+        return httpx.Response(200, json={"choices": [{"message": {"content": self.reply}}]})
+
+
+def make_extractor(reply):
+    llm = FakeLLM(reply)
+    client = LLMClient("k", "http://llm/v1", "qwen", httpx.AsyncClient(transport=httpx.MockTransport(llm.handler)))
+    return AnswerExtractor(client), llm
+
+
+FREE_TEXT = "Bence bu kaban güzel ama biraz pahalı. 60 dolara alırdım, 120 dolardan fazlasına asla."
+
+
+async def test_free_text_answers_are_extracted_by_llm(tmp_path):
+    fake = FakeMiroFish()
+    fake.reply_text = FREE_TEXT
+    ext, llm = make_extractor(json.dumps({"interest": 55, "too_cheap": 20, "cheap": 45, "expensive": 80,
+                                          "too_expensive": 120, "objection": "Pahalı", "estimated": True}))
+    engine = make_engine(tmp_path, fake, extractor=ext)
+    card = await engine.fuse_product_card(REQ)
+    sim = await engine.simulate_region(card, "EU", 25.0)
+    assert llm.calls == 5 and sim.meta["n_valid"] == 5 and sim.meta["n_extracted"] == 5
+    assert sim.meta["n_estimated"] == 5 and sim.objections == ["Pahalı"]
+    raw = sim.meta["raw_answers"]
+    assert raw[0]["status"] == "extracted" and FREE_TEXT in raw[0]["text"]
+    saved = (tmp_path / "world.json.answers.jsonl").read_text().splitlines()
+    assert len(saved) == 5 and json.loads(saved[0])["region"] == "EU"
+
+
+async def test_extraction_failure_error_includes_raw_snippet(tmp_path):
+    fake = FakeMiroFish()
+    fake.reply_text = FREE_TEXT
+    ext, _ = make_extractor("{}")  # geçersiz çıkarım
+    engine = make_engine(tmp_path, fake, extractor=ext, retries=0)
+    card = await engine.fuse_product_card(REQ)
+    with pytest.raises(RegionUnavailable, match="Örnek ham cevap") as exc:
+        await engine.simulate_region(card, "EU", 25.0)
+    assert FREE_TEXT[:30] in str(exc.value) and exc.value.raw_answers[0]["status"] == "failed"
+
+
+async def test_free_text_without_llm_fails_clearly(tmp_path):
+    fake = FakeMiroFish()
+    fake.reply_text = FREE_TEXT
+    engine = make_engine(tmp_path, fake, retries=0)
+    card = await engine.fuse_product_card(REQ)
+    with pytest.raises(RegionUnavailable, match="çıkarılamadı"):
+        await engine.simulate_region(card, "EU", 25.0)

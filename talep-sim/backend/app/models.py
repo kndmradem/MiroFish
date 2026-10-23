@@ -87,6 +87,13 @@ class VanWestendorpResult(BaseModel):
     curve: List[PricePoint]
 
 
+class RawAnswer(BaseModel):
+    agent: int
+    status: str = Field(..., description="json | extracted | failed | empty")
+    text: str = Field("", description="Ajanın ham cevabı (kısaltılmış)")
+    interest: Optional[float] = None
+
+
 # --- Çıktı (Response) Modeli ---
 class RegionPredictionResult(BaseModel):
     region: str
@@ -98,6 +105,7 @@ class RegionPredictionResult(BaseModel):
     key_objections: List[str] = Field(..., description="Ajanlardan gelen top 3 eleştiri")
     van_westendorp: VanWestendorpResult
     explanations: List[Explanation] = []
+    raw_answers: List[RawAnswer] = Field([], description="Ajanların ham cevapları ve nasıl çözümlendikleri (MiroFish motoru)")
     local_currency: Optional[str] = Field(None, description="Bölgenin yerel para birimi (yalnızca TL gösterilen bölgelerde)")
     local_price: Optional[Decimal] = Field(None, description="Önerilen fiyatın yerel para karşılığı")
     fx_rate: Optional[float] = Field(None, description="Kullanılan kur: 1 USD = fx_rate yerel para")
@@ -106,6 +114,7 @@ class RegionPredictionResult(BaseModel):
 class FailedRegion(BaseModel):
     region: str
     reason: str = Field(..., description="Bölgenin neden hesaplanamadığı (ör. model zaman aşımı)")
+    raw_answers: List[RawAnswer] = []
 
 
 class PredictionResponse(BaseModel):

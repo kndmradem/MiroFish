@@ -86,9 +86,17 @@ export interface RegionPredictionResult {
   key_objections: string[];
   van_westendorp: VanWestendorpResult;
   explanations: Explanation[];
+  raw_answers?: RawAnswer[];
   local_currency?: string | null;
   local_price?: string | null;
   fx_rate?: number | null;
+}
+
+export interface RawAnswer {
+  agent: number;
+  status: "json" | "extracted" | "failed" | "empty";
+  text: string;
+  interest?: number | null;
 }
 
 export interface PredictionResponse {
@@ -103,7 +111,7 @@ export interface PredictionResponse {
   methodology_notes: string[];
   regional_breakdown: RegionPredictionResult[];
   /** Zaman aşımı vb. yüzünden hesaplanamayan bölgeler; diğer bölgeler yine de gösterilir. */
-  failed_regions: { region: string; reason: string }[];
+  failed_regions: { region: string; reason: string; raw_answers?: RawAnswer[] }[];
   /** Eski bir API sürümü açıklama/öneri alanlarını göndermediyse true (istemci tarafında eklenir). */
   api_outdated?: boolean;
 }

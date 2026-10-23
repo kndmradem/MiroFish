@@ -5,6 +5,7 @@ import { ImageIcon, Loader2 } from "lucide-react";
 
 import { BrandPanel, SourceBadge } from "@/components/brand-panel";
 import { applyProgress, ProgressPanel, type ProgressState, type RegionStatus } from "@/components/progress-panel";
+import { RawAnswers } from "@/components/raw-answers";
 import { VanWestendorpChart } from "@/components/price-chart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -358,6 +359,11 @@ export default function Dashboard() {
               </CardContent>
             </Card>
             )}
+
+            <RawAnswers groups={[
+              ...result.regional_breakdown.map((r) => ({ region: r.region, answers: r.raw_answers ?? [] })),
+              ...result.failed_regions.map((f) => ({ region: `${f.region} (hesaplanamadı)`, answers: f.raw_answers ?? [] })),
+            ]} />
 
             <ul className="list-disc space-y-1 pl-5 text-xs text-muted-foreground">
               {(result.methodology_notes ?? []).map((n) => <li key={n}>{n}</li>)}

@@ -11,7 +11,7 @@ Akış:
 """
 import asyncio
 import json
-import re
+import logging
 from collections import Counter
 from pathlib import Path
 from typing import Awaitable, Callable, Dict, List, Optional, Sequence
@@ -20,16 +20,23 @@ from .. import brand as brandlib
 from .. import economy
 from ..models import BrandProfile, PredictionRequest
 from ..pricing import AgentPriceAnswer
+from .answer_extractor import AnswerExtractor, parse_agent_answer
 from .engine import RegionSimulation
 from .mirofish_client import MiroFishClient, MiroFishError, MiroFishTimeout
 from .personas import PERSONAS, build_seed_document, region_of, scope_of, seed_hash, simulation_requirement
 
 Fuser = Callable[[PredictionRequest], Awaitable[dict]]
 Progress = Callable[[dict], Awaitable[None]]
+log = logging.getLogger(__name__)
+RAW_CHARS = 1500
 
 
 class RegionUnavailable(MiroFishError):
     """Bölge için yeterli ajan cevabı alınamadı (genellikle yavaş model); diğer bölgeler etkilenmez."""
+
+    def __init__(self, message: str, raw_answers: Optional[List[dict]] = None):
+        super().__init__(message)
+        self.raw_answers = raw_answers or []
 
 
 def build_interview_prompt(card: dict, region: str, brand: Optional[BrandProfile] = None,
@@ -73,28 +80,12 @@ def build_interview_prompt(card: dict, region: str, brand: Optional[BrandProfile
     )
 
 
-def parse_agent_answer(text: str) -> Optional[dict]:
-    """Ajan cevabından JSON çıkarır; tutarsız ya da eksik cevap None döner."""
-    match = re.search(r"\{.*\}", text or "", re.S)
-    if not match:
-        return None
-    try:
-        raw = json.loads(match.group(0))
-        vals = [float(raw[k]) for k in ("too_cheap", "cheap", "expensive", "too_expensive")]
-        interest = max(0.0, min(100.0, float(raw["interest"])))
-    except (ValueError, KeyError, TypeError):
-        return None
-    if not all(0 < a < b for a, b in zip(vals, vals[1:])) or vals[0] <= 0:
-        return None
-    return {"interest": interest, "prices": vals, "objection": str(raw.get("objection", "")).strip()}
-
-
 class MiroFishSimulationEngine:
     def __init__(self, client: MiroFishClient, fuser: Fuser, state_file: str,
                  max_rounds: int = 3, interview_timeout: int = 180,
                  poll_s: float = 5, env_wait_s: float = 3600, retries: int = 1,
                  batch_size: int = 3, timeout_retries: int = 1, max_concurrency: int = 1,
-                 min_valid: int = 2):
+                 min_valid: int = 2, extractor: Optional[AnswerExtractor] = None):
         self.client = client
         self.fuser = fuser
         self.state_path = Path(state_file)
@@ -109,6 +100,7 @@ class MiroFishSimulationEngine:
         self.timeout_retries = max(0, timeout_retries)
         self.max_concurrency = max(1, max_concurrency)
         self.min_valid = max(1, min_valid)
+        self.extractor = extractor
         self._worlds: Optional[Dict[str, dict]] = None
         self._lock = asyncio.Lock()
 
@@ -185,6 +177,30 @@ class MiroFishSimulationEngine:
         return {"project_id": project_id, "simulation_id": simulation_id, "agents": agents, "seed_hash": seed_hash(regions), "regions": regions}
 
     # --- bölge simülasyonu ----------------------------------------------
+    async def _understand(self, text: str, currency_note: str):
+        """(cevap, durum): önce hoşgörülü JSON ayrıştırma, olmazsa LLM ile çıkarım."""
+        if not (text or "").strip():
+            return None, "empty"
+        if (answer := parse_agent_answer(text)) is not None:
+            return answer, "json"
+        if self.extractor is not None:
+            if (answer := await self.extractor.extract(text, currency_note)) is not None:
+                return answer, "extracted"
+            return None, "failed"
+        return None, "failed"
+
+    def _persist(self, region: str, raw_answers: List[dict]) -> None:
+        """Hata ayıklama için ham cevapları (kısaltılmış) diske ve loga yazar."""
+        path = self.state_path.with_name(self.state_path.name + ".answers.jsonl")
+        try:
+            with path.open("a", encoding="utf-8") as f:
+                for r in raw_answers:
+                    f.write(json.dumps({"region": region, **r}, ensure_ascii=False) + "\n")
+        except OSError as e:
+            log.warning("Ham cevaplar yazılamadı: %s", e)
+        for r in raw_answers:
+            log.info("%s ajan %s [%s]: %s", region, r["agent"], r["status"], r["text"][:200].replace("\n", " "))
+
     async def _interview_chunk(self, simulation_id: str, chunk: List[int], prompt: str) -> Dict[int, str]:
         """Bir grubu röportaj eder; zaman aşımında aynı grubu yeniden dener, hâlâ olmazsa MiroFishTimeout fırlatır."""
         for attempt in range(1 + self.timeout_retries):
@@ -212,6 +228,11 @@ class MiroFishSimulationEngine:
 
         prompt = build_interview_prompt(card, region, brand, unit_cost, fx_rates)
         parsed: Dict[int, dict] = {}
+        raw: Dict[int, dict] = {}
+        eco = economy.REGION_ECONOMY.get(region)
+        rate = (fx_rates or {}).get(eco.currency) if eco else None
+        currency_note = (f"Cevaptaki fiyatlar {eco.currency} ise USD'ye çevir (1 USD = {rate:g} {eco.currency})."
+                         if eco and rate else "")
         timed_out = 0
         stuck = False
         # Küçük/yerel modeller JSON'u bozabilir: geçersiz cevap verenleri bir kez daha sor.
@@ -235,22 +256,31 @@ class MiroFishSimulationEngine:
                     continue
                 consecutive_timeouts = 0
                 for agent_id, text in responses.items():
-                    answer = parse_agent_answer(text)
+                    await note(f"Ajan {agent_id} cevabı çözümleniyor")
+                    answer, how = await self._understand(text, currency_note)
+                    raw[agent_id] = {"agent": agent_id, "status": how, "text": (text or "")[:RAW_CHARS]}
                     if answer:
                         parsed[agent_id] = answer
+                        raw[agent_id]["interest"] = answer["interest"]
         valid = list(parsed.values())
+        raw_answers = list(raw.values())
+        self._persist(region, raw_answers)
         need = min(self.min_valid, len(agent_ids))
         if len(valid) < need:
-            reason = "model zaman aşımına uğradı" if timed_out else "ajan cevapları geçerli JSON değildi"
+            reason = "model zaman aşımına uğradı" if timed_out else "ajan cevaplarından fiyat/ilgi bilgisi çıkarılamadı"
+            snippet = next((r["text"] for r in raw_answers if r["text"]), "")[:200].replace("\n", " ")
+            hint = f" Örnek ham cevap: «{snippet}»" if snippet else ""
             raise RegionUnavailable(
                 f"{region}: {len(agent_ids)} ajandan yalnızca {len(valid)} geçerli cevap alınabildi "
-                f"({reason}; en az {need} gerekli)")
+                f"({reason}; en az {need} gerekli).{hint}", raw_answers)
 
         answers = [AgentPriceAnswer(*a["prices"]) for a in valid]
         demand = round(sum(a["interest"] for a in valid) / len(valid))
         counts = Counter(a["objection"] for a in valid if a["objection"])
         objections = [o for o, _ in counts.most_common(3)]
         meta = {"engine": "mirofish", "n_agents": len(agent_ids), "n_valid": len(valid),
-                "n_timed_out": timed_out, "mean_interest": demand,
+                "n_timed_out": timed_out, "n_extracted": sum(r["status"] == "extracted" for r in raw_answers),
+                "n_estimated": sum(1 for a in valid if a.get("estimated")), "raw_answers": raw_answers,
+                "mean_interest": demand,
                 "objection_counts": counts.most_common(3)}
         return RegionSimulation(region, demand, answers, objections, meta)
