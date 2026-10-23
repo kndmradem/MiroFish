@@ -1,0 +1,247 @@
+"use client";
+
+import { useCallback, useState } from "react";
+import { ImageIcon, Loader2 } from "lucide-react";
+
+import { VanWestendorpChart } from "@/components/price-chart";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import { predict, REGIONS, usd, type PredictionResponse, type RegionCode } from "@/lib/api";
+
+function demandTone(score: number) {
+  if (score >= 70) return "text-green-600";
+  if (score >= 40) return "text-amber-600";
+  return "text-red-600";
+}
+
+export default function Dashboard() {
+  const [productName, setProductName] = useState("Kışlık Oversize Yün Kaban");
+  const [specs, setSpecs] = useState("GSM: 450g, %80 Yün %20 Polyamid, Su itici astar.");
+  const [unitCost, setUnitCost] = useState("25.50");
+  const [budget, setBudget] = useState("100000");
+  const [regions, setRegions] = useState<RegionCode[]>(["EU", "MENA", "CIS"]);
+  const [image, setImage] = useState<{ name: string; dataUrl: string } | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<PredictionResponse | null>(null);
+  const [chartRegion, setChartRegion] = useState<RegionCode | null>(null);
+
+  const readFile = useCallback((file: File | undefined) => {
+    if (!file || !file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = () => setImage({ name: file.name, dataUrl: String(reader.result) });
+    reader.readAsDataURL(file);
+  }, []);
+
+  const toggleRegion = (code: RegionCode, on: boolean) =>
+    setRegions((prev) => (on ? [...prev, code] : prev.filter((r) => r !== code)));
+
+  const canSubmit = !!image && productName && specs && Number(unitCost) > 0 && Number(budget) > 0 && regions.length > 0;
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!image) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await predict({
+        product_name: productName,
+        image_base64: image.dataUrl.split(",")[1] ?? "",
+        technical_specs: specs,
+        unit_cost: unitCost,
+        total_production_budget: Math.floor(Number(budget)),
+        target_regions: regions,
+      });
+      setResult(res);
+      setChartRegion(res.regional_breakdown[0]?.region ?? null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const chartRow = result?.regional_breakdown.find((r) => r.region === chartRegion);
+
+  return (
+    <main className="mx-auto grid max-w-7xl gap-6 p-4 md:p-8 lg:grid-cols-[380px_1fr]">
+      <Card className="h-fit">
+        <CardHeader>
+          <CardTitle>Ürün Girdisi</CardTitle>
+          <CardDescription>Tasarımı ve maliyetleri gir, bölgesel talebi simüle et.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={onSubmit} className="grid gap-4">
+            <label
+              onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => { e.preventDefault(); setDragging(false); readFile(e.dataTransfer.files[0]); }}
+              className={cn(
+                "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-4 text-center text-sm text-muted-foreground transition-colors",
+                dragging && "border-primary bg-muted",
+              )}
+            >
+              {image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={image.dataUrl} alt={image.name} className="max-h-40 rounded-md object-contain" />
+              ) : (
+                <>
+                  <ImageIcon className="size-8" />
+                  <span>Tasarım görselini sürükle bırak ya da tıkla</span>
+                </>
+              )}
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => readFile(e.target.files?.[0])} />
+            </label>
+
+            <div className="grid gap-2">
+              <Label htmlFor="name">Ürün adı</Label>
+              <Input id="name" value={productName} onChange={(e) => setProductName(e.target.value)} />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="specs">Teknik detay</Label>
+              <Textarea id="specs" rows={4} value={specs} onChange={(e) => setSpecs(e.target.value)}
+                placeholder="Kumaş, kalıp, ekstra detaylar" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-2">
+                <Label htmlFor="cost">Birim maliyet ($)</Label>
+                <Input id="cost" type="number" min="0.01" step="0.01" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="budget">Toplam bütçe ($)</Label>
+                <Input id="budget" type="number" min="1" step="1" value={budget} onChange={(e) => setBudget(e.target.value)} />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label>Hedef bölgeler</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {REGIONS.map((r) => (
+                  <label key={r.code} className="flex items-center gap-2 text-sm">
+                    <Checkbox checked={regions.includes(r.code)} onCheckedChange={(v) => toggleRegion(r.code, v === true)} />
+                    {r.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <Button type="submit" disabled={!canSubmit || loading}>
+              {loading && <Loader2 className="animate-spin" />}
+              {loading ? "Ajanlar değerlendiriyor…" : "Simülasyonu çalıştır"}
+            </Button>
+            {!image && <p className="text-xs text-muted-foreground">Simülasyon için görsel gerekli.</p>}
+            {error && <p className="text-sm text-destructive">{error}</p>}
+          </form>
+        </CardContent>
+      </Card>
+
+      <section className="grid min-w-0 content-start gap-6">
+        {!result ? (
+          <Card className="grid min-h-64 place-items-center text-muted-foreground">
+            <p className="p-6 text-center text-sm">Sonuçlar burada görünecek.</p>
+          </Card>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+              {result.regional_breakdown.map((r) => (
+                <Card key={r.region} className="gap-2 py-4">
+                  <CardHeader className="px-4">
+                    <CardDescription>{REGIONS.find((x) => x.code === r.region)?.label}</CardDescription>
+                    <CardTitle className={cn("text-4xl tabular-nums", demandTone(r.demand_score_100))}>
+                      {r.demand_score_100}
+                      <span className="ml-1 text-sm font-normal text-muted-foreground">/ 100</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-4 text-xs text-muted-foreground">Talep endeksi</CardContent>
+                </Card>
+              ))}
+            </div>
+
+            <Card>
+              <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
+                <div>
+                  <CardTitle>Optimal Fiyat (Van Westendorp)</CardTitle>
+                  <CardDescription>
+                    Yeşil alan kabul edilebilir fiyat aralığı. OPP: “çok ucuz” ve “çok pahalı” eğrilerinin kesişimi.
+                  </CardDescription>
+                </div>
+                <div className="flex gap-1">
+                  {result.regional_breakdown.map((r) => (
+                    <Button key={r.region} size="sm" variant={r.region === chartRegion ? "default" : "outline"}
+                      onClick={() => setChartRegion(r.region)}>
+                      {r.region}
+                    </Button>
+                  ))}
+                </div>
+              </CardHeader>
+              <CardContent>{chartRow && <VanWestendorpChart result={chartRow} />}</CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Önerilen Üretim Adedi</CardTitle>
+                <CardDescription>Bütçe, talep skoru × birim kâr ağırlığıyla dağıtıldı.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Bölge</TableHead>
+                      <TableHead className="text-right">Satış fiyatı</TableHead>
+                      <TableHead className="text-right">Brüt marj</TableHead>
+                      <TableHead className="text-right">Bütçe</TableHead>
+                      <TableHead className="text-right">Adet</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {result.regional_breakdown.map((r) => (
+                      <TableRow key={r.region}>
+                        <TableCell className="font-medium">{r.region}</TableCell>
+                        <TableCell className="text-right tabular-nums">{usd(r.optimal_sale_price)}</TableCell>
+                        <TableCell className="text-right tabular-nums">%{r.estimated_margin_percentage}</TableCell>
+                        <TableCell className="text-right tabular-nums">{usd(r.allocated_budget)}</TableCell>
+                        <TableCell className="text-right font-semibold tabular-nums">
+                          {r.recommended_production_qty.toLocaleString("tr-TR")}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                  <TableFooter>
+                    <TableRow>
+                      <TableCell colSpan={3}>Toplam (artan bütçe: {usd(result.unallocated_budget)})</TableCell>
+                      <TableCell />
+                      <TableCell className="text-right tabular-nums">{result.total_produced_qty.toLocaleString("tr-TR")}</TableCell>
+                    </TableRow>
+                  </TableFooter>
+                </Table>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Ajan İtirazları</CardTitle>
+                <CardDescription>Her bölgedeki persona sürüsünün öne çıkan 3 eleştirisi.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4 md:grid-cols-2">
+                {result.regional_breakdown.map((r) => (
+                  <div key={r.region} className="grid gap-2">
+                    <Badge variant="secondary">{r.region}</Badge>
+                    <ul className="list-disc space-y-1 pl-5 text-sm">
+                      {r.key_objections.map((o) => <li key={o}>{o}</li>)}
+                    </ul>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </section>
+    </main>
+  );
+}
