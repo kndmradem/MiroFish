@@ -67,7 +67,7 @@ def parse_agent_answer(text: str) -> Optional[dict]:
 class MiroFishSimulationEngine:
     def __init__(self, client: MiroFishClient, fuser: Fuser, state_file: str,
                  max_rounds: int = 3, interview_timeout: int = 180,
-                 poll_s: float = 5, env_wait_s: float = 600):
+                 poll_s: float = 5, env_wait_s: float = 600, retries: int = 1):
         self.client = client
         self.fuser = fuser
         self.state_path = Path(state_file)
@@ -75,6 +75,7 @@ class MiroFishSimulationEngine:
         self.interview_timeout = interview_timeout
         self.poll_s = poll_s
         self.env_wait_s = env_wait_s
+        self.retries = retries
         self._world: Optional[dict] = None
         self._lock = asyncio.Lock()
 
@@ -132,9 +133,21 @@ class MiroFishSimulationEngine:
         if not agent_ids:
             raise MiroFishError(f"{region} bölgesi için ajan bulunamadı")
 
-        responses = await self.client.interview_batch(
-            world["simulation_id"], agent_ids, build_interview_prompt(card, region), self.interview_timeout)
-        parsed = [a for a in (parse_agent_answer(t) for t in responses.values()) if a]
+        prompt = build_interview_prompt(card, region)
+        parsed: Dict[int, dict] = {}
+        pending = list(agent_ids)
+        # Küçük/yerel modeller JSON'u bozabilir: geçersiz cevap veren ajanlara bir kez daha sor.
+        for _ in range(1 + self.retries):
+            if not pending:
+                break
+            responses = await self.client.interview_batch(
+                world["simulation_id"], pending, prompt, self.interview_timeout)
+            for agent_id, text in responses.items():
+                answer = parse_agent_answer(text)
+                if answer:
+                    parsed[agent_id] = answer
+            pending = [a for a in pending if a not in parsed]
+        parsed = list(parsed.values())
         if len(parsed) < max(1, len(agent_ids) // 2):
             raise MiroFishError(
                 f"{region}: {len(agent_ids)} ajandan yalnızca {len(parsed)} geçerli cevap geldi")

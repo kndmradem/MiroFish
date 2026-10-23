@@ -36,7 +36,9 @@ def test_region_mapping_from_seed_names_and_cities():
 class FakeMiroFish:
     """MiroFish Flask API'sinin test çifti; çağrı sırasını kaydeder."""
 
-    def __init__(self, bad_json=False):
+    def __init__(self, bad_json=False, fail_first=False):
+        self.fail_first = fail_first
+        self.interview_calls = 0
         self.calls = []
         self.bad_json = bad_json
         self.started = False
@@ -68,7 +70,9 @@ class FakeMiroFish:
             return ok({"env_alive": self.started})
         if path == "/api/simulation/interview/batch":
             body = json.loads(request.content)
-            reply = "bozuk" if self.bad_json else json.dumps({
+            self.interview_calls += 1
+            broken = self.bad_json or (self.fail_first and self.interview_calls == 1)
+            reply = "bozuk" if broken else json.dumps({
                 "interest": 70, "too_cheap": 30, "cheap": 55, "expensive": 90, "too_expensive": 130,
                 "objection": "Kumaş kalın"})
             return ok({"result": {"results": {
@@ -116,3 +120,11 @@ async def test_unparseable_agent_answers_raise(tmp_path):
     card = await engine.fuse_product_card(REQ)
     with pytest.raises(MiroFishError):
         await engine.simulate_region(card, "EU", 25.0)
+
+
+async def test_invalid_answers_are_retried_once(tmp_path):
+    fake = FakeMiroFish(fail_first=True)
+    engine = make_engine(tmp_path, fake)
+    card = await engine.fuse_product_card(REQ)
+    sim = await engine.simulate_region(card, "EU", 25.0)
+    assert fake.interview_calls == 2 and len(sim.price_answers) == 5

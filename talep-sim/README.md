@@ -71,6 +71,24 @@ Not: Bu entegrasyon gerçek MiroFish'e karşı henüz çalıştırılmadı (anah
 MiroFish API'sini taklit eden bir sahte sunucuyla çalışıyor; gerçek ajan cevaplarının
 JSON formatına uyma oranı ilk gerçek denemede ölçülmeli.
 
+### Yerel Qwen ile çalıştırma (OpenAI API anahtarı yerine)
+
+`local-llm/` klasörü Ollama'yı ayağa kaldırır: `docker compose up -d && ./pull-models.sh`
+(ya da Ollama'yı doğrudan kurup `OLLAMA=ollama ./pull-models.sh`). Betik çıktısındaki
+`LLM_*` satırlarını MiroFish `.env`'ine, `VISION_*` satırlarını `talep-sim/backend/.env`'e yaz.
+Önerilen: metin için `qwen2.5:14b-instruct` (~16 GB GPU belleği ya da 32 GB Mac), görsel için
+`qwen2.5vl:7b`. 7B altı metin modelleri ajan JSON'unu sık bozar; motor geçersiz cevap veren
+ajanlara bir kez tekrar sorar (`retries`). **Zep yine buluttan gelir**, aşağıya bak.
+
+### Zep ne yapıyor?
+
+MiroFish, seed dokümanı (bizde 20 tüketicilik panel) Zep Cloud'a yükler. Zep metinden
+kişi/yer/kavram varlıklarını ve aralarındaki ilişkileri çıkarıp bir **bilgi grafiği** kurar.
+MiroFish ajan profillerini bu grafiğe bakarak zenginleştirir (bir tüketicinin şehri, tercihleri,
+çevresi) ve ajanlar uzun vadeli hafızasını buradan okur. Zep kendi başına bir LLM değil, bir
+hafıza/bilgi-grafiği servisidir. Bu MVP'de katkısı sınırlı; asıl ajan zekâsını LLM verir. Ama
+MiroFish bu adım olmadan çalışmıyor ve yalnızca Zep Cloud'a bağlanıyor (`ZEP_API_URL` kabul etmiyor).
+
 **Lisans notu:** MiroFish AGPL-3.0. Bu kodu MiroFish ile birlikte ağ
 üzerinden hizmet olarak sunarsan kaynak kodunu kullanıcılara açma
 yükümlülüğü doğar. Ticari kapalı ürün düşünülüyorsa MiroFish'i ayrı bir
