@@ -190,3 +190,63 @@ def test_explanations_work_for_mirofish_style_meta():
     exps = explain_region(sim, vw, best, 25.0, alloc, Decimal(640), 1000, LUXURY)
     assert [e.key for e in exps] == ["demand", "price", "margin", "quantity"]
     assert "4 ajandan geçerli cevap" in exps[0].how
+
+
+def _tr(**extra):
+    return _predict(target_regions=["EU", "TR"], **extra)
+
+
+def test_turkey_has_lower_price_than_eu_and_shows_try():
+    data = _tr(brand_profile=MASS.model_dump(), usd_try_rate=40)
+    rows = {r["region"]: r for r in data["regional_breakdown"]}
+    assert Decimal(rows["TR"]["optimal_sale_price"]) < Decimal(rows["EU"]["optimal_sale_price"])  # düşük alım gücü
+    assert rows["TR"]["local_currency"] == "TRY" and rows["TR"]["fx_rate"] == 40
+    assert Decimal(rows["TR"]["local_price"]) == (Decimal(rows["TR"]["optimal_sale_price"]) * 40).quantize(Decimal("1"))
+    assert rows["EU"]["local_price"] is None
+
+
+def test_turkey_explanation_states_fx_assumption_and_shock():
+    row = [r for r in _tr(usd_try_rate=50)["regional_breakdown"] if r["region"] == "TR"][0]
+    price = [e for e in row["explanations"] if e["key"] == "price"][0]
+    assert "1 USD = 50 TRY" in price["how"] and "Kur riski" in price["how"]
+    assert any("canlı kur değildir" in a for a in price["assumptions"])
+    assert any("alım gücü" in a for a in price["assumptions"])
+
+
+def test_turkey_price_band_is_narrower_than_same_profile_elsewhere():
+    rows = {r["region"]: r["van_westendorp"] for r in _tr(brand_profile=MASS.model_dump())["regional_breakdown"]}
+
+    def width(vw):
+        return (Decimal(vw["acceptable_range_high"]) - Decimal(vw["acceptable_range_low"])) / Decimal(vw["optimal_price_point"])
+    assert width(rows["TR"]) < width(rows["EU"])  # +0.15 fiyat duyarlılığı bandı daraltır
+
+
+def test_turkey_recommendation_includes_fx_risk_with_numbers():
+    recs = _tr(usd_try_rate=42)["recommendations"]
+    fx = [r for r in recs if "kur riskini planla" in r["title"]]
+    assert fx and "marj" in fx[0]["detail"] and "42" in fx[0]["based_on"]
+
+
+def test_default_fx_rate_used_when_not_given():
+    row = [r for r in _tr()["regional_breakdown"] if r["region"] == "TR"][0]
+    assert row["fx_rate"] == 42.0
+
+
+def test_turkey_seed_and_region_mapping():
+    from app.services.personas import SEED_CONSUMERS, build_seed_document, region_of, seed_hash
+    assert len(SEED_CONSUMERS["TR"]) == 5 and "TR paneli" in build_seed_document()
+    assert region_of("Elif Demir, pazarlama uzmanı") == "TR" and region_of("someone in Izmir") == "TR"
+    assert len(seed_hash()) == 12
+
+
+def test_interview_prompt_has_turkey_economic_context_and_rate():
+    prompt = build_interview_prompt({"product_name": "Kaban", "features": {}}, "TR", None, 25.0, {"TRY": 42})
+    assert "Ekonomik bağlam" in prompt and "1 USD = 42 TRY" in prompt
+    assert "Ekonomik bağlam" not in build_interview_prompt({"product_name": "Kaban", "features": {}}, "EU")
+
+
+def test_model_recommendations_keep_fx_risk_warning_for_turkey(isolated_app):
+    good = json.dumps({"oneriler": [{"category": "fiyat", "title": "Fiyatı $95 yap", "detail": "x", "based_on": "y"}]})
+    isolated_app[get_advisor] = lambda: Advisor(fake_llm(good))
+    recs = _tr(brand_profile=MASS.model_dump())["recommendations"]
+    assert recs[0]["source"] == "model" and any("kur riskini planla" in r["title"] for r in recs)

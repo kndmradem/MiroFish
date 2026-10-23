@@ -40,6 +40,9 @@ class Settings:
     llm_base_url: str = field(default_factory=lambda: _env("LLM_BASE_URL", "https://api.openai.com/v1"))
     llm_model: str = field(default_factory=lambda: _env("LLM_MODEL_NAME", "gpt-4o-mini"))
 
+    # Türkiye için TL gösterimi: 1 USD = ? TL (arayüzden istek bazında değiştirilebilir)
+    usd_try_rate: float = field(default_factory=lambda: float(_env("USD_TRY_RATE", "42.0")))
+
     @property
     def llm_enabled(self) -> bool:
         return bool(self.llm_api_key)

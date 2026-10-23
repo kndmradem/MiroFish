@@ -63,6 +63,19 @@ PERSONAS: Dict[str, RegionPersona] = {
         likes={"oversize": 0.7, "premium": 0.3, "warmth": 0.3, "waterproof": 0.4, "eco": 0.3, "sheen": 0.0, "heavy": -0.2},
         price_multiplier=2.8,
     ),
+    "TR": RegionPersona(
+        region="TR",
+        city="İstanbul",
+        prompt=(
+            "Sen İstanbul'da yaşayan bir tüketicisin. Yüksek enflasyon ve kur dalgalanması yüzünden alım gücün "
+            "düşük; fiyata çok duyarlısın, indirim dönemlerini ve kampanyaları beklersin, taksitle alışveriş "
+            "yaparsın ve yerli markalarla fiyat karşılaştırırsın. Kalite ve dayanıklılık için ancak makul bir "
+            "fark ödersin."
+        ),
+        likes={"warmth": 0.4, "waterproof": 0.3, "heavy": 0.1, "oversize": 0.3, "premium": 0.2, "sheen": 0.1,
+               "eco": 0.1, "synthetic": -0.1},
+        price_multiplier=1.9,
+    ),
 }
 
 
@@ -98,14 +111,27 @@ SEED_CONSUMERS: Dict[str, List[str]] = {
         "Daniel Brooks, 46, Seattle, yazılımcı; yağmura dayanıklı, sade ve teknik giyim",
         "Rachel Kim, 38, Austin, emlakçı; şık ama rahat, online alışveriş, kolay iade",
     ],
+    "TR": [
+        "Elif Demir, 29, Istanbul, pazarlama uzmanı; kira ve enflasyon baskısı altında, indirim dönemlerini bekler, taksitle alır",
+        "Mehmet Yılmaz, 38, Ankara, kamu çalışanı; sabit maaş, dayanıklı ve uygun fiyatlı ürün arar",
+        "Zeynep Kaya, 25, Izmir, üniversite öğrencisi; sosyal medya trendlerini izler ama bütçesi dar, uygun fiyat arar",
+        "Burak Şahin, 34, Bursa, mühendis; kalite/fiyat dengesine bakar, yerli markalarla kıyaslar, kampanyaları takip eder",
+        "Ayşe Çelik, 45, Antalya, esnaf; sezonluk alışveriş yapar, nakit ile taksit arasında hesap yapar, iade kolaylığı önemli",
+    ],
 }
 
 SIMULATION_REQUIREMENT = (
-    "Dört bölgesel pazardaki (EU, MENA, CIS, US) tüketicilerin yeni moda/tekstil ürünlerini "
+    "Dört bölgesel pazardaki (EU, MENA, CIS, US, TR) tüketicilerin yeni moda/tekstil ürünlerini "
     "nasıl değerlendirdiğini simüle et. Her tüketici kendi şehrinin iklimini, kültürünü ve "
     "satın alma önceliklerini korumalı. Tüketiciler ürünler hakkında fikir paylaşır, fiyat "
     "algılarını ve itirazlarını tartışır."
 )
+
+
+def seed_hash() -> str:
+    """Seed dokümanın özeti: bölge/tüketici listesi değişince kayıtlı MiroFish dünyası yenilenir."""
+    import hashlib
+    return hashlib.sha256(build_seed_document().encode()).hexdigest()[:12]
 
 
 def build_seed_document() -> str:

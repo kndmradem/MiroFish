@@ -128,3 +128,14 @@ async def test_invalid_answers_are_retried_once(tmp_path):
     card = await engine.fuse_product_card(REQ)
     sim = await engine.simulate_region(card, "EU", 25.0)
     assert fake.interview_calls == 2 and len(sim.price_answers) == 5
+
+
+async def test_stale_world_without_turkey_is_rebuilt(tmp_path):
+    fake = FakeMiroFish()
+    (tmp_path / "world.json").write_text(json.dumps(
+        {"project_id": "p", "simulation_id": "sim_1", "agents": {"EU": [0]}, "seed_hash": "eskiseed"}))
+    fake.started = True  # ortam canlı görünse bile seed değiştiği için yeniden kurulmalı
+    engine = make_engine(tmp_path, fake)
+    card = await engine.fuse_product_card(REQ)
+    sim = await engine.simulate_region(card, "TR", 25.0, None, {"TRY": 42})
+    assert "/api/graph/ontology/generate" in fake.calls and len(sim.price_answers) == 5

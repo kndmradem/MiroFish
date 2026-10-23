@@ -128,11 +128,11 @@ export function BrandPanel({ brand, notes, profile, onBrand, onNotes, onProfile 
           </div>
           <div className="grid gap-1">
             <Label className="text-xs">Bölgesel marka gücü (0-100)</Label>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-5 gap-2">
               {REGIONS.map((r) => (
                 <div key={r.code} className="grid gap-1">
                   <span className="text-xs text-muted-foreground">{r.code}</span>
-                  <Input type="number" min="0" max="100" value={profile.regional_strength[r.code] ?? 50}
+                  <Input type="number" min="0" max="100" className="px-1.5" value={profile.regional_strength[r.code] ?? 50}
                     onChange={(e) => edit({ regional_strength: { ...profile.regional_strength, [r.code]: num(e.target.value, 50) } })} />
                 </div>
               ))}

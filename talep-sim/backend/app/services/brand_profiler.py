@@ -28,9 +28,9 @@ Bu markanın giyim/tekstil ürünleri için fiyat profilini çıkar. Şu JSON ş
  "brand_pull": 0-100 (marka bilinirliği ve çekim gücü),
  "typical_customer": "tipik müşteri, 1 cümle",
  "margin_norm_pct": markanın tipik brüt kâr marjı yüzdesi (sayı),
- "regional_strength": {{"EU": 0-100, "MENA": 0-100, "CIS": 0-100, "US": 0-100}}
+ "regional_strength": {{"EU": 0-100, "MENA": 0-100, "CIS": 0-100, "US": 0-100, "TR": 0-100}}
 }}
-regional_strength, markanın o bölgedeki bilinirliği ve satış gücüdür."""
+regional_strength, markanın o bölgedeki bilinirliği ve satış gücüdür (TR = Türkiye)."""
 
 _TIERS = tuple(TIER_MULTIPLE_RANGE)
 

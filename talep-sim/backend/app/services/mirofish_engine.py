@@ -17,17 +17,18 @@ from pathlib import Path
 from typing import Awaitable, Callable, Dict, List, Optional
 
 from .. import brand as brandlib
+from .. import economy
 from ..models import BrandProfile, PredictionRequest
 from ..pricing import AgentPriceAnswer
 from .engine import RegionSimulation
 from .mirofish_client import MiroFishClient, MiroFishError
-from .personas import PERSONAS, SIMULATION_REQUIREMENT, build_seed_document, region_of
+from .personas import PERSONAS, SIMULATION_REQUIREMENT, build_seed_document, region_of, seed_hash
 
 Fuser = Callable[[PredictionRequest], Awaitable[dict]]
 
 
 def build_interview_prompt(card: dict, region: str, brand: Optional[BrandProfile] = None,
-                           unit_cost: Optional[float] = None) -> str:
+                           unit_cost: Optional[float] = None, fx_rates: Optional[dict] = None) -> str:
     persona = PERSONAS[region]
     features = ", ".join(k for k, v in card.get("features", {}).items() if v) or "belirtilmemiş"
     brand_block = ""
@@ -39,6 +40,13 @@ def build_interview_prompt(card: dict, region: str, brand: Optional[BrandProfile
             f"Markanın bu bölgedeki bilinirliği: {brandlib.region_strength(brand, region)}/100. "
             "Ürünü ve fiyat eşiklerini bu markanın müşterisi gibi değerlendir.\n"
         )
+    eco = economy.REGION_ECONOMY.get(region)
+    if eco is not None:
+        rate = (fx_rates or {}).get(eco.currency)
+        brand_block += f"Ekonomik bağlam: {eco.context}"
+        if rate:
+            brand_block += f" Kur: 1 USD = {rate:g} {eco.currency}; fiyatı kafanda {eco.currency} ile değerlendir, cevabını USD ver."
+        brand_block += "\n"
     return (
         f"{persona.prompt}\n\n"
         "Aşağıdaki yeni ürünü bir tüketici olarak değerlendir. Fiyatlar ABD doları.\n"
@@ -99,7 +107,9 @@ class MiroFishSimulationEngine:
         async with self._lock:
             if self._world is None and self.state_path.exists():
                 self._world = json.loads(self.state_path.read_text())
-            if self._world is not None and await self._world_alive(self._world):
+            # Seed (bölge/tüketici listesi) değiştiyse kayıtlı dünya eskidir, yeniden kurulur.
+            if self._world is not None and self._world.get("seed_hash") == seed_hash() \
+                    and await self._world_alive(self._world):
                 return self._world
             self._world = await self._build_world()
             self.state_path.write_text(json.dumps(self._world))
@@ -136,17 +146,18 @@ class MiroFishSimulationEngine:
             if loop.time() > deadline:
                 raise MiroFishError("Simülasyon ortamı röportaja hazır hale gelmedi")
             await asyncio.sleep(self.poll_s)
-        return {"project_id": project_id, "simulation_id": simulation_id, "agents": agents}
+        return {"project_id": project_id, "simulation_id": simulation_id, "agents": agents, "seed_hash": seed_hash()}
 
     # --- bölge simülasyonu ----------------------------------------------
     async def simulate_region(self, card: dict, region: str, unit_cost: float,
-                              brand: Optional[BrandProfile] = None) -> RegionSimulation:
+                              brand: Optional[BrandProfile] = None,
+                              fx_rates: Optional[dict] = None) -> RegionSimulation:
         world = await self._ensure_world()
         agent_ids = world["agents"].get(region, [])
         if not agent_ids:
             raise MiroFishError(f"{region} bölgesi için ajan bulunamadı")
 
-        prompt = build_interview_prompt(card, region, brand, unit_cost)
+        prompt = build_interview_prompt(card, region, brand, unit_cost, fx_rates)
         parsed: Dict[int, dict] = {}
         pending = list(agent_ids)
         # Küçük/yerel modeller JSON'u bozabilir: geçersiz cevap veren ajanlara bir kez daha sor.

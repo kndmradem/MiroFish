@@ -7,6 +7,7 @@ from decimal import Decimal
 from typing import List, Optional
 
 from . import brand as brandlib
+from . import economy
 from .allocation import RegionAllocation
 from .models import BrandProfile, Explanation, VanWestendorpResult
 from .services.engine import RegionSimulation
@@ -48,7 +49,7 @@ def _demand(sim: RegionSimulation, region: str, brand: Optional[BrandProfile]) -
 
 
 def _price(sim: RegionSimulation, vw: VanWestendorpResult, best: Decimal, unit_cost: float,
-           brand: Optional[BrandProfile], region: str) -> Explanation:
+           brand: Optional[BrandProfile], region: str, fx_rate: Optional[float] = None) -> Explanation:
     how = (f"{len(sim.price_answers)} ajana dört fiyat sorusu soruldu (çok ucuz, ucuz, pahalı, çok pahalı). "
            f"Eğrilerin kesişimiyle kabul edilebilir aralık {_usd(vw.acceptable_range_low)} – {_usd(vw.acceptable_range_high)}, "
            f"optimal fiyat noktası (OPP) {_usd(vw.optimal_price_point)} bulundu. Önerilen {_usd(best)}, bu aralıkta "
@@ -68,6 +69,19 @@ def _price(sim: RegionSimulation, vw: VanWestendorpResult, best: Decimal, unit_c
                            + (", kullanıcı düzenledi" if brand.edited else "") + f", güven: {brand.confidence}) doğruluğu kadar geçerlidir.")
     else:
         assumptions.append("Marka girilmediği için nötr kitlesel fiyat varsayımı (maliyetin ~2.7 katı) kullanıldı.")
+    eco = economy.REGION_ECONOMY.get(region)
+    if eco is not None:
+        assumptions.extend(eco.assumptions)
+        if eco.currency and fx_rate:
+            local = economy.local_price(best, fx_rate)
+            lo = economy.local_price(vw.acceptable_range_low, fx_rate)
+            hi = economy.local_price(vw.acceptable_range_high, fx_rate)
+            how += (f" Yerel para: kur 1 USD = {fx_rate:g} {eco.currency} varsayımıyla önerilen fiyat ₺{int(local):,} "
+                    f"(kabul aralığı ₺{int(lo):,} – ₺{int(hi):,}).")
+            shocked = economy.margin_after_fx_shock(float(best), unit_cost)
+            how += (f" Kur riski: {eco.currency} %{economy.FX_SHOCK_PCT:.0f} değer kaybeder ve TL fiyatı sabit kalırsa "
+                    f"USD marjı %{(float(best) - unit_cost) / float(best) * 100:.1f}'den %{shocked:.1f}'e düşer.")
+            assumptions.append(f"Kur 1 USD = {fx_rate:g} {eco.currency} alındı; bu varsayılan/girilen bir değerdir, canlı kur değildir.")
     return Explanation(key="price", label="Optimal satış fiyatı", value=_usd(best), how=how, assumptions=assumptions)
 
 
@@ -101,8 +115,8 @@ def _quantity(alloc: RegionAllocation, total_weight: Decimal, total_budget: int,
 
 def explain_region(sim: RegionSimulation, vw: VanWestendorpResult, best: Decimal, unit_cost: float,
                    alloc: RegionAllocation, total_weight: Decimal, total_budget: int,
-                   brand: Optional[BrandProfile]) -> List[Explanation]:
-    return [_demand(sim, sim.region, brand), _price(sim, vw, best, unit_cost, brand, sim.region),
+                   brand: Optional[BrandProfile], fx_rate: Optional[float] = None) -> List[Explanation]:
+    return [_demand(sim, sim.region, brand), _price(sim, vw, best, unit_cost, brand, sim.region, fx_rate),
             _margin(best, unit_cost, brand), _quantity(alloc, total_weight, total_budget, unit_cost, sim, best)]
 
 

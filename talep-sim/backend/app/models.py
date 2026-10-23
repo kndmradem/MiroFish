@@ -5,11 +5,11 @@ from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-Region = Literal["EU", "MENA", "CIS", "US"]
+Region = Literal["EU", "MENA", "CIS", "US", "TR"]
 
 
 PriceTier = Literal["budget", "mass", "upper_mass", "premium", "luxury"]
-ALL_REGIONS = ("EU", "MENA", "CIS", "US")
+ALL_REGIONS = ("EU", "MENA", "CIS", "US", "TR")
 
 
 class BrandProfile(BaseModel):
@@ -62,6 +62,7 @@ class PredictionRequest(BaseModel):
     brand: Optional[str] = Field(None, examples=["Ipekyol"], description="Marka adı; fiyat politikası markaya göre belirlenir")
     brand_notes: Optional[str] = Field(None, description="Marka profili üretilirken kullanılacak kullanıcı notları")
     brand_profile: Optional[BrandProfile] = Field(None, description="Hazır/düzenlenmiş profil; verilirse yeniden üretilmez")
+    usd_try_rate: Optional[float] = Field(None, gt=0, description="1 USD kaç TL (Türkiye için TL gösterimi); boşsa varsayılan kur")
 
     @field_validator("target_regions")
     @classmethod
@@ -97,6 +98,9 @@ class RegionPredictionResult(BaseModel):
     key_objections: List[str] = Field(..., description="Ajanlardan gelen top 3 eleştiri")
     van_westendorp: VanWestendorpResult
     explanations: List[Explanation] = []
+    local_currency: Optional[str] = Field(None, description="Bölgenin yerel para birimi (yalnızca TL gösterilen bölgelerde)")
+    local_price: Optional[Decimal] = Field(None, description="Önerilen fiyatın yerel para karşılığı")
+    fx_rate: Optional[float] = Field(None, description="Kullanılan kur: 1 USD = fx_rate yerel para")
 
 
 class PredictionResponse(BaseModel):

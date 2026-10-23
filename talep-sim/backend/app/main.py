@@ -12,6 +12,7 @@ from .allocation import RegionSignal, allocate_production_budget
 from .models import BrandProfile, BrandProfileRequest, PredictionRequest, PredictionResponse, RegionPredictionResult
 from .advisor import Advisor
 from .explain import explain_region, methodology_notes
+from . import economy
 from .pricing import analyze
 from .config import Settings, settings
 from .services.brand_profiler import BrandProfiler
@@ -80,13 +81,15 @@ async def predict(req: PredictionRequest, engine: SimulationEngine = Depends(get
                   profiler: BrandProfiler = Depends(get_profiler),
                   advisor: Advisor = Depends(get_advisor)) -> PredictionResponse:
     unit_cost = float(req.unit_cost)
+    fx_rate = req.usd_try_rate or settings.usd_try_rate
+    fx_rates = {"TRY": fx_rate}
     brand = req.brand_profile
     if brand is None and req.brand and req.brand.strip():
         brand = await profiler.profile(req.brand, req.brand_notes)
     try:
         card = await engine.fuse_product_card(req)
         # Bölge simülasyonları birbirinden bağımsız, paralel koşar.
-        sims = await asyncio.gather(*(engine.simulate_region(card, r, unit_cost, brand) for r in req.target_regions))
+        sims = await asyncio.gather(*(engine.simulate_region(card, r, unit_cost, brand, fx_rates) for r in req.target_regions))
     except (MiroFishError, LLMError, httpx.HTTPError) as e:
         raise HTTPException(status_code=502, detail=f"Simülasyon servisi hatası: {type(e).__name__}: {e}") from e
 
@@ -101,6 +104,9 @@ async def predict(req: PredictionRequest, engine: SimulationEngine = Depends(get
     breakdown = []
     for region, (sim, vw, best) in priced.items():
         alloc = allocations[region]
+        currency = economy.currency_of(region)
+        local = {"local_currency": currency, "local_price": economy.local_price(best, fx_rate),
+                 "fx_rate": fx_rate} if currency == "TRY" else {}
         margin = float((best - req.unit_cost) / best * 100) if best > 0 else 0.0
         breakdown.append(RegionPredictionResult(
             region=region,
@@ -112,7 +118,8 @@ async def predict(req: PredictionRequest, engine: SimulationEngine = Depends(get
             key_objections=sim.objections,
             van_westendorp=vw,
             explanations=explain_region(sim, vw, best, unit_cost, alloc, total_weight,
-                                        req.total_production_budget, brand),
+                                        req.total_production_budget, brand, fx_rate),
+            **local,
         ))
 
     spent = sum((a.quantity * req.unit_cost for a in allocations.values()), Decimal(0))

@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Protocol
 
 from .. import brand as brandlib
+from .. import economy
 from ..models import BrandProfile, PredictionRequest
 from ..pricing import AgentPriceAnswer
 from .personas import PERSONAS
@@ -32,7 +33,8 @@ class SimulationEngine(Protocol):
     async def fuse_product_card(self, req: PredictionRequest) -> dict: ...
 
     async def simulate_region(self, card: dict, region: str, unit_cost: float,
-                              brand: Optional[BrandProfile] = None) -> RegionSimulation: ...
+                              brand: Optional[BrandProfile] = None,
+                              fx_rates: Optional[dict] = None) -> RegionSimulation: ...
 
 
 _FEATURE_KEYWORDS = {
@@ -99,7 +101,8 @@ class MockSimulationEngine:
         }
 
     async def simulate_region(self, card: dict, region: str, unit_cost: float,
-                              brand: Optional[BrandProfile] = None) -> RegionSimulation:
+                              brand: Optional[BrandProfile] = None,
+                              fx_rates: Optional[dict] = None) -> RegionSimulation:
         await asyncio.sleep(self.latency_s)  # MiroFish ajan turu yerine
         persona = PERSONAS[region]
         features = card["features"]
@@ -118,7 +121,8 @@ class MockSimulationEngine:
         # Uyum fiyat algısını da kaydırır: beğenilen ürüne daha fazla ödenir.
         region_factor = persona.price_multiplier / brandlib.NEUTRAL_MULTIPLE
         center = unit_cost * brand.price_multiple * region_factor * (1 + 0.15 * fit)
-        spread, tol = brandlib.price_spread(brand), brandlib.upper_tolerance(brand)
+        sens_adj = economy.sensitivity_adj(region)  # örn. enflasyonlu pazarda fiyata duyarlılık artar
+        spread, tol = brandlib.price_spread(brand, sens_adj), brandlib.upper_tolerance(brand, sens_adj)
         answers = []
         for _ in range(self.agents_per_region):
             mid = center * rng.lognormvariate(0, spread)
@@ -132,7 +136,7 @@ class MockSimulationEngine:
             "engine": "mock", "n_agents": self.agents_per_region, "fit_points": round(fit * 22, 1),
             "brand_region_points": round(region_pts, 1), "brand_pull_points": round(pull_pts, 1),
             "noise_points": round(noise, 1), "price_center": round(center, 2),
-            "region_factor": round(region_factor, 2),
+            "region_factor": round(region_factor, 2), "sensitivity_adj": sens_adj,
             "matched_features": [f for f, w in persona.likes.items() if features.get(f)],
         }
 

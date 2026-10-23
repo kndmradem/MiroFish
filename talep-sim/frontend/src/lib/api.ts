@@ -3,6 +3,7 @@ export const REGIONS = [
   { code: "MENA", label: "Körfez (MENA)" },
   { code: "CIS", label: "Kafkaslar (CIS)" },
   { code: "US", label: "Amerika (US)" },
+  { code: "TR", label: "Türkiye (TR)" },
 ] as const;
 
 export type RegionCode = (typeof REGIONS)[number]["code"];
@@ -56,6 +57,7 @@ export interface PredictionRequest {
   brand?: string;
   brand_notes?: string;
   brand_profile?: BrandProfile;
+  usd_try_rate?: number;
 }
 
 export interface PricePoint {
@@ -84,6 +86,9 @@ export interface RegionPredictionResult {
   key_objections: string[];
   van_westendorp: VanWestendorpResult;
   explanations: Explanation[];
+  local_currency?: string | null;
+  local_price?: string | null;
+  fx_rate?: number | null;
 }
 
 export interface PredictionResponse {
@@ -138,6 +143,8 @@ export async function fetchBrandProfile(brand: string, notes: string): Promise<B
   if (!res.ok) throw new Error(`Marka profili alınamadı (${res.status}): ${await res.text()}`);
   return res.json();
 }
+
+export const try_ = (v: string | number) => `₺${Math.round(Number(v)).toLocaleString("tr-TR")}`;
 
 export const usd = (v: string | number) =>
   Number(v).toLocaleString("tr-TR", { style: "currency", currency: "USD" });

@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { predict, REGIONS, TIER_LABEL, usd, type BrandProfile, type PredictionResponse, type RegionCode } from "@/lib/api";
+import { predict, REGIONS, TIER_LABEL, try_, usd, type BrandProfile, type PredictionResponse, type RegionCode } from "@/lib/api";
 
 function demandTone(score: number) {
   if (score >= 70) return "text-green-600";
@@ -27,6 +27,7 @@ export default function Dashboard() {
   const [specs, setSpecs] = useState("GSM: 450g, %80 Yün %20 Polyamid, Su itici astar.");
   const [unitCost, setUnitCost] = useState("25.50");
   const [budget, setBudget] = useState("100000");
+  const [usdTry, setUsdTry] = useState("42");
   const [brand, setBrand] = useState("");
   const [brandNotes, setBrandNotes] = useState("");
   const [profile, setProfile] = useState<BrandProfile | null>(null);
@@ -66,6 +67,7 @@ export default function Dashboard() {
         brand: brand.trim() || undefined,
         brand_notes: brandNotes.trim() || undefined,
         brand_profile: profile ?? undefined,
+        usd_try_rate: regions.includes("TR") && Number(usdTry) > 0 ? Number(usdTry) : undefined,
       });
       if (res.brand_profile) setProfile(res.brand_profile);
       setResult(res);
@@ -141,6 +143,15 @@ export default function Dashboard() {
                 ))}
               </div>
             </div>
+            {regions.includes("TR") && (
+              <div className="grid gap-1 rounded-md border p-3">
+                <Label htmlFor="fx" className="text-xs">Türkiye için kur: 1 USD = ? TL</Label>
+                <Input id="fx" type="number" min="1" step="0.1" value={usdTry} onChange={(e) => setUsdTry(e.target.value)} />
+                <p className="text-xs text-muted-foreground">
+                  Varsayılan örnek bir kurdur, canlı kur değildir; güncel kurunu gir. Türkiye fiyatı TL olarak da gösterilir.
+                </p>
+              </div>
+            )}
             <Button type="submit" disabled={!canSubmit || loading}>
               {loading && <Loader2 className="animate-spin" />}
               {loading ? "Ajanlar değerlendiriyor…" : "Simülasyonu çalıştır"}
@@ -184,7 +195,7 @@ export default function Dashboard() {
               </Card>
             )}
 
-            <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
               {result.regional_breakdown.map((r) => (
                 <Card key={r.region} className="gap-2 py-4">
                   <CardHeader className="px-4">
@@ -194,7 +205,10 @@ export default function Dashboard() {
                       <span className="ml-1 text-sm font-normal text-muted-foreground">/ 100</span>
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="px-4 text-xs text-muted-foreground">Talep endeksi</CardContent>
+                  <CardContent className="px-4 text-xs text-muted-foreground">
+                    Talep endeksi
+                    {r.local_price && <div className="mt-1 font-medium text-foreground">{try_(r.local_price)} / {usd(r.optimal_sale_price)}</div>}
+                  </CardContent>
                 </Card>
               ))}
             </div>
@@ -262,7 +276,10 @@ export default function Dashboard() {
                     {result.regional_breakdown.map((r) => (
                       <TableRow key={r.region}>
                         <TableCell className="font-medium">{r.region}</TableCell>
-                        <TableCell className="text-right tabular-nums">{usd(r.optimal_sale_price)}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {usd(r.optimal_sale_price)}
+                          {r.local_price && <div className="text-xs text-muted-foreground">{try_(r.local_price)}</div>}
+                        </TableCell>
                         <TableCell className="text-right tabular-nums">%{r.estimated_margin_percentage}</TableCell>
                         <TableCell className="text-right tabular-nums">{usd(r.allocated_budget)}</TableCell>
                         <TableCell className="text-right font-semibold tabular-nums">

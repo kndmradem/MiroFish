@@ -4,6 +4,7 @@ from decimal import Decimal
 from typing import Dict, List, Optional
 
 from . import brand as brandlib
+from . import economy
 from .models import BrandProfile, Recommendation, RegionPredictionResult
 from .services.llm import LLMClient, LLMError
 
@@ -70,6 +71,19 @@ def rule_recommendations(regions: List[RegionPredictionResult], brand: Optional[
                                               "profil alanlarını gerçek bilginle düzeltip yeniden çalıştır.",
                                        based_on="Marka profili güven düzeyi"))
 
+    # Kur riski olan bölgeler (ör. Türkiye)
+    for r in regions:
+        if r.local_price is not None and r.fx_rate:
+            price = float(r.optimal_sale_price)
+            before = (price - unit_cost) / price * 100
+            after = economy.margin_after_fx_shock(price, unit_cost)
+            recs.append(Recommendation(
+                category="fiyat", title=f"{r.region}: TL fiyatı ₺{int(r.local_price):,}, kur riskini planla",
+                detail=(f"Kur %{economy.FX_SHOCK_PCT:.0f} kayarsa ve TL fiyatı sabit kalırsa marj %{before:.0f}'den %{after:.0f}'e düşer. "
+                        "TL fiyat listesini kur ve enflasyona göre düzenli güncelle; taksit seçeneği ve sezon kampanyalarıyla "
+                        "fiyat algısını yönet, liste fiyatını gereksiz yükseltmek yerine indirim dönemlerinde marjı koru."),
+                based_on=f"1 USD = {r.fx_rate:g} TL varsayımı ve {r.region} fiyatı"))
+
     # Bölge
     total = sum(r.recommended_production_qty for r in regions) or 1
     top = max(regions, key=lambda r: r.recommended_production_qty)
@@ -125,5 +139,6 @@ class Advisor:
                     for i in items if isinstance(i, dict) and i.get("category") in _CATEGORIES and i.get("title") and i.get("detail")]
         except (LLMError, KeyError, TypeError, AttributeError):
             return rules
-        # Model önerileri öne, kural tabanlı güvenlik notları (marka doğrulama) sona
-        return recs[:5] + [r for r in rules if r.title == "Marka profilini doğrula"] if recs else rules
+        # Model önerileri öne; sayıya dayalı sabit uyarılar (marka doğrulama, kur riski) sona eklenir
+        keep = [r for r in rules if r.title == "Marka profilini doğrula" or "kur riskini planla" in r.title]
+        return recs[:5] + keep if recs else rules

@@ -53,6 +53,19 @@ düzenlenmiş profil `/api/predict`'e `brand_profile` olarak gider ve yeniden ü
 - **LLM ayarı:** `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL_NAME` (MiroFish'le aynı adlar). API, hem
   `talep-sim/backend/.env` hem repo kökündeki `.env` dosyasını okur.
 
+## Türkiye (TR) ayrı bölge
+
+Türkiye, EU/MENA/CIS/US ile birlikte ayrı bir hedef bölge: kendi ajan paneli (5 tüketici), skor kartı,
+fiyat grafiği sekmesi ve üretim payı var. Ekonomik farkı `app/economy.py` modeller; tüm değerler varsayımdır
+ve arayüzde/açıklamalarda belirtilir:
+- **Alım gücü:** fiyat merkezi diğer bölgelere göre aşağı çekilir (persona fiyat çarpanı 1.9, EU için 2.6).
+- **Enflasyon ve kur belirsizliği:** fiyata duyarlılık +0.15 artar, kabul edilebilir fiyat bandı daralır.
+- **TL gösterimi:** önerilen fiyat ve kabul aralığı TL olarak da gösterilir; kur arayüzden girilir
+  (`usd_try_rate`, varsayılan `USD_TRY_RATE` ortam değişkeni ya da 42; canlı kur değildir).
+- **Kur riski:** TL %10 değer kaybeder ve TL fiyatı sabit kalırsa USD marjının ne olacağı hesaplanıp önerilere yazılır.
+- **MiroFish:** seed dokümana TR paneli eklendi. Kayıtlı dünya (`.mirofish_world.json`) seed özetiyle
+  karşılaştırılır; TR'siz eski dünya otomatik yeniden kurulur (ilk istek uzun sürer).
+
 ## MiroFish entegrasyonu
 
 `SIM_ENGINE=mirofish` ile mock yerine MiroFish ajan sürüsü kullanılır
