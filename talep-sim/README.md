@@ -102,6 +102,11 @@ MiroFish simülasyonu LLM tüketir; `MIROFISH_MAX_ROUNDS` düşük tutuldu.
 `MIROFISH_BATCH_SIZE` (varsayılan 3) kişilik gruplarla röportaj edilir; zaman aşımına uğrayan grup
 `MIROFISH_TIMEOUT_RETRIES` kez yeniden denenir, sonra atlanır. Bir bölge için en az `MIROFISH_MIN_VALID` ajan cevabı
 yoksa o bölge `failed_regions` içinde nedeniyle birlikte döner; diğer bölgeler ve bütçe dağıtımı yine üretilir.
+**Fiyat merdiveni.** Ajanlara serbest fiyat yerine 5 sabit fiyat (referans fiyatın 0,5x-2,1x'i; Türkiye için TL karşılığıyla) sunulur
+ve her biri için tek kelimelik karar istenir (`supheli`, `uygun`, `pahali`, `cok_pahali`). Van Westendorp eşikleri bu kararların
+geçiş noktalarından türetilir. Fiyat alanlarına sayı yerine cümle yazan cevaplar önce LLM ile merdivene çevrilir; yine olmazsa
+ajanın ilgi puanı yine de talep skoruna katılır ve fiyat eğrisi marka/maliyet referansından kurulur (açıklamada belirtilir).
+
 **Ajan cevapları serbest metin olabilir.** Küçük modeller istenen JSON'u vermez. Önce hoşgörülü ayrıştırma denenir
 (kod bloğu, metin içi JSON); olmazsa cevap, `LLM_*` ile ayarlı modele ayrı ve küçük bir JSON-modu çağrısıyla gönderilip
 ilgi puanı, dört fiyat eşiği ve itiraza çevrilir (`LLM_API_KEY` gerekli; Ollama için herhangi bir değer). Ham cevaplar

@@ -36,6 +36,12 @@ def _demand(sim: RegionSimulation, region: str, brand: Optional[BrandProfile]) -
             assumptions.append(
                 f"{m['n_extracted']} ajan serbest metinle cevap verdi; ilgi ve fiyat eşikleri ayrı bir dil modeli çağrısıyla "
                 "bu metinlerden çıkarıldı (ham cevaplar 'Ham ajan cevapları' bölümünde).")
+        if m.get("price_source") == "brand_fallback":
+            assumptions.append(
+                "Ajanlardan kullanılabilir fiyat eşiği gelmedi (yalnızca ilgi puanı); fiyat eğrisi marka profili ve maliyetten "
+                "üretilen referans fiyat etrafında kuruldu. Önerilen fiyatı ajan görüşü değil varsayım olarak değerlendir.")
+        elif m.get("n_priced") is not None and m["n_priced"] < m["n_valid"]:
+            assumptions.append(f"{m['n_valid'] - m['n_priced']} ajanın yalnızca ilgi puanı alındı; fiyat eğrisi {m['n_priced']} ajana dayanıyor.")
         if m.get("n_estimated"):
             assumptions.append(f"{m['n_estimated']} cevapta bazı fiyat eşikleri açıkça yazmıyordu, metnin tonundan tahmin edildi.")
         if m["n_valid"] < m["n_agents"]:

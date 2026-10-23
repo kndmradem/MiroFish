@@ -94,7 +94,7 @@ export interface RegionPredictionResult {
 
 export interface RawAnswer {
   agent: number;
-  status: "json" | "extracted" | "failed" | "empty";
+  status: "json" | "partial" | "extracted" | "failed" | "empty";
   text: string;
   interest?: number | null;
 }

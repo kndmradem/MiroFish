@@ -16,12 +16,12 @@ from app.services.personas import SEED_CONSUMERS, build_seed_document, region_of
 def test_parse_agent_answer_accepts_wrapped_json():
     text = 'Tabii: {"interest": 80, "too_cheap": 20, "cheap": 40, "expensive": 80, "too_expensive": 120, "objection": "Kalın"} bu kadar.'
     a = parse_agent_answer(text)
-    assert a == {"interest": 80.0, "prices": [20.0, 40.0, 80.0, 120.0], "objection": "Kalın", "estimated": False}
+    assert a == {"interest": 80.0, "prices": [20.0, 40.0, 80.0, 120.0], "objection": "Kalın", "estimated": False,
+                 "price_source": "numeric"}
 
 
 @pytest.mark.parametrize("text", [
     "", "no json",
-    '{"interest": 50, "cheap": 40}',  # eksik
 ])
 def test_parse_agent_answer_rejects_bad(text):
     assert parse_agent_answer(text) is None
@@ -263,13 +263,15 @@ FREE_TEXT = "Bence bu kaban güzel ama biraz pahalı. 60 dolara alırdım, 120 d
 async def test_free_text_answers_are_extracted_by_llm(tmp_path):
     fake = FakeMiroFish()
     fake.reply_text = FREE_TEXT
-    ext, llm = make_extractor(json.dumps({"interest": 55, "too_cheap": 20, "cheap": 45, "expensive": 80,
-                                          "too_expensive": 120, "objection": "Pahalı", "estimated": True}))
+    # merdivende şüpheli/uygun/uygun/pahalı/çok pahalı: eşiklerin hepsi cevapta dayanaklı değil -> tahmin etiketi yok
+    ext, llm = make_extractor(json.dumps({"interest": 55, "ladder": {"1": "supheli", "2": "uygun", "3": "uygun",
+                                                                      "4": "pahali", "5": "cok_pahali"},
+                                          "objection": "Pahalı"}))
     engine = make_engine(tmp_path, fake, extractor=ext)
     card = await engine.fuse_product_card(REQ)
     sim = await engine.simulate_region(card, "EU", 25.0)
     assert llm.calls == 5 and sim.meta["n_valid"] == 5 and sim.meta["n_extracted"] == 5
-    assert sim.meta["n_estimated"] == 5 and sim.objections == ["Pahalı"]
+    assert sim.meta["n_priced"] == 5 and sim.meta["price_source"] == "agents" and sim.objections == ["Pahalı"]
     raw = sim.meta["raw_answers"]
     assert raw[0]["status"] == "extracted" and FREE_TEXT in raw[0]["text"]
     saved = (tmp_path / "world.json.answers.jsonl").read_text().splitlines()
@@ -294,3 +296,51 @@ async def test_free_text_without_llm_fails_clearly(tmp_path):
     card = await engine.fuse_product_card(REQ)
     with pytest.raises(RegionUnavailable, match="çıkarılamadı"):
         await engine.simulate_region(card, "EU", 25.0)
+
+
+def test_ladder_labels_become_ordered_thresholds():
+    from app.services.answer_extractor import make_ladder
+    ladder = make_ladder(100)
+    assert ladder == sorted(ladder) and len(set(ladder)) == 5
+    a = parse_agent_answer(json.dumps({"interest": "65/100", "ladder": {"1": "şüpheli", "2": "Uygun", "3": "uygun",
+                                                                         "4": "pahalı", "5": "çok pahalı"}}), ladder)
+    tc, ch, ex, te = a["prices"]
+    assert a["interest"] == 65 and tc < ch < ex < te and a["price_source"] == "ladder" and not a["estimated"]
+    assert ladder[0] < tc < ladder[2] and ladder[2] < ex < ladder[4]
+
+
+def test_prose_thresholds_give_partial_answer():
+    text = ('{"interest": 65, "too_cheap": "Fiyat çok düşüktür, üründen şüphe uyandırır.", '
+            '"cheap": "Fiyat uygun.", "expensive": "pahalı", "too_expensive": "asla"}')
+    a = parse_agent_answer(text)
+    assert a["interest"] == 65 and a["prices"] is None
+
+
+async def test_prose_thresholds_are_recovered_by_ladder_extraction(tmp_path):
+    fake = FakeMiroFish()
+    fake.reply_text = '{"interest": 65, "too_cheap": "çok düşük, şüphe uyandırır", "cheap": "uygun", "expensive": "x", "too_expensive": "y"}'
+    ext, llm = make_extractor(json.dumps({"interest": 70, "ladder": ["uygun", "uygun", "pahali", "cok_pahali", "cok_pahali"]}))
+    engine = make_engine(tmp_path, fake, extractor=ext)
+    card = await engine.fuse_product_card(REQ)
+    sim = await engine.simulate_region(card, "EU", 25.0)
+    assert sim.meta["n_priced"] == 5 and sim.meta["price_source"] == "agents"
+    assert sim.meta["n_estimated"] == 5  # 'şüpheli' basamağı yok -> alt eşik tahmin
+    analyze(sim.price_answers, 25.0)
+
+
+async def test_interest_only_answers_still_give_demand_and_fallback_prices(tmp_path):
+    fake = FakeMiroFish()
+    fake.reply_text = '{"interest": 62, "too_cheap": "ucuz", "objection": "Kalın"}'
+    engine = make_engine(tmp_path, fake)  # LLM çıkarıcı yok
+    card = await engine.fuse_product_card(REQ)
+    sim = await engine.simulate_region(card, "EU", 25.0)
+    assert sim.demand_score == 62 and sim.meta["n_priced"] == 0 and sim.meta["price_source"] == "brand_fallback"
+    vw, best = analyze(sim.price_answers, 25.0)
+    assert best > 25.0 and sim.objections == ["Kalın"]
+    assert all(r["status"] == "partial" for r in sim.meta["raw_answers"])
+
+
+async def test_interview_prompt_contains_price_ladder(tmp_path):
+    from app.services.mirofish_engine import build_interview_prompt
+    p = build_interview_prompt({"product_name": "K"}, "TR", None, 25.0, {"TRY": 42.0}, [50, 80, 110, 150, 210])
+    assert "1) $50 (≈ ₺2.100)" in p and "cok_pahali" in p and '"ladder"' in p

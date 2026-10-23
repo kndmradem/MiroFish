@@ -2,6 +2,7 @@ import type { RawAnswer } from "@/lib/api";
 
 const STATUS: Record<RawAnswer["status"], string> = {
   json: "JSON",
+  partial: "yalnızca ilgi puanı",
   extracted: "metinden çıkarıldı",
   failed: "çözümlenemedi",
   empty: "boş cevap",
