@@ -98,6 +98,12 @@ Akış:
 (Python 3.11-3.12 gerekir). Sonra `SIM_ENGINE=mirofish uvicorn app.main:app --port 8000`.
 MiroFish simülasyonu LLM tüketir; `MIROFISH_MAX_ROUNDS` düşük tutuldu.
 
+**Yavaş model / zaman aşımı (`等待IPC响应超时`, 504).** Bölgeler sırayla (`MIROFISH_CONCURRENCY=1`), ajanlar
+`MIROFISH_BATCH_SIZE` (varsayılan 3) kişilik gruplarla röportaj edilir; zaman aşımına uğrayan grup
+`MIROFISH_TIMEOUT_RETRIES` kez yeniden denenir, sonra atlanır. Bir bölge için en az `MIROFISH_MIN_VALID` ajan cevabı
+yoksa o bölge `failed_regions` içinde nedeniyle birlikte döner; diğer bölgeler ve bütçe dağıtımı yine üretilir.
+Arayüz `POST /api/predict/stream` (NDJSON) ile hangi bölgenin değerlendirildiğini canlı gösterir.
+
 Not: Bu entegrasyon gerçek MiroFish'e karşı henüz çalıştırılmadı (anahtar yok). Testler
 MiroFish API'sini taklit eden bir sahte sunucuyla çalışıyor; gerçek ajan cevaplarının
 JSON formatına uyma oranı ilk gerçek denemede ölçülmeli.
