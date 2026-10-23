@@ -7,7 +7,7 @@ from app.models import PredictionRequest
 from app.pricing import analyze
 from app.services.engine import MockSimulationEngine
 from app.services.mirofish_client import MiroFishClient, MiroFishError
-from app.services.mirofish_engine import MiroFishSimulationEngine, parse_agent_answer
+from app.services.mirofish_engine import MiroFishSimulationEngine, RegionUnavailable, parse_agent_answer
 from app.services.personas import SEED_CONSUMERS, build_seed_document, region_of
 
 
@@ -36,7 +36,9 @@ def test_region_mapping_from_seed_names_and_cities():
 class FakeMiroFish:
     """MiroFish Flask API'sinin test çifti; çağrı sırasını kaydeder."""
 
-    def __init__(self, bad_json=False, fail_first=False):
+    def __init__(self, bad_json=False, fail_first=False, timeout_calls=(), always_timeout=False):
+        self.timeout_calls = set(timeout_calls)
+        self.always_timeout = always_timeout
         self.fail_first = fail_first
         self.interview_calls = 0
         self.calls = []
@@ -71,6 +73,8 @@ class FakeMiroFish:
         if path == "/api/simulation/interview/batch":
             body = json.loads(request.content)
             self.interview_calls += 1
+            if self.always_timeout or self.interview_calls in self.timeout_calls:
+                return httpx.Response(504, json={"success": False, "error": "等待IPC响应超时"})
             broken = self.bad_json or (self.fail_first and self.interview_calls == 1)
             reply = "bozuk" if broken else json.dumps({
                 "interest": 70, "too_cheap": 30, "cheap": 55, "expensive": 90, "too_expensive": 130,
@@ -81,12 +85,12 @@ class FakeMiroFish:
         return httpx.Response(404, json={"success": False, "error": path})
 
 
-def make_engine(tmp_path, fake):
+def make_engine(tmp_path, fake, **kw):
     client = MiroFishClient("http://mf", httpx.AsyncClient(
         base_url="http://mf", transport=httpx.MockTransport(fake.handler)))
     mock = MockSimulationEngine(latency_s=0)
     return MiroFishSimulationEngine(client, mock.fuse_product_card, str(tmp_path / "world.json"),
-                                    poll_s=0, env_wait_s=1)
+                                    poll_s=0, env_wait_s=1, **kw)
 
 
 REQ = PredictionRequest(product_name="Kaban", image_base64="x", technical_specs="GSM: 450, yün",
@@ -127,7 +131,7 @@ async def test_invalid_answers_are_retried_once(tmp_path):
     engine = make_engine(tmp_path, fake)
     card = await engine.fuse_product_card(REQ)
     sim = await engine.simulate_region(card, "EU", 25.0)
-    assert fake.interview_calls == 2 and len(sim.price_answers) == 5
+    assert fake.interview_calls == 3 and len(sim.price_answers) == 5  # 2 grup + 1 yeniden deneme
 
 
 async def test_stale_world_without_turkey_is_rebuilt(tmp_path):
@@ -139,3 +143,38 @@ async def test_stale_world_without_turkey_is_rebuilt(tmp_path):
     card = await engine.fuse_product_card(REQ)
     sim = await engine.simulate_region(card, "TR", 25.0, None, {"TRY": 42})
     assert "/api/graph/ontology/generate" in fake.calls and len(sim.price_answers) == 5
+
+
+async def test_interviews_are_chunked_into_small_batches(tmp_path):
+    fake = FakeMiroFish()
+    engine = make_engine(tmp_path, fake, batch_size=2)
+    card = await engine.fuse_product_card(REQ)
+    sim = await engine.simulate_region(card, "EU", 25.0)
+    assert fake.interview_calls == 3  # 5 ajan -> 2+2+1
+    assert sim.meta["n_valid"] == 5
+
+
+async def test_timeout_is_retried_and_succeeds(tmp_path):
+    fake = FakeMiroFish(timeout_calls=[1])
+    engine = make_engine(tmp_path, fake)
+    card = await engine.fuse_product_card(REQ)
+    sim = await engine.simulate_region(card, "EU", 25.0)
+    assert sim.meta["n_valid"] == 5 and sim.meta["n_timed_out"] == 0
+
+
+async def test_partial_result_when_one_chunk_times_out(tmp_path):
+    # batch 2: grup1 iki kez zaman aşımı (çağrı 1,2) -> atlanır; kalan 3 ajan cevaplar.
+    fake = FakeMiroFish(timeout_calls=[1, 2])
+    engine = make_engine(tmp_path, fake, batch_size=2, retries=0)
+    card = await engine.fuse_product_card(REQ)
+    sim = await engine.simulate_region(card, "EU", 25.0)
+    assert sim.meta["n_valid"] == 3 and sim.meta["n_timed_out"] == 2
+
+
+async def test_stuck_model_aborts_region_with_clear_error(tmp_path):
+    fake = FakeMiroFish(always_timeout=True)
+    engine = make_engine(tmp_path, fake, batch_size=1)
+    card = await engine.fuse_product_card(REQ)
+    with pytest.raises(RegionUnavailable, match="zaman aşımına"):
+        await engine.simulate_region(card, "EU", 25.0)
+    assert fake.interview_calls == 4  # 2 grup x (1 + 1 yeniden deneme), sonra vazgeçer

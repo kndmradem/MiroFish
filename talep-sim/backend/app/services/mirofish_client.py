@@ -22,6 +22,13 @@ class MiroFishError(RuntimeError):
     pass
 
 
+class MiroFishTimeout(MiroFishError):
+    """Yavaş model yüzünden zaman aşımı (HTTP 504, "IPC yanıt zaman aşımı" ya da istemci timeout'u)."""
+
+
+_TIMEOUT_HINTS = ("timeout", "timed out", "超时")
+
+
 class MiroFishClient:
     def __init__(self, base_url: str, client: Optional[httpx.AsyncClient] = None):
         self.client = client or httpx.AsyncClient(base_url=base_url.rstrip("/"), timeout=300)
@@ -29,6 +36,8 @@ class MiroFishClient:
     async def _call(self, method: str, path: str, **kwargs) -> Dict[str, Any]:
         try:
             resp = await self.client.request(method, path, **kwargs)
+        except httpx.TimeoutException as e:
+            raise MiroFishTimeout(f"MiroFish yanıt vermedi ({path}): {type(e).__name__}: {e}") from e
         except httpx.HTTPError as e:
             raise MiroFishError(f"MiroFish'e ulaşılamadı ({path}): {type(e).__name__}: {e}") from e
         try:
@@ -36,7 +45,10 @@ class MiroFishClient:
         except ValueError:
             raise MiroFishError(f"{path} JSON olmayan cevap döndü ({resp.status_code})")
         if resp.status_code >= 400 or not body.get("success", False):
-            raise MiroFishError(f"{path} başarısız ({resp.status_code}): {body.get('error')}")
+            err = str(body.get("error"))
+            if resp.status_code == 504 or any(h in err.lower() for h in _TIMEOUT_HINTS):
+                raise MiroFishTimeout(f"{path} zaman aşımı ({resp.status_code}): {err}")
+            raise MiroFishError(f"{path} başarısız ({resp.status_code}): {err}")
         return body["data"]
 
     async def generate_ontology(self, filename: str, document: str, requirement: str, project_name: str) -> str:

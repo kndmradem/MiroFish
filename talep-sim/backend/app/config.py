@@ -29,6 +29,12 @@ class Settings:
     mirofish_state_file: str = field(default_factory=lambda: _env("MIROFISH_STATE_FILE", ".mirofish_world.json"))
     mirofish_max_rounds: int = field(default_factory=lambda: int(_env("MIROFISH_MAX_ROUNDS", "3")))
     mirofish_interview_timeout: int = field(default_factory=lambda: int(_env("MIROFISH_INTERVIEW_TIMEOUT", "180")))
+    # Yavaş yerel model için: grup başına ajan sayısı, zaman aşımında yeniden deneme,
+    # aynı anda kaç bölge, bir bölge için gereken en az geçerli ajan cevabı
+    mirofish_batch_size: int = field(default_factory=lambda: int(_env("MIROFISH_BATCH_SIZE", "3")))
+    mirofish_timeout_retries: int = field(default_factory=lambda: int(_env("MIROFISH_TIMEOUT_RETRIES", "1")))
+    mirofish_concurrency: int = field(default_factory=lambda: int(_env("MIROFISH_CONCURRENCY", "1")))
+    mirofish_min_valid: int = field(default_factory=lambda: int(_env("MIROFISH_MIN_VALID", "2")))
 
     # Görsel + metin füzyonu için OpenAI uyumlu vision modeli (Qwen-VL, GPT-4o, Claude vb.)
     vision_api_key: Optional[str] = field(default_factory=lambda: _env("VISION_API_KEY"))

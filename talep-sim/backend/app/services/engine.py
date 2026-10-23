@@ -10,7 +10,7 @@ import hashlib
 import random
 import re
 from dataclasses import dataclass, field
-from typing import List, Optional, Protocol
+from typing import Awaitable, Callable, List, Optional, Protocol
 
 from .. import brand as brandlib
 from .. import economy
@@ -34,7 +34,8 @@ class SimulationEngine(Protocol):
 
     async def simulate_region(self, card: dict, region: str, unit_cost: float,
                               brand: Optional[BrandProfile] = None,
-                              fx_rates: Optional[dict] = None) -> RegionSimulation: ...
+                              fx_rates: Optional[dict] = None,
+                              progress: Optional[Callable[[dict], Awaitable[None]]] = None) -> RegionSimulation: ...
 
 
 _FEATURE_KEYWORDS = {
@@ -102,7 +103,8 @@ class MockSimulationEngine:
 
     async def simulate_region(self, card: dict, region: str, unit_cost: float,
                               brand: Optional[BrandProfile] = None,
-                              fx_rates: Optional[dict] = None) -> RegionSimulation:
+                              fx_rates: Optional[dict] = None,
+                              progress: Optional[Callable[[dict], Awaitable[None]]] = None) -> RegionSimulation:
         await asyncio.sleep(self.latency_s)  # MiroFish ajan turu yerine
         persona = PERSONAS[region]
         features = card["features"]

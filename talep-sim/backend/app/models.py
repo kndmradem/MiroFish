@@ -103,6 +103,11 @@ class RegionPredictionResult(BaseModel):
     fx_rate: Optional[float] = Field(None, description="Kullanılan kur: 1 USD = fx_rate yerel para")
 
 
+class FailedRegion(BaseModel):
+    region: str
+    reason: str = Field(..., description="Bölgenin neden hesaplanamadığı (ör. model zaman aşımı)")
+
+
 class PredictionResponse(BaseModel):
     session_id: str
     status: str = "COMPLETED"
@@ -114,3 +119,4 @@ class PredictionResponse(BaseModel):
     recommendations: List[Recommendation] = []
     methodology_notes: List[str] = []
     regional_breakdown: List[RegionPredictionResult]
+    failed_regions: List[FailedRegion] = []

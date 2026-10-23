@@ -21,10 +21,15 @@ from .. import economy
 from ..models import BrandProfile, PredictionRequest
 from ..pricing import AgentPriceAnswer
 from .engine import RegionSimulation
-from .mirofish_client import MiroFishClient, MiroFishError
+from .mirofish_client import MiroFishClient, MiroFishError, MiroFishTimeout
 from .personas import PERSONAS, SIMULATION_REQUIREMENT, build_seed_document, region_of, seed_hash
 
 Fuser = Callable[[PredictionRequest], Awaitable[dict]]
+Progress = Callable[[dict], Awaitable[None]]
+
+
+class RegionUnavailable(MiroFishError):
+    """Bölge için yeterli ajan cevabı alınamadı (genellikle yavaş model); diğer bölgeler etkilenmez."""
 
 
 def build_interview_prompt(card: dict, region: str, brand: Optional[BrandProfile] = None,
@@ -87,7 +92,9 @@ def parse_agent_answer(text: str) -> Optional[dict]:
 class MiroFishSimulationEngine:
     def __init__(self, client: MiroFishClient, fuser: Fuser, state_file: str,
                  max_rounds: int = 3, interview_timeout: int = 180,
-                 poll_s: float = 5, env_wait_s: float = 600, retries: int = 1):
+                 poll_s: float = 5, env_wait_s: float = 600, retries: int = 1,
+                 batch_size: int = 3, timeout_retries: int = 1, max_concurrency: int = 1,
+                 min_valid: int = 2):
         self.client = client
         self.fuser = fuser
         self.state_path = Path(state_file)
@@ -96,6 +103,12 @@ class MiroFishSimulationEngine:
         self.poll_s = poll_s
         self.env_wait_s = env_wait_s
         self.retries = retries
+        # Yerel/yavaş modeller için: küçük röportaj grupları, zaman aşımında yeniden deneme,
+        # bölgeleri sırayla koşma (max_concurrency, main.py tarafından okunur).
+        self.batch_size = max(1, batch_size)
+        self.timeout_retries = max(0, timeout_retries)
+        self.max_concurrency = max(1, max_concurrency)
+        self.min_valid = max(1, min_valid)
         self._world: Optional[dict] = None
         self._lock = asyncio.Lock()
 
@@ -149,37 +162,71 @@ class MiroFishSimulationEngine:
         return {"project_id": project_id, "simulation_id": simulation_id, "agents": agents, "seed_hash": seed_hash()}
 
     # --- bölge simülasyonu ----------------------------------------------
+    async def _interview_chunk(self, simulation_id: str, chunk: List[int], prompt: str) -> Dict[int, str]:
+        """Bir grubu röportaj eder; zaman aşımında aynı grubu yeniden dener, hâlâ olmazsa MiroFishTimeout fırlatır."""
+        for attempt in range(1 + self.timeout_retries):
+            try:
+                return await self.client.interview_batch(simulation_id, chunk, prompt, self.interview_timeout)
+            except MiroFishTimeout:
+                if attempt == self.timeout_retries:
+                    raise
+        return {}
+
     async def simulate_region(self, card: dict, region: str, unit_cost: float,
                               brand: Optional[BrandProfile] = None,
-                              fx_rates: Optional[dict] = None) -> RegionSimulation:
+                              fx_rates: Optional[dict] = None,
+                              progress: Optional[Progress] = None) -> RegionSimulation:
+        async def note(detail: str) -> None:
+            if progress:
+                await progress({"stage": "interview", "region": region, "detail": detail})
+
+        await note("Simülasyon dünyası hazırlanıyor")
         world = await self._ensure_world()
         agent_ids = world["agents"].get(region, [])
         if not agent_ids:
-            raise MiroFishError(f"{region} bölgesi için ajan bulunamadı")
+            raise RegionUnavailable(f"{region} bölgesi için ajan bulunamadı")
 
         prompt = build_interview_prompt(card, region, brand, unit_cost, fx_rates)
         parsed: Dict[int, dict] = {}
-        pending = list(agent_ids)
-        # Küçük/yerel modeller JSON'u bozabilir: geçersiz cevap veren ajanlara bir kez daha sor.
+        timed_out = 0
+        stuck = False
+        # Küçük/yerel modeller JSON'u bozabilir: geçersiz cevap verenleri bir kez daha sor.
+        # Zaman aşımına uğrayan gruplar aynı turda yeniden denenir, olmazsa atlanır (kısmi sonuç).
         for _ in range(1 + self.retries):
-            if not pending:
+            pending = [a for a in agent_ids if a not in parsed]
+            if not pending or stuck:
                 break
-            responses = await self.client.interview_batch(
-                world["simulation_id"], pending, prompt, self.interview_timeout)
-            for agent_id, text in responses.items():
-                answer = parse_agent_answer(text)
-                if answer:
-                    parsed[agent_id] = answer
-            pending = [a for a in pending if a not in parsed]
-        parsed = list(parsed.values())
-        if len(parsed) < max(1, len(agent_ids) // 2):
-            raise MiroFishError(
-                f"{region}: {len(agent_ids)} ajandan yalnızca {len(parsed)} geçerli cevap geldi")
+            chunks = [pending[i:i + self.batch_size] for i in range(0, len(pending), self.batch_size)]
+            consecutive_timeouts = 0
+            for n, chunk in enumerate(chunks, 1):
+                await note(f"Ajanlar röportaj ediliyor ({len(parsed)}/{len(agent_ids)} cevap, grup {n}/{len(chunks)})")
+                try:
+                    responses = await self._interview_chunk(world["simulation_id"], chunk, prompt)
+                except MiroFishTimeout:
+                    timed_out += len(chunk)
+                    consecutive_timeouts += 1
+                    if consecutive_timeouts >= 2:  # model takılmış görünüyor, bölgeyi boşuna bekletme
+                        stuck = True
+                        break
+                    continue
+                consecutive_timeouts = 0
+                for agent_id, text in responses.items():
+                    answer = parse_agent_answer(text)
+                    if answer:
+                        parsed[agent_id] = answer
+        valid = list(parsed.values())
+        need = min(self.min_valid, len(agent_ids))
+        if len(valid) < need:
+            reason = "model zaman aşımına uğradı" if timed_out else "ajan cevapları geçerli JSON değildi"
+            raise RegionUnavailable(
+                f"{region}: {len(agent_ids)} ajandan yalnızca {len(valid)} geçerli cevap alınabildi "
+                f"({reason}; en az {need} gerekli)")
 
-        answers = [AgentPriceAnswer(*a["prices"]) for a in parsed]
-        demand = round(sum(a["interest"] for a in parsed) / len(parsed))
-        counts = Counter(a["objection"] for a in parsed if a["objection"])
+        answers = [AgentPriceAnswer(*a["prices"]) for a in valid]
+        demand = round(sum(a["interest"] for a in valid) / len(valid))
+        counts = Counter(a["objection"] for a in valid if a["objection"])
         objections = [o for o, _ in counts.most_common(3)]
-        meta = {"engine": "mirofish", "n_agents": len(agent_ids), "n_valid": len(parsed),
-                "mean_interest": demand, "objection_counts": counts.most_common(3)}
+        meta = {"engine": "mirofish", "n_agents": len(agent_ids), "n_valid": len(valid),
+                "n_timed_out": timed_out, "mean_interest": demand,
+                "objection_counts": counts.most_common(3)}
         return RegionSimulation(region, demand, answers, objections, meta)

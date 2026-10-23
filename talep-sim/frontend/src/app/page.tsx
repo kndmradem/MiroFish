@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { ImageIcon, Loader2 } from "lucide-react";
 
 import { BrandPanel, SourceBadge } from "@/components/brand-panel";
+import { applyProgress, ProgressPanel, type ProgressState, type RegionStatus } from "@/components/progress-panel";
 import { VanWestendorpChart } from "@/components/price-chart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { predict, REGIONS, TIER_LABEL, try_, usd, type BrandProfile, type PredictionResponse, type RegionCode } from "@/lib/api";
+import { predictStream, REGIONS, TIER_LABEL, try_, usd, type BrandProfile, type PredictionResponse, type RegionCode } from "@/lib/api";
 
 function demandTone(score: number) {
   if (score >= 70) return "text-green-600";
@@ -36,6 +37,7 @@ export default function Dashboard() {
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<ProgressState | null>(null);
   const [result, setResult] = useState<PredictionResponse | null>(null);
   const [chartRegion, setChartRegion] = useState<RegionCode | null>(null);
 
@@ -56,8 +58,9 @@ export default function Dashboard() {
     if (!image) return;
     setLoading(true);
     setError(null);
+    setProgress({ message: "Başlatılıyor…", regions: Object.fromEntries(regions.map((r) => [r, "waiting" as RegionStatus])) });
     try {
-      const res = await predict({
+      const res = await predictStream({
         product_name: productName,
         image_base64: image.dataUrl.split(",")[1] ?? "",
         technical_specs: specs,
@@ -68,7 +71,7 @@ export default function Dashboard() {
         brand_notes: brandNotes.trim() || undefined,
         brand_profile: profile ?? undefined,
         usd_try_rate: regions.includes("TR") && Number(usdTry) > 0 ? Number(usdTry) : undefined,
-      });
+      }, (ev) => setProgress((prev) => applyProgress(prev, ev, regions)));
       if (res.brand_profile) setProfile(res.brand_profile);
       setResult(res);
       setChartRegion(res.regional_breakdown[0]?.region ?? null);
@@ -76,6 +79,7 @@ export default function Dashboard() {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
+      setProgress(null);
     }
   }
 
@@ -157,6 +161,7 @@ export default function Dashboard() {
               {loading ? "Ajanlar değerlendiriyor…" : "Simülasyonu çalıştır"}
             </Button>
             {!image && <p className="text-xs text-muted-foreground">Simülasyon için görsel gerekli.</p>}
+            {loading && progress && <ProgressPanel progress={progress} />}
             {error && <p className="text-sm text-destructive">{error}</p>}
           </form>
         </CardContent>
@@ -169,6 +174,20 @@ export default function Dashboard() {
           </Card>
         ) : (
           <>
+            {result.failed_regions.length > 0 && (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+                <p className="font-medium">
+                  {result.failed_regions.map((f) => f.region).join(", ")} bölgesi hesaplanamadı (model zaman aşımına uğradı ya da geçerli cevap vermedi).
+                </p>
+                <p className="text-muted-foreground">
+                  Diğer bölgeler gösteriliyor; bütçe yalnızca hesaplanan bölgeler arasında dağıtıldı. Yeniden denemek için
+                  modeli ısıtıp tekrar çalıştır veya <code>MIROFISH_BATCH_SIZE</code>/<code>MIROFISH_INTERVIEW_TIMEOUT</code> değerlerini ayarla.
+                </p>
+                <ul className="mt-1 list-disc pl-5 text-xs text-muted-foreground">
+                  {result.failed_regions.map((f) => <li key={f.region}><b>{f.region}:</b> {f.reason}</li>)}
+                </ul>
+              </div>
+            )}
             {result.api_outdated && (
               <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
                 API eski sürümde çalışıyor: açıklama ve öneri alanları gelmedi. Backend terminalinde <code>Ctrl+C</code> ile

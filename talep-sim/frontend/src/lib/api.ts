@@ -102,11 +102,55 @@ export interface PredictionResponse {
   recommendations: Recommendation[];
   methodology_notes: string[];
   regional_breakdown: RegionPredictionResult[];
+  /** Zaman aşımı vb. yüzünden hesaplanamayan bölgeler; diğer bölgeler yine de gösterilir. */
+  failed_regions: { region: string; reason: string }[];
   /** Eski bir API sürümü açıklama/öneri alanlarını göndermediyse true (istemci tarafında eklenir). */
   api_outdated?: boolean;
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+export interface ProgressEvent {
+  stage: string;
+  region?: string;
+  detail?: string;
+  done?: number;
+  total?: number;
+}
+
+/** NDJSON akışlı tahmin: ilerleme olaylarını `onProgress`e iletir. Akış uç noktası yoksa (eski API) /api/predict'e düşer. */
+export async function predictStream(body: PredictionRequest, onProgress: (e: ProgressEvent) => void): Promise<PredictionResponse> {
+  const res = await fetch(`${API_URL}/api/predict/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (res.status === 404 || res.status === 405 || !res.body) return predict(body);
+  if (!res.ok) throw new Error(`Simülasyon başarısız (${res.status}): ${await res.text()}`);
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let result: PredictionResponse | null = null;
+  const handle = (line: string) => {
+    if (!line.trim()) return;
+    const ev = JSON.parse(line);
+    if (ev.type === "progress") onProgress(ev);
+    else if (ev.type === "result") result = normalizePrediction(ev.data);
+    else if (ev.type === "error") throw new Error(`Simülasyon başarısız (${ev.status}): ${ev.detail}`);
+  };
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    lines.forEach(handle);
+  }
+  handle(buffer);
+  if (!result) throw new Error("Simülasyon sonuç döndürmeden bağlantı kapandı.");
+  return result;
+}
 
 export async function predict(body: PredictionRequest): Promise<PredictionResponse> {
   const res = await fetch(`${API_URL}/api/predict`, {
@@ -129,6 +173,7 @@ export function normalizePrediction(raw: PredictionResponse): PredictionResponse
     brand_profile: raw.brand_profile ?? null,
     recommendations: raw.recommendations ?? [],
     methodology_notes: raw.methodology_notes ?? [],
+    failed_regions: raw.failed_regions ?? [],
     regional_breakdown: raw.regional_breakdown.map((r) => ({ ...r, explanations: r.explanations ?? [] })),
     api_outdated: outdated,
   };

@@ -32,6 +32,10 @@ def _demand(sim: RegionSimulation, region: str, brand: Optional[BrandProfile]) -
                f"cevap geldi. Talep endeksi bu ajanların 0-100 arası ilgi puanlarının ortalamasıdır ({m['mean_interest']}).")
         assumptions = ["Ajanlar bir dil modelinin canlandırdığı sentetik tüketicilerdir, gerçek satış verisi değildir.",
                        "Sonuç modelin kalitesine bağlıdır; küçük yerel modeller tutarsız puan verebilir."]
+        if m["n_valid"] < m["n_agents"]:
+            assumptions.append(
+                f"{m['n_agents'] - m['n_valid']} ajan zaman aşımı ya da bozuk cevap yüzünden hesaba katılmadı; "
+                "sonuç kısmi örneklemle üretildi, güven düşüktür.")
     else:
         feats = ", ".join(_FEATURE_TR.get(f, f) for f in m.get("matched_features", [])) or "eşleşen özellik yok"
         parts = [f"taban 55", f"ürün-bölge uyumu {_signed(m['fit_points'])} ({feats})"]

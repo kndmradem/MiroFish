@@ -1,5 +1,6 @@
 """FastAPI giriş noktası: ürün talep ve fiyat simülasyonu."""
 import asyncio
+import json
 import os
 import uuid
 from decimal import Decimal
@@ -7,9 +8,10 @@ from decimal import Decimal
 import httpx
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 from .allocation import RegionSignal, allocate_production_budget
-from .models import BrandProfile, BrandProfileRequest, PredictionRequest, PredictionResponse, RegionPredictionResult
+from .models import FailedRegion, BrandProfile, BrandProfileRequest, PredictionRequest, PredictionResponse, RegionPredictionResult
 from .advisor import Advisor
 from .explain import explain_region, methodology_notes
 from . import economy
@@ -44,6 +46,8 @@ def build_engine(cfg: Settings) -> SimulationEngine:
     return MiroFishSimulationEngine(
         MiroFishClient(cfg.mirofish_url), fuser, cfg.mirofish_state_file,
         max_rounds=cfg.mirofish_max_rounds, interview_timeout=cfg.mirofish_interview_timeout,
+        batch_size=cfg.mirofish_batch_size, timeout_retries=cfg.mirofish_timeout_retries,
+        max_concurrency=cfg.mirofish_concurrency, min_valid=cfg.mirofish_min_valid,
     )
 
 
@@ -76,22 +80,55 @@ async def brand_profile(req: BrandProfileRequest, profiler: BrandProfiler = Depe
     return await profiler.profile(req.brand, req.notes)
 
 
-@app.post("/api/predict", response_model=PredictionResponse)
-async def predict(req: PredictionRequest, engine: SimulationEngine = Depends(get_engine),
-                  profiler: BrandProfiler = Depends(get_profiler),
-                  advisor: Advisor = Depends(get_advisor)) -> PredictionResponse:
+async def _noop(_: dict) -> None:
+    return None
+
+
+async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profiler: BrandProfiler,
+                         advisor: Advisor, emit=_noop) -> PredictionResponse:
+    """Tahmin hattı. `emit` ilerleme olayları alır; bölge hataları tüm çalıştırmayı düşürmez."""
     unit_cost = float(req.unit_cost)
     fx_rate = req.usd_try_rate or settings.usd_try_rate
     fx_rates = {"TRY": fx_rate}
     brand = req.brand_profile
-    if brand is None and req.brand and req.brand.strip():
-        brand = await profiler.profile(req.brand, req.brand_notes)
     try:
+        if brand is None and req.brand and req.brand.strip():
+            await emit({"stage": "brand", "detail": f"{req.brand} marka profili çıkarılıyor"})
+            brand = await profiler.profile(req.brand, req.brand_notes)
+        await emit({"stage": "card", "detail": "Görsel ve teknik metin ürün kartına çevriliyor"})
         card = await engine.fuse_product_card(req)
-        # Bölge simülasyonları birbirinden bağımsız, paralel koşar.
-        sims = await asyncio.gather(*(engine.simulate_region(card, r, unit_cost, brand, fx_rates) for r in req.target_regions))
     except (MiroFishError, LLMError, httpx.HTTPError) as e:
         raise HTTPException(status_code=502, detail=f"Simülasyon servisi hatası: {type(e).__name__}: {e}") from e
+
+    # Yavaş yerel modelde bölgeler sırayla koşar (motorun max_concurrency'si); mock'ta hepsi paralel.
+    gate = asyncio.Semaphore(getattr(engine, "max_concurrency", len(req.target_regions)))
+    total = len(req.target_regions)
+    done = 0
+
+    async def one(region: str):
+        nonlocal done
+        async with gate:
+            await emit({"stage": "region_start", "region": region, "done": done, "total": total,
+                        "detail": f"{region} bölgesi değerlendiriliyor"})
+            try:
+                sim = await engine.simulate_region(card, region, unit_cost, brand, fx_rates, progress=emit)
+            except (MiroFishError, LLMError, httpx.HTTPError) as e:
+                done += 1
+                reason = f"{type(e).__name__}: {e}"
+                await emit({"stage": "region_failed", "region": region, "done": done, "total": total, "detail": reason})
+                return FailedRegion(region=region, reason=reason)
+            done += 1
+            await emit({"stage": "region_done", "region": region, "done": done, "total": total,
+                        "detail": f"{region} tamamlandı"})
+            return sim
+
+    outcomes = await asyncio.gather(*(one(r) for r in req.target_regions))
+    sims = [o for o in outcomes if not isinstance(o, FailedRegion)]
+    failed = [o for o in outcomes if isinstance(o, FailedRegion)]
+    if not sims:
+        detail = "; ".join(f"{f.region}: {f.reason}" for f in failed)
+        raise HTTPException(status_code=502, detail=f"Hiçbir bölge hesaplanamadı. {detail}")
+    await emit({"stage": "finalize", "detail": "Fiyat analizi, bütçe dağıtımı ve öneriler hazırlanıyor"})
 
     priced = {s.region: (s, *analyze(s.price_answers, unit_cost)) for s in sims}
     allocations = allocate_production_budget(
@@ -125,6 +162,10 @@ async def predict(req: PredictionRequest, engine: SimulationEngine = Depends(get
     spent = sum((a.quantity * req.unit_cost for a in allocations.values()), Decimal(0))
     unallocated = Decimal(req.total_production_budget) - spent
     engine_name = sims[0].meta.get("engine", "mock")
+    notes = methodology_notes(engine_name, brand)
+    if failed:
+        notes.append("Hesaplanamayan bölgeler (" + ", ".join(f.region for f in failed) +
+                     ") dağıtıma katılmadı; bütçe yalnızca hesaplanan bölgeler arasında paylaştırıldı.")
     return PredictionResponse(
         session_id=str(uuid.uuid4()),
         total_produced_qty=sum(a.quantity for a in allocations.values()),
@@ -133,6 +174,45 @@ async def predict(req: PredictionRequest, engine: SimulationEngine = Depends(get
         engine=engine_name,
         brand_profile=brand,
         recommendations=await advisor.recommend(breakdown, brand, unit_cost, req.total_production_budget, unallocated, card),
-        methodology_notes=methodology_notes(engine_name, brand),
+        methodology_notes=notes,
         regional_breakdown=breakdown,
+        failed_regions=failed,
     )
+
+
+@app.post("/api/predict", response_model=PredictionResponse)
+async def predict(req: PredictionRequest, engine: SimulationEngine = Depends(get_engine),
+                  profiler: BrandProfiler = Depends(get_profiler),
+                  advisor: Advisor = Depends(get_advisor)) -> PredictionResponse:
+    return await run_prediction(req, engine, profiler, advisor)
+
+
+@app.post("/api/predict/stream")
+async def predict_stream(req: PredictionRequest, engine: SimulationEngine = Depends(get_engine),
+                         profiler: BrandProfiler = Depends(get_profiler),
+                         advisor: Advisor = Depends(get_advisor)) -> StreamingResponse:
+    """NDJSON akışı: her satır {"type":"progress",...} / {"type":"result","data":...} / {"type":"error",...}."""
+    queue: asyncio.Queue = asyncio.Queue()
+
+    async def emit(event: dict) -> None:
+        await queue.put({"type": "progress", **event})
+
+    async def work() -> None:
+        try:
+            result = await run_prediction(req, engine, profiler, advisor, emit)
+            await queue.put({"type": "result", "data": json.loads(result.model_dump_json())})
+        except HTTPException as e:
+            await queue.put({"type": "error", "status": e.status_code, "detail": e.detail})
+        except Exception as e:  # akış kopmasın, hata istemciye iletilsin
+            await queue.put({"type": "error", "status": 500, "detail": f"{type(e).__name__}: {e}"})
+        await queue.put(None)
+
+    async def body():
+        task = asyncio.create_task(work())
+        try:
+            while (event := await queue.get()) is not None:
+                yield json.dumps(event, ensure_ascii=False) + "\n"
+        finally:
+            task.cancel()
+
+    return StreamingResponse(body(), media_type="application/x-ndjson")
