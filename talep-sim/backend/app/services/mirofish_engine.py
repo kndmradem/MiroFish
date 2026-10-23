@@ -14,7 +14,7 @@ import json
 import re
 from collections import Counter
 from pathlib import Path
-from typing import Awaitable, Callable, Dict, List, Optional
+from typing import Awaitable, Callable, Dict, List, Optional, Sequence
 
 from .. import brand as brandlib
 from .. import economy
@@ -22,7 +22,7 @@ from ..models import BrandProfile, PredictionRequest
 from ..pricing import AgentPriceAnswer
 from .engine import RegionSimulation
 from .mirofish_client import MiroFishClient, MiroFishError, MiroFishTimeout
-from .personas import PERSONAS, SIMULATION_REQUIREMENT, build_seed_document, region_of, seed_hash
+from .personas import PERSONAS, build_seed_document, region_of, scope_of, seed_hash, simulation_requirement
 
 Fuser = Callable[[PredictionRequest], Awaitable[dict]]
 Progress = Callable[[dict], Awaitable[None]]
@@ -109,24 +109,31 @@ class MiroFishSimulationEngine:
         self.timeout_retries = max(0, timeout_retries)
         self.max_concurrency = max(1, max_concurrency)
         self.min_valid = max(1, min_valid)
-        self._world: Optional[dict] = None
+        self._worlds: Optional[Dict[str, dict]] = None
         self._lock = asyncio.Lock()
 
     async def fuse_product_card(self, req: PredictionRequest) -> dict:
         return await self.fuser(req)
 
     # --- dünya kurulumu -------------------------------------------------
-    async def _ensure_world(self) -> dict:
+    async def _ensure_world(self, scope: Optional[Sequence[str]] = None) -> dict:
+        """Seçili bölgelere özel dünya: yalnızca o bölgelerin tüketicileri kurulur ve kaydedilir."""
+        regions = scope_of(scope)
+        key = seed_hash(regions)
         async with self._lock:
-            if self._world is None and self.state_path.exists():
-                self._world = json.loads(self.state_path.read_text())
-            # Seed (bölge/tüketici listesi) değiştiyse kayıtlı dünya eskidir, yeniden kurulur.
-            if self._world is not None and self._world.get("seed_hash") == seed_hash() \
-                    and await self._world_alive(self._world):
-                return self._world
-            self._world = await self._build_world()
-            self.state_path.write_text(json.dumps(self._world))
-            return self._world
+            if self._worlds is None:
+                self._worlds = {}
+                if self.state_path.exists():
+                    saved = json.loads(self.state_path.read_text())
+                    # Eski biçim: tek dünya {"seed_hash": ..., ...}
+                    self._worlds = {saved["seed_hash"]: saved} if "seed_hash" in saved else saved
+            world = self._worlds.get(key)
+            if world is not None and await self._world_alive(world):
+                return world
+            world = await self._build_world(regions)
+            self._worlds[key] = world
+            self.state_path.write_text(json.dumps(self._worlds))
+            return world
 
     async def _world_alive(self, world: dict) -> bool:
         try:
@@ -134,20 +141,20 @@ class MiroFishSimulationEngine:
         except MiroFishError:
             return False
 
-    async def _build_world(self) -> dict:
+    async def _build_world(self, regions: List[str]) -> dict:
         c = self.client
         project_id = await c.generate_ontology(
-            "tuketici_panelleri.md", build_seed_document(), SIMULATION_REQUIREMENT, "talep-simulasyonu")
+            "tuketici_panelleri.md", build_seed_document(regions), simulation_requirement(regions), "talep-simulasyonu")
         await c.wait_graph_task(await c.build_graph(project_id), poll_s=self.poll_s)
         simulation_id = await c.create_simulation(project_id)
         await c.wait_prepared(simulation_id, await c.prepare(simulation_id), poll_s=self.poll_s)
 
         profiles = await c.profiles(simulation_id)
-        agents: Dict[str, List[int]] = {r: [] for r in PERSONAS}
+        agents: Dict[str, List[int]] = {r: [] for r in regions}
         for p in profiles:
             text = " ".join(str(p.get(k, "")) for k in ("name", "username", "bio", "persona"))
             region = region_of(text)
-            if region:
+            if region in agents:
                 agents[region].append(int(p["user_id"]))
         if not any(agents.values()):
             raise MiroFishError("Hiçbir ajan bir bölgeye eşlenemedi; seed doküman ve profilleri kontrol et")
@@ -159,7 +166,7 @@ class MiroFishSimulationEngine:
             if loop.time() > deadline:
                 raise MiroFishError("Simülasyon ortamı röportaja hazır hale gelmedi")
             await asyncio.sleep(self.poll_s)
-        return {"project_id": project_id, "simulation_id": simulation_id, "agents": agents, "seed_hash": seed_hash()}
+        return {"project_id": project_id, "simulation_id": simulation_id, "agents": agents, "seed_hash": seed_hash(regions), "regions": regions}
 
     # --- bölge simülasyonu ----------------------------------------------
     async def _interview_chunk(self, simulation_id: str, chunk: List[int], prompt: str) -> Dict[int, str]:
@@ -175,13 +182,14 @@ class MiroFishSimulationEngine:
     async def simulate_region(self, card: dict, region: str, unit_cost: float,
                               brand: Optional[BrandProfile] = None,
                               fx_rates: Optional[dict] = None,
-                              progress: Optional[Progress] = None) -> RegionSimulation:
+                              progress: Optional[Progress] = None,
+                              scope: Optional[Sequence[str]] = None) -> RegionSimulation:
         async def note(detail: str) -> None:
             if progress:
                 await progress({"stage": "interview", "region": region, "detail": detail})
 
         await note("Simülasyon dünyası hazırlanıyor")
-        world = await self._ensure_world()
+        world = await self._ensure_world(scope or [region])
         agent_ids = world["agents"].get(region, [])
         if not agent_ids:
             raise RegionUnavailable(f"{region} bölgesi için ajan bulunamadı")

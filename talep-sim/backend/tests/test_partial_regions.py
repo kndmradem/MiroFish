@@ -18,7 +18,7 @@ class FlakyEngine(MockSimulationEngine):
         self.bad = bad
         self.max_concurrency = 1
 
-    async def simulate_region(self, card, region, unit_cost, brand=None, fx_rates=None, progress=None):
+    async def simulate_region(self, card, region, unit_cost, brand=None, fx_rates=None, progress=None, scope=None):
         if progress:
             await progress({"stage": "interview", "region": region, "detail": "röportaj"})
         if region in self.bad:

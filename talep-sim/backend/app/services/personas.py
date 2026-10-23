@@ -5,7 +5,7 @@ kullanılacak. Diğer alanlar mock simülasyonun parametreleri.
 """
 import re
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Optional, Sequence
 
 
 @dataclass(frozen=True)
@@ -120,23 +120,35 @@ SEED_CONSUMERS: Dict[str, List[str]] = {
     ],
 }
 
-SIMULATION_REQUIREMENT = (
-    "Dört bölgesel pazardaki (EU, MENA, CIS, US, TR) tüketicilerin yeni moda/tekstil ürünlerini "
-    "nasıl değerlendirdiğini simüle et. Her tüketici kendi şehrinin iklimini, kültürünü ve "
-    "satın alma önceliklerini korumalı. Tüketiciler ürünler hakkında fikir paylaşır, fiyat "
-    "algılarını ve itirazlarını tartışır."
-)
+def simulation_requirement(regions: Optional[Sequence[str]] = None) -> str:
+    regions = list(regions or SEED_CONSUMERS)
+    return (
+        f"{len(regions)} bölgesel pazardaki ({', '.join(regions)}) tüketicilerin yeni moda/tekstil ürünlerini "
+        "nasıl değerlendirdiğini simüle et. Her tüketici kendi şehrinin iklimini, kültürünü ve "
+        "satın alma önceliklerini korumalı. Tüketiciler ürünler hakkında fikir paylaşır, fiyat "
+        "algılarını ve itirazlarını tartışır."
+    )
 
 
-def seed_hash() -> str:
-    """Seed dokümanın özeti: bölge/tüketici listesi değişince kayıtlı MiroFish dünyası yenilenir."""
+SIMULATION_REQUIREMENT = simulation_requirement()
+
+
+def scope_of(regions: Optional[Sequence[str]] = None) -> List[str]:
+    """Seçili bölgeler (sıra bağımsız, tekrarsız); boşsa hepsi."""
+    return [r for r in SEED_CONSUMERS if not regions or r in regions]
+
+
+def seed_hash(regions: Optional[Sequence[str]] = None) -> str:
+    """Seed dokümanın özeti: seçili bölge/tüketici listesi değişince farklı bir MiroFish dünyası gerekir."""
     import hashlib
-    return hashlib.sha256(build_seed_document().encode()).hexdigest()[:12]
+    return hashlib.sha256(build_seed_document(regions).encode()).hexdigest()[:12]
 
 
-def build_seed_document() -> str:
+def build_seed_document(regions: Optional[Sequence[str]] = None) -> str:
+    """Yalnızca seçili bölgelerin tüketici panellerini içerir; seçilmeyen bölge dünyaya hiç girmez."""
     lines = ["# Bölgesel Tüketici Panelleri", ""]
-    for region, people in SEED_CONSUMERS.items():
+    for region in scope_of(regions):
+        people = SEED_CONSUMERS[region]
         persona = PERSONAS[region]
         lines += [f"## {region} paneli ({persona.city} ve çevresi)", "", f"Bölge profili: {persona.prompt}", ""]
         lines += [f"- {p} ({region} bölgesi tüketicisi)" for p in people]

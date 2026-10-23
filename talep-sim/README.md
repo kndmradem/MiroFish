@@ -102,6 +102,8 @@ MiroFish simülasyonu LLM tüketir; `MIROFISH_MAX_ROUNDS` düşük tutuldu.
 `MIROFISH_BATCH_SIZE` (varsayılan 3) kişilik gruplarla röportaj edilir; zaman aşımına uğrayan grup
 `MIROFISH_TIMEOUT_RETRIES` kez yeniden denenir, sonra atlanır. Bir bölge için en az `MIROFISH_MIN_VALID` ajan cevabı
 yoksa o bölge `failed_regions` içinde nedeniyle birlikte döner; diğer bölgeler ve bütçe dağıtımı yine üretilir.
+**Bölge seçimi katıdır.** MiroFish dünyası yalnızca seçili bölgelerin tüketici panelleriyle kurulur (seed doküman, Zep grafiği, ajan profilleri, röportajlar); seçilmeyen bölge hiç dahil olmaz. Her bölge kombinasyonu için ayrı dünya kaydedilir (`.mirofish_world.json`), ilk kez seçilen kombinasyon dünyayı kurar, sonrakiler yeniden kullanır. Bütçe dağıtımı da yalnızca seçili (ve hesaplanan) bölgeler arasındadır.
+
 Arayüz `POST /api/predict/stream` (NDJSON) ile hangi bölgenin değerlendirildiğini canlı gösterir.
 
 Not: Bu entegrasyon gerçek MiroFish'e karşı henüz çalıştırılmadı (anahtar yok). Testler

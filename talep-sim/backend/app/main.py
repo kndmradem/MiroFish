@@ -111,7 +111,8 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
             await emit({"stage": "region_start", "region": region, "done": done, "total": total,
                         "detail": f"{region} bölgesi değerlendiriliyor"})
             try:
-                sim = await engine.simulate_region(card, region, unit_cost, brand, fx_rates, progress=emit)
+                sim = await engine.simulate_region(card, region, unit_cost, brand, fx_rates, progress=emit,
+                                                scope=req.target_regions)
             except (MiroFishError, LLMError, httpx.HTTPError) as e:
                 done += 1
                 reason = f"{type(e).__name__}: {e}"

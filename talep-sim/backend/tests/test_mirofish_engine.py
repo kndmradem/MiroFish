@@ -52,6 +52,7 @@ class FakeMiroFish:
         self.calls.append(path)
         ok = lambda data: httpx.Response(200, json={"success": True, "data": data})
         if path == "/api/graph/ontology/generate":
+            self.uploaded_seed = request.content.decode(errors="ignore")
             return ok({"project_id": "proj_1"})
         if path == "/api/graph/build":
             return ok({"task_id": "t1"})
@@ -101,7 +102,7 @@ async def test_world_built_once_and_regions_interviewed(tmp_path):
     fake = FakeMiroFish()
     engine = make_engine(tmp_path, fake)
     card = await engine.fuse_product_card(REQ)
-    eu, cis = [await engine.simulate_region(card, r, 25.0) for r in ("EU", "CIS")]
+    eu, cis = [await engine.simulate_region(card, r, 25.0, scope=["EU", "CIS"]) for r in ("EU", "CIS")]
 
     assert fake.calls.count("/api/graph/ontology/generate") == 1  # ikinci bölge dünyayı yeniden kurmaz
     assert eu.demand_score == 70 and len(eu.price_answers) == 5
@@ -113,9 +114,9 @@ async def test_world_built_once_and_regions_interviewed(tmp_path):
 async def test_saved_world_reused_after_restart(tmp_path):
     fake = FakeMiroFish()
     card = await make_engine(tmp_path, fake).fuse_product_card(REQ)
-    await make_engine(tmp_path, fake).simulate_region(card, "EU", 25.0)
+    await make_engine(tmp_path, fake).simulate_region(card, "EU", 25.0, scope=["EU", "MENA"])
     fake.calls.clear()
-    await make_engine(tmp_path, fake).simulate_region(card, "MENA", 25.0)
+    await make_engine(tmp_path, fake).simulate_region(card, "MENA", 25.0, scope=["EU", "MENA"])
     assert "/api/graph/ontology/generate" not in fake.calls
 
 
@@ -178,3 +179,27 @@ async def test_stuck_model_aborts_region_with_clear_error(tmp_path):
     with pytest.raises(RegionUnavailable, match="zaman aşımına"):
         await engine.simulate_region(card, "EU", 25.0)
     assert fake.interview_calls == 4  # 2 grup x (1 + 1 yeniden deneme), sonra vazgeçer
+
+
+async def test_world_contains_only_selected_regions(tmp_path):
+    fake = FakeMiroFish()
+    engine = make_engine(tmp_path, fake)
+    card = await engine.fuse_product_card(REQ)
+    await engine.simulate_region(card, "EU", 25.0, scope=["EU", "TR"])
+    assert "EU paneli" in fake.uploaded_seed and "TR paneli" in fake.uploaded_seed
+    for other in ("MENA paneli", "CIS paneli", "US paneli"):
+        assert other not in fake.uploaded_seed
+    world = json.loads((tmp_path / "world.json").read_text())
+    (w,) = world.values()
+    assert set(w["agents"]) == {"EU", "TR"}
+
+
+async def test_different_selection_builds_separate_world(tmp_path):
+    fake = FakeMiroFish()
+    engine = make_engine(tmp_path, fake)
+    card = await engine.fuse_product_card(REQ)
+    await engine.simulate_region(card, "EU", 25.0, scope=["EU"])
+    await engine.simulate_region(card, "EU", 25.0, scope=["EU", "US"])
+    assert fake.calls.count("/api/graph/ontology/generate") == 2
+    await engine.simulate_region(card, "EU", 25.0, scope=["US", "EU"])  # sıra önemsiz, yeniden kurulmaz
+    assert fake.calls.count("/api/graph/ontology/generate") == 2
