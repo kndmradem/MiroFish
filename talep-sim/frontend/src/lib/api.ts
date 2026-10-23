@@ -97,6 +97,8 @@ export interface PredictionResponse {
   recommendations: Recommendation[];
   methodology_notes: string[];
   regional_breakdown: RegionPredictionResult[];
+  /** Eski bir API sürümü açıklama/öneri alanlarını göndermediyse true (istemci tarafında eklenir). */
+  api_outdated?: boolean;
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -110,7 +112,21 @@ export async function predict(body: PredictionRequest): Promise<PredictionRespon
   if (!res.ok) {
     throw new Error(`Simülasyon başarısız (${res.status}): ${await res.text()}`);
   }
-  return res.json();
+  return normalizePrediction(await res.json());
+}
+
+/** Eski/eksik API cevabında arayüzün çökmemesi için eksik alanları boş değerle doldurur. */
+export function normalizePrediction(raw: PredictionResponse): PredictionResponse {
+  const outdated = raw.recommendations === undefined || raw.regional_breakdown.some((r) => r.explanations === undefined);
+  return {
+    ...raw,
+    engine: raw.engine ?? "mock",
+    brand_profile: raw.brand_profile ?? null,
+    recommendations: raw.recommendations ?? [],
+    methodology_notes: raw.methodology_notes ?? [],
+    regional_breakdown: raw.regional_breakdown.map((r) => ({ ...r, explanations: r.explanations ?? [] })),
+    api_outdated: outdated,
+  };
 }
 
 export async function fetchBrandProfile(brand: string, notes: string): Promise<BrandProfile> {

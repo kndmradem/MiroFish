@@ -158,6 +158,13 @@ export default function Dashboard() {
           </Card>
         ) : (
           <>
+            {result.api_outdated && (
+              <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+                API eski sürümde çalışıyor: açıklama ve öneri alanları gelmedi. Backend terminalinde <code>Ctrl+C</code> ile
+                durdurup <code>uvicorn</code> komutunu yeniden çalıştır.
+              </p>
+            )}
+
             {result.brand_profile && (
               <Card>
                 <CardHeader>
@@ -212,7 +219,7 @@ export default function Dashboard() {
               <CardContent>{chartRow && <VanWestendorpChart result={chartRow} />}</CardContent>
             </Card>
 
-            {chartRow && (
+            {chartRow && chartRow.explanations.length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle>Bu sayılar nasıl hesaplandı? ({chartRow.region})</CardTitle>
@@ -292,6 +299,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
+            {(result.recommendations ?? []).length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle>Öneriler</CardTitle>
@@ -300,7 +308,7 @@ export default function Dashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3">
-                {result.recommendations.map((r, i) => (
+                {(result.recommendations ?? []).map((r, i) => (
                   <div key={i} className="grid gap-1 rounded-md border p-3 text-sm">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="secondary">{r.category}</Badge>
@@ -313,9 +321,10 @@ export default function Dashboard() {
                 ))}
               </CardContent>
             </Card>
+            )}
 
             <ul className="list-disc space-y-1 pl-5 text-xs text-muted-foreground">
-              {result.methodology_notes.map((n) => <li key={n}>{n}</li>)}
+              {(result.methodology_notes ?? []).map((n) => <li key={n}>{n}</li>)}
             </ul>
           </>
         )}

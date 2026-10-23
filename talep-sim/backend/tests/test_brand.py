@@ -154,3 +154,39 @@ def test_interview_prompt_contains_brand_block():
     prompt = build_interview_prompt(card, "MENA", LUXURY, 25.0)
     assert "LuxA" in prompt and "lüks segment" in prompt and "$250" in prompt and "95/100" in prompt
     assert "Marka:" not in build_interview_prompt(card, "MENA")
+
+
+def test_every_region_always_has_explanations():
+    cheap_brand = MASS.model_copy(update={"price_multiple": 1.2})
+    data = _predict(unit_cost="300", total_production_budget=5000, brand_profile=cheap_brand.model_dump())
+    for row in data["regional_breakdown"]:
+        assert len(row["explanations"]) == 4
+
+
+def test_zero_weight_region_is_explained():
+    from app.allocation import RegionAllocation
+    from app.explain import explain_region
+    from app.pricing import AgentPriceAnswer, analyze
+    from app.services.engine import RegionSimulation
+
+    answers = [AgentPriceAnswer(8 + i, 12 + i, 20 + i, 30 + i) for i in range(5)]
+    sim = RegionSimulation("US", 30, answers, [], {"engine": "mirofish", "n_agents": 5, "n_valid": 5, "mean_interest": 30})
+    vw, best = analyze(answers, 25.0)
+    exps = explain_region(sim, vw, best, 25.0, RegionAllocation("US", Decimal(0), Decimal(0), 0), Decimal(0), 1000, None)
+    assert "üretim ayrılmadı" in exps[3].how
+
+
+def test_explanations_work_for_mirofish_style_meta():
+    from app.allocation import RegionAllocation
+    from app.explain import explain_region
+    from app.pricing import AgentPriceAnswer, analyze
+    from app.services.engine import RegionSimulation
+
+    answers = [AgentPriceAnswer(20 + i, 40 + i, 80 + i, 120 + i) for i in range(5)]
+    sim = RegionSimulation("EU", 64, answers, ["Kalın"], {"engine": "mirofish", "n_agents": 5, "n_valid": 4,
+                                                           "mean_interest": 64, "objection_counts": [("Kalın", 3)]})
+    vw, best = analyze(answers, 25.0)
+    alloc = RegionAllocation("EU", Decimal(640), Decimal(1000), 40)
+    exps = explain_region(sim, vw, best, 25.0, alloc, Decimal(640), 1000, LUXURY)
+    assert [e.key for e in exps] == ["demand", "price", "margin", "quantity"]
+    assert "4 ajandan geçerli cevap" in exps[0].how
