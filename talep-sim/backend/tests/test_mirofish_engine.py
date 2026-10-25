@@ -389,3 +389,28 @@ async def test_world_version_change_invalidates_cache(tmp_path, monkeypatch):
     engine2 = make_engine(tmp_path, fake)
     await engine2.simulate_region(card, "EU", 25.0, scope=["EU"])
     assert fake.calls.count("/api/graph/ontology/generate") == 2
+
+
+@pytest.mark.parametrize("content", [
+    {"project_id": "p0", "simulation_id": "s0", "agents": {"EU": [0]}},  # seed_hash'siz eski tek dünya
+    {"abc": "bozuk", "def": 3},  # değerleri dict olmayan kayıtlar
+    ["liste"], "metin",
+])
+async def test_old_or_malformed_cache_is_ignored_and_rebuilt(tmp_path, content):
+    (tmp_path / "world.json").write_text(json.dumps(content))
+    fake = FakeMiroFish()
+    engine = make_engine(tmp_path, fake)
+    card = await engine.fuse_product_card(REQ)
+    notes = await engine.reset_world(["EU"])  # eskiden 'str' object has no attribute 'get'
+    assert isinstance(notes, list)
+    sim = await engine.simulate_region(card, "EU", 25.0, scope=["EU"])
+    assert sim.demand_score == 70 and fake.calls.count("/api/graph/ontology/generate") == 1
+
+
+async def test_corrupt_cache_file_is_ignored(tmp_path):
+    (tmp_path / "world.json").write_text("{bozuk json")
+    fake = FakeMiroFish()
+    engine = make_engine(tmp_path, fake)
+    card = await engine.fuse_product_card(REQ)
+    await engine.simulate_region(card, "EU", 25.0, scope=["EU"])
+    assert fake.calls.count("/api/graph/ontology/generate") == 1

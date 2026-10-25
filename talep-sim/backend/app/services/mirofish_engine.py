@@ -174,13 +174,31 @@ class MiroFishSimulationEngine:
                 notes.append(f"Eski proje silinemedi ({w['project_id']}): Zep Cloud panelinden 'mirofish_' grafiklerini elle silebilirsin. Yeni dünya yine de sıfırdan kuruldu.")
         return notes
 
+    @staticmethod
+    def _valid_world(w) -> bool:
+        return (isinstance(w, dict) and isinstance(w.get("project_id"), str) and isinstance(w.get("simulation_id"), str)
+                and isinstance(w.get("agents"), dict))
+
     def _load_state(self) -> None:
-        if self._worlds is None:
-            self._worlds = {}
-            if self.state_path.exists():
-                saved = json.loads(self.state_path.read_text())
-                # Eski biçim: tek dünya {"seed_hash": ..., ...}
-                self._worlds = {saved["seed_hash"]: saved} if "seed_hash" in saved else saved
+        """Önbelleği okur; eski/bozuk biçimli kayıtlar (ya da dosya) geçersiz sayılır ve dünya yeniden kurulur."""
+        if self._worlds is not None:
+            return
+        self._worlds = {}
+        if not self.state_path.exists():
+            return
+        try:
+            saved = json.loads(self.state_path.read_text())
+        except (OSError, ValueError):
+            log.warning("Dünya önbelleği okunamadı (%s); yeniden kurulacak", self.state_path)
+            return
+        if not isinstance(saved, dict):
+            return
+        # Eski biçim: tek dünya {"seed_hash": ..., ...} ya da seed_hash'siz düz dünya
+        if self._valid_world(saved):
+            saved = {str(saved.get("seed_hash") or "legacy"): saved}
+        self._worlds = {k: w for k, w in saved.items() if self._valid_world(w)}
+        if len(self._worlds) != len(saved):
+            log.warning("Önbellekte geçersiz dünya kayıtları atıldı")
 
     async def _world_alive(self, world: dict) -> bool:
         try:

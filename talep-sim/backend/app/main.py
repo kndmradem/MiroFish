@@ -1,6 +1,8 @@
 """FastAPI giriş noktası: ürün talep ve fiyat simülasyonu."""
 import asyncio
 import json
+import logging
+import traceback
 import os
 import time
 import uuid
@@ -300,7 +302,12 @@ async def predict_stream(req: PredictionRequest, engine: SimulationEngine = Depe
         except HTTPException as e:
             await run.publish({"type": "error", "status": e.status_code, "detail": e.detail})
         except Exception as e:  # akış kopmasın, hata istemciye iletilsin
-            await run.publish({"type": "error", "status": 500, "detail": f"{type(e).__name__}: {e}"})
+            logging.getLogger("talep-sim").exception("Koşu beklenmedik hatayla düştü")
+            tb = traceback.extract_tb(e.__traceback__)[-1]
+            where = f"{os.path.basename(tb.filename)}:{tb.lineno} ({tb.name})"
+            await run.publish({"type": "error", "status": 500, "detail": (
+                f"Beklenmedik hata: {type(e).__name__}: {e} [{where}]. Eski/bozuk önbellek şüphesinde "
+                "'Dünyayı sıfırla' kutusunu işaretleyip tekrar dene; sorun sürerse API terminalindeki hata dökümünü paylaş.")})
         run.done = True
         async with run.cond:
             run.cond.notify_all()
