@@ -9,7 +9,7 @@ from typing import List, Optional
 from . import brand as brandlib
 from . import economy
 from .allocation import RegionAllocation
-from .models import BrandProfile, Explanation, VanWestendorpResult
+from .models import AllocationView, BrandProfile, Explanation, VanWestendorpResult
 from .services.engine import RegionSimulation
 
 _FEATURE_TR = {"warmth": "ısı tutma", "waterproof": "su/rüzgar geçirmezlik", "sheen": "parlak yüzey",
@@ -143,3 +143,42 @@ def methodology_notes(engine: str, brand: Optional[BrandProfile]) -> List[str]:
     if brand is None:
         notes.append("Marka girilmedi: fiyatlama nötr kitlesel varsayımla yapıldı.")
     return notes
+
+
+def allocation_view(region: str, objective: str, demand: float, ret_pct: float, restock: float,
+                    units_before: int, units: int, unit_cost: float, price: float) -> AllocationView:
+    """Eski (kâr ağırlıklı) ve yeni dağıtımı orta senaryoda (tahmin bölümüyle aynı) karşılaştırır ve nedenini yazar."""
+    def outcome(q: int):
+        sold = min(q, int(demand))
+        return sold, q - sold, max(0, int(demand) - q), round(sold / q * 100, 1) if q else 0.0
+
+    sb, lb, ub, stb = outcome(units_before)
+    sn, ln, un, stn = outcome(units)
+    net = int(demand * (1 - ret_pct / 100 * (1 - restock)))
+    names = {"balanced": "dengeli (satış hızı)", "profit": "kâr ağırlıklı", "blended": "karışık"}
+    if units <= 0:
+        why = (f"{region} için üretim ayrılmadı: iade ve iade lojistiği düşülünce net fiyat birim maliyetin altında kalıyor "
+               "ya da beklenen talep sıfır.")
+    elif units >= int(demand):
+        why = (f"{region} için beklenen 120 günlük talep yaklaşık {int(demand):,} adet (iade sonrası kalıcı satış ~{net:,}). "
+               f"Talebi karşılayacak kadar {units:,} adet ayrıldı; fazlası stok riski yaratırdı.")
+    else:
+        why = (f"Bütçe tüm bölgelerin talebini karşılamaya yetmedi. {region} beklenen talebi ~{int(demand):,} adet; "
+               f"bölgelerin satış oranı dengelenerek {units:,} adet ayrıldı (beklenen satış {sn:,}, karşılanamayan talep ~{un:,}).")
+    if units_before != units:
+        why += (f" Eski kâr ağırlıklı dağıtım {units_before:,} adet verirdi: "
+                + (f"~{lb:,} adet stok kalırdı." if lb > 0 else f"~{ub:,} adetlik talep karşılanamazdı."))
+    return AllocationView(
+        objective=objective, demand_units=int(demand), net_demand_units=net, units_before=units_before, units=units,
+        sold_before=sb, sold=sn, leftover_before=lb, leftover=ln, unmet_before=ub, unmet=un,
+        sell_through_before_pct=stb, sell_through_pct=stn, why=why + f" Hedef: {names.get(objective, objective)}.")
+
+
+def allocation_note(objective: str, unspent: Decimal, unit_cost: Decimal, total_demand: float, produced: int) -> str:
+    if objective == "profit":
+        return "Kâr ağırlıklı mod: bütçe, talep × (fiyat − maliyet) ağırlığıyla dağıtıldı; bölgelerde stok kalması ya da talebin karşılanamaması olabilir."
+    if unspent > unit_cost * 10:
+        return (f"Toplam bütçe, beklenen 120 günlük talebi (~{int(total_demand):,} adet) karşılamak için gerekenden fazla. "
+                f"{int(unspent / unit_cost):,} adetlik ({unspent:,.0f} $) bütçe stok riski yaratacağı için üretime ayrılmadı; "
+                f"önerilen toplam üretim {produced:,} adet. Daha fazla üretmek istersen 'Kâr ağırlıklı' modu ya da kitle varsayımlarını değiştir.")
+    return "Bütçe, beklenen talebin altında kaldı; üretim bölgeler arasında satış oranları dengelenecek biçimde dağıtıldı."

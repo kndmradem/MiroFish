@@ -191,3 +191,11 @@ servis olarak HTTP üzerinden çağırmak ve hukuki görüş almak gerekir.
 - Bölge başına 10 tüketici, 9 basamaklı fiyat merdiveni. Van Westendorp eşikleri log-fiyatta yumuşatılır (az ajanda
   basamaklı/çökmüş eğri olmaz), bölgeler sıralı ve en az %4 genişliktedir. Ajan sayısı < 6 ise grafikte "düşük örneklem"
   uyarısı çıkar. Ajan sayısı `MIROFISH_AGENTS_PER_REGION` ile sınırlanır.
+
+## Üretim dağıtımı (satış hızına göre)
+
+`allocation_objective`: `balanced` (varsayılan), `blended`, `profit`. Dengeli modda bütçe, bölgelerin 120 günlük beklenen
+satışına göre yinelemeli dağıtılır: her adımda bir parti, "sonraki birim satılır mı" olasılığı en yüksek bölgeye gider
+(talep ±%40 belirsizlik senaryolarıyla, azalan getiri). Böylece bir bölgede stok kalırken diğerinde talep karşılanamaz
+olmaz. Bütçe toplam talepten büyükse fazlası üretime ayrılmaz ve sonuçta "daha az üret" notu çıkar. Net fiyatı maliyetin
+altında kalan bölge üretim almaz. Sonuçta her bölge için eski (kâr ağırlıklı) ve yeni dağıtım yan yana gösterilir.

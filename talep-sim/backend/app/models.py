@@ -76,6 +76,8 @@ class PredictionRequest(BaseModel):
     brand_profile: Optional[BrandProfile] = Field(None, description="Hazır/düzenlenmiş profil; verilirse yeniden üretilmez")
     assumptions: Assumptions = Field(default_factory=Assumptions)
     usd_try_rate: Optional[float] = Field(None, gt=0, description="1 USD kaç TL (Türkiye için TL gösterimi); boşsa varsayılan kur")
+    allocation_objective: Literal["balanced", "profit", "blended"] = Field(
+        "balanced", description="Üretim dağıtım hedefi: balanced = satış hızı/dengeli stok, profit = kâr ağırlıklı, blended = karışık")
     reset_world: bool = Field(False, description="Seçili bölgelerin önbellekteki MiroFish dünyasını (ve Zep grafiğini) silip baştan kurar")
 
     @field_validator("target_regions")
@@ -280,6 +282,24 @@ class Seasonality(BaseModel):
 
 
 # --- Çıktı (Response) Modeli ---
+class AllocationView(BaseModel):
+    """Bölgenin üretim kararı: eski (kâr ağırlıklı) ve yeni (seçilen hedef) dağıtımın yan yana karşılaştırması."""
+    objective: str
+    demand_units: int = Field(..., description="120 günde beklenen brüt satış adedi (stok sınırsızken)")
+    net_demand_units: int = Field(..., description="İade sonrası kalıcı satış (iade x yeniden satılamayanlar düşülmüş)")
+    units_before: int
+    units: int
+    sold_before: int
+    sold: int
+    leftover_before: int
+    leftover: int
+    unmet_before: int
+    unmet: int
+    sell_through_before_pct: float
+    sell_through_pct: float
+    why: str
+
+
 class RegionPredictionResult(BaseModel):
     region: str
     demand_score_100: int = Field(..., ge=0, le=100, description="0-100 arası talep skoru")
@@ -290,6 +310,7 @@ class RegionPredictionResult(BaseModel):
     key_objections: List[str] = Field(..., description="Ajanlardan gelen top 3 eleştiri")
     van_westendorp: VanWestendorpResult
     explanations: List[Explanation] = []
+    allocation: Optional[AllocationView] = None
     price_steps: List[PriceStep] = []
     returns: Optional[ReturnEstimate] = None
     forecast: Optional[SalesForecast] = None
@@ -316,7 +337,9 @@ class PredictionResponse(BaseModel):
     session_id: str
     status: str = "COMPLETED"
     total_produced_qty: int
-    unallocated_budget: Decimal = Field(..., description="Aşağı yuvarlamadan artan bütçe")
+    unallocated_budget: Decimal = Field(..., description="Harcanmayan bütçe (yuvarlama ya da talep bütçeden azsa üretmemek için)")
+    allocation_objective: str = "balanced"
+    allocation_note: str = ""
     product_card: dict = Field(..., description="Vision+Text füzyonundan çıkan ürün kartı")
     engine: str = "mock"
     brand_profile: Optional[BrandProfile] = None

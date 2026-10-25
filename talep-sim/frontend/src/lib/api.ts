@@ -215,6 +215,7 @@ export interface PredictionRequest {
   brand_profile?: BrandProfile;
   usd_try_rate?: number;
   reset_world?: boolean;
+  allocation_objective?: "balanced" | "profit" | "blended";
 }
 
 export interface PricePoint {
@@ -254,7 +255,25 @@ export interface VanWestendorpResult {
   quality_note?: string;
 }
 
+export interface AllocationView {
+  objective: string;
+  demand_units: number;
+  net_demand_units: number;
+  units_before: number;
+  units: number;
+  sold_before: number;
+  sold: number;
+  leftover_before: number;
+  leftover: number;
+  unmet_before: number;
+  unmet: number;
+  sell_through_before_pct: number;
+  sell_through_pct: number;
+  why: string;
+}
+
 export interface RegionPredictionResult {
+  allocation?: AllocationView | null;
   region: RegionCode;
   demand_score_100: number;
   optimal_sale_price: string;
@@ -292,6 +311,8 @@ export interface PredictionResponse {
   status: string;
   total_produced_qty: number;
   unallocated_budget: string;
+  allocation_objective: string;
+  allocation_note: string;
   product_card: Record<string, unknown>;
   engine: string;
   brand_profile: BrandProfile | null;

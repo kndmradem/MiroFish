@@ -5,6 +5,7 @@ import { ImageIcon, Loader2 } from "lucide-react";
 
 import { BrandPanel, SourceBadge } from "@/components/brand-panel";
 import { applyProgress, initialProgress, ProgressPanel, type ProgressState } from "@/components/progress-panel";
+import { AllocationCard } from "@/components/allocation-card";
 import { ExtrasCard } from "@/components/extras-card";
 import { SummaryCard } from "@/components/summary-card";
 import { CampaignsCard, PricePlanCard } from "@/components/scenarios-card";
@@ -49,6 +50,7 @@ export default function Dashboard() {
   const [profile, setProfile] = useState<BrandProfile | null>(null);
   const [regions, setRegions] = useState<RegionCode[]>(["EU", "MENA", "CIS"]);
   const [image, setImage] = useState<{ name: string; dataUrl: string } | null>(null);
+  const [objective, setObjective] = useState<"balanced" | "profit" | "blended">("balanced");
   const [resetWorld, setResetWorld] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -127,6 +129,7 @@ export default function Dashboard() {
         },
         usd_try_rate: regions.includes("TR") && Number(usdTry) > 0 ? Number(usdTry) : undefined,
         reset_world: resetWorld || undefined,
+        allocation_objective: objective,
       }, handlers(regions));
       setResetWorld(false);
       if (res.brand_profile) setProfile(res.brand_profile);
@@ -286,6 +289,15 @@ export default function Dashboard() {
                 </div>
               </div>
             </details>
+            <div className="grid gap-1.5">
+              <Label htmlFor="objective">Üretim dağıtım hedefi</Label>
+              <select id="objective" value={objective} onChange={(e) => setObjective(e.target.value as typeof objective)}
+                className="h-9 rounded-md border bg-transparent px-2 text-sm">
+                <option value="balanced">Dengeli: satış hızı, stok kalmasın (önerilen)</option>
+                <option value="blended">Karışık: dengeli + kâr</option>
+                <option value="profit">Kâr ağırlıklı: talep × birim kâr</option>
+              </select>
+            </div>
             <label className="flex items-start gap-2 rounded-md border p-3 text-sm">
               <Checkbox checked={resetWorld} onCheckedChange={(v) => setResetWorld(v === true)} className="mt-0.5" />
               <span>
@@ -515,6 +527,8 @@ export default function Dashboard() {
                 </Table>
               </CardContent>
             </Card>
+
+            <AllocationCard result={result} />
 
             <Card>
               <CardHeader>

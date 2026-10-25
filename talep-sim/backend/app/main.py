@@ -14,10 +14,10 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
-from .allocation import RegionSignal, allocate_production_budget
-from .models import FailedRegion, BrandProfile, BrandProfileRequest, PredictionRequest, PredictionResponse, RegionPredictionResult
+from .allocation import DemandSignal, RegionSignal, allocate_by_sales_velocity, allocate_production_budget
+from .models import Explanation, FailedRegion, BrandProfile, BrandProfileRequest, PredictionRequest, PredictionResponse, RegionPredictionResult
 from .advisor import Advisor
-from .explain import explain_region, methodology_notes
+from .explain import allocation_note, allocation_view, explain_region, methodology_notes
 from . import economy
 from .forecast import DemandModel, forecast_sales
 from .extras import break_even, confidence, seasonal_factor, sensitivity, size_curve
@@ -161,11 +161,25 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
     await emit({"stage": "finalize", "detail": "Fiyat analizi, bütçe dağıtımı ve öneriler hazırlanıyor"})
 
     priced = {s.region: (s, *analyze(s.price_answers, unit_cost)) for s in sims}
-    allocations = allocate_production_budget(
+    fx = req.assumptions
+    pre = {}
+    for r, (s_, vw_, best_) in priced.items():
+        prob_ = purchase_probability(s_.price_answers, float(best_))
+        season_ = seasonal_factor(card, r, fx)
+        ret_ = estimate_returns(card, r, float(best_), unit_cost, 0, brand, fx, f"{req.product_name} {req.technical_specs}")
+        dm_ = DemandModel(r, s_.demand_score, float(best_), vw_.zones, brand, fx, season_.factor if season_ else 1.0)
+        pre[r] = (dm_.base * prob_, ret_.rate_pct)
+    before = allocate_production_budget(
         [RegionSignal(r, s.demand_score, best) for r, (s, _, best) in priced.items()],
-        Decimal(req.total_production_budget),
-        req.unit_cost,
-    )
+        Decimal(req.total_production_budget), req.unit_cost)
+    if req.allocation_objective == "profit":
+        allocations = before
+    else:
+        bal = allocate_by_sales_velocity(
+            [DemandSignal(r, pre[r][0], float(best) * (1 - pre[r][1] / 100 * (1 + fx.reverse_logistics_pct / 100)),
+                          pre[r][1], fx.restock_share) for r, (s, _, best) in priced.items()],
+            Decimal(req.total_production_budget), req.unit_cost, req.allocation_objective)
+        allocations = bal.allocations
 
     total_weight = sum((a.weight for a in allocations.values()), Decimal(0))
     breakdown = []
@@ -175,6 +189,8 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
         local = {"local_currency": currency, "local_price": economy.local_price(best, fx_rate),
                  "fx_rate": fx_rate} if currency == "TRY" else {}
         margin = float((best - req.unit_cost) / best * 100) if best > 0 else 0.0
+        view = allocation_view(region, req.allocation_objective, pre[region][0], pre[region][1], fx.restock_share,
+                               before[region].quantity, alloc.quantity, float(req.unit_cost), float(best))
         ret = estimate_returns(card, region, float(best), unit_cost, alloc.quantity, brand,
                                req.assumptions, f"{req.product_name} {req.technical_specs}")
         prob = purchase_probability(sim.price_answers, float(best))
@@ -204,8 +220,13 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
             confidence=confidence(sim.meta, brand.known_brand if brand else None, req.assumptions, region),
             size_curve=size_curve(region, card), seasonality=season,
             raw_answers=sim.meta.get("raw_answers", []),
-            explanations=explain_region(sim, vw, best, unit_cost, alloc, total_weight,
-                                        req.total_production_budget, brand, fx_rate),
+            explanations=[e if e.key != "quantity" else Explanation(
+                key="quantity", label=e.label, value=f"{alloc.quantity:,}", how=view.why,
+                assumptions=["Talep 120 günlük ajan talebi + kural varsayımlarından (kitle, dönüşüm) gelir; stok sınırsız varsayıldığında beklenen satıştır.",
+                             "Üretim adedi minimum sipariş adedi ve sezon sonu indirimi hesaba katılmadan belirlendi."])
+                          for e in explain_region(sim, vw, best, unit_cost, alloc, total_weight,
+                                                  req.total_production_budget, brand, fx_rate)],
+            allocation=view,
             **local,
         ))
 
@@ -220,6 +241,9 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
         session_id=str(uuid.uuid4()),
         total_produced_qty=sum(a.quantity for a in allocations.values()),
         unallocated_budget=unallocated,
+        allocation_objective=req.allocation_objective,
+        allocation_note=allocation_note(req.allocation_objective, unallocated, req.unit_cost,
+                                        sum(pre[r][0] for r in pre), sum(a.quantity for a in allocations.values())),
         product_card=card,
         engine=engine_name,
         brand_profile=brand,
