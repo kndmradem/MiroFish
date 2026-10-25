@@ -102,6 +102,11 @@ MiroFish simülasyonu LLM tüketir; `MIROFISH_MAX_ROUNDS` düşük tutuldu.
 `MIROFISH_BATCH_SIZE` (varsayılan 3) kişilik gruplarla röportaj edilir; zaman aşımına uğrayan grup
 `MIROFISH_TIMEOUT_RETRIES` kez yeniden denenir, sonra atlanır. Bir bölge için en az `MIROFISH_MIN_VALID` ajan cevabı
 yoksa o bölge `failed_regions` içinde nedeniyle birlikte döner; diğer bölgeler ve bütçe dağıtımı yine üretilir.
+**İade oranı (kural tabanlı varsayım).** `app/returns.py`: bölge taban oranı (EU 24, US 20, TR 17, MENA 15, CIS 14) üzerine kalıp,
+kumaş, kesim (dekolte vb., bölgeye göre), iklim uyumsuzluğu ve marka segmenti faktörleri eklenir; her faktör yüzde puanıyla ve
+nedeniyle gösterilir. Kanal, yeniden satılabilir oran ve iade lojistiği ile kendi gerçek taban oranların arayüzde "Varsayımlar (iade)"
+bölümünden değiştirilir. Bu ajan cevabı değil varsayımdır; gerçek veri girildikçe değiştir.
+
 **Fiyat merdiveni.** Ajanlara serbest fiyat yerine 5 sabit fiyat (referans fiyatın 0,5x-2,1x'i; Türkiye için TL karşılığıyla) sunulur
 ve her biri için tek kelimelik karar istenir (`supheli`, `uygun`, `pahali`, `cok_pahali`). Van Westendorp eşikleri bu kararların
 geçiş noktalarından türetilir. Fiyat alanlarına sayı yerine cümle yazan cevaplar önce LLM ile merdivene çevrilir; yine olmazsa

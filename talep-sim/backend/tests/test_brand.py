@@ -263,3 +263,47 @@ def test_price_zones_cover_axis_without_gaps():
     assert zones[-1].high is None and zones[1].low == vw.acceptable_range_low
     steps = steps_from_answers(answers, [10, 40, 70, 120])
     assert steps[0].suspicious == 10 and steps[-1].too_expensive == 10 and all(s.n == 10 for s in steps)
+
+
+def _card(**kw):
+    base = {"product_name": "Elbise", "features": {}, "composition": "pamuk", "climate_fit": "ılıman", "visual_description": ""}
+    base.update(kw)
+    return base
+
+
+def test_returns_revealing_cut_raises_mena_more_than_eu():
+    from app.models import Assumptions
+    from app.returns import estimate_returns
+    a = Assumptions()
+    card = _card(visual_description="derin V dekolteli, kolsuz elbise")
+    mena = estimate_returns(card, "MENA", 80, 25, 100, None, a)
+    eu = estimate_returns(card, "EU", 80, 25, 100, None, a)
+    assert any("Açık kesim" in d.label and d.points == 6.0 for d in mena.drivers)
+    assert not any(d.points > 0 and "Açık kesim" in d.label for d in eu.drivers)
+    plain = estimate_returns(_card(), "MENA", 80, 25, 100, None, a)
+    assert mena.rate_pct == plain.rate_pct + 6.0
+
+
+def test_returns_user_base_store_channel_and_net_margin():
+    from app.models import Assumptions
+    from app.returns import estimate_returns
+    online = estimate_returns(_card(), "TR", 100, 30, 1000, None, Assumptions(return_base_pct={"TR": 20}))
+    assert online.base_pct == 20 and online.drivers[0].basis == "kullanıcı verisi"
+    store = estimate_returns(_card(), "TR", 100, 30, 1000, None, Assumptions(channel="store", return_base_pct={"TR": 20}))
+    assert store.rate_pct < online.rate_pct * 0.6
+    assert online.net_margin_pct < online.gross_margin_pct
+    assert online.low_pct < online.rate_pct < online.high_pct
+    assert online.net_qty_if_sold_out == int(1000 * (1 - online.rate_pct / 100))
+
+
+def test_predict_endpoint_includes_returns_with_assumptions():
+    from fastapi.testclient import TestClient
+    from app.main import app
+    body = {"product_name": "Elbise", "image_base64": "x", "technical_specs": "Saten, derin dekolte, slim fit",
+            "unit_cost": "20", "total_production_budget": 50000, "target_regions": ["EU", "MENA"],
+            "assumptions": {"channel": "online", "restock_share": 0.5}}
+    r = TestClient(app).post("/api/predict", json=body)
+    assert r.status_code == 200, r.text
+    rows = {x["region"]: x["returns"] for x in r.json()["regional_breakdown"]}
+    assert rows["MENA"]["rate_pct"] > 0 and rows["MENA"]["net_margin_pct"] < rows["MENA"]["gross_margin_pct"]
+    assert any("dekolte" in d["label"].lower() or "Açık kesim" in d["label"] for d in rows["MENA"]["drivers"])

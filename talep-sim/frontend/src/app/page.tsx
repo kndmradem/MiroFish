@@ -5,6 +5,7 @@ import { ImageIcon, Loader2 } from "lucide-react";
 
 import { BrandPanel, SourceBadge } from "@/components/brand-panel";
 import { applyProgress, ProgressPanel, type ProgressState, type RegionStatus } from "@/components/progress-panel";
+import { ReturnsCard } from "@/components/returns-card";
 import { PriceZones } from "@/components/price-zones";
 import { RawAnswers } from "@/components/raw-answers";
 import { VanWestendorpChart } from "@/components/price-chart";
@@ -31,6 +32,10 @@ export default function Dashboard() {
   const [unitCost, setUnitCost] = useState("25.50");
   const [budget, setBudget] = useState("100000");
   const [usdTry, setUsdTry] = useState("42");
+  const [channel, setChannel] = useState<"online" | "store">("online");
+  const [restock, setRestock] = useState("70");
+  const [logistics, setLogistics] = useState("8");
+  const [baseReturn, setBaseReturn] = useState<Record<string, string>>({});
   const [brand, setBrand] = useState("");
   const [brandNotes, setBrandNotes] = useState("");
   const [profile, setProfile] = useState<BrandProfile | null>(null);
@@ -72,6 +77,14 @@ export default function Dashboard() {
         brand: brand.trim() || undefined,
         brand_notes: brandNotes.trim() || undefined,
         brand_profile: profile ?? undefined,
+        assumptions: {
+          channel,
+          restock_share: Math.min(1, Math.max(0, Number(restock) / 100)),
+          reverse_logistics_pct: Math.max(0, Number(logistics) || 0),
+          return_base_pct: Object.fromEntries(
+            Object.entries(baseReturn).filter(([r, v]) => regions.includes(r as RegionCode) && v !== "" && Number(v) >= 0).map(([r, v]) => [r, Number(v)]),
+          ),
+        },
         usd_try_rate: regions.includes("TR") && Number(usdTry) > 0 ? Number(usdTry) : undefined,
       }, (ev) => setProgress((prev) => applyProgress(prev, ev, regions)));
       if (res.brand_profile) setProfile(res.brand_profile);
@@ -158,6 +171,41 @@ export default function Dashboard() {
                 </p>
               </div>
             )}
+            <details className="rounded-md border p-3 text-sm">
+              <summary className="cursor-pointer font-medium">Varsayımlar (iade)</summary>
+              <div className="mt-3 grid gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="channel">Satış kanalı</Label>
+                  <select id="channel" value={channel} onChange={(e) => setChannel(e.target.value as "online" | "store")}
+                    className="h-9 rounded-md border bg-transparent px-2 text-sm">
+                    <option value="online">Online</option>
+                    <option value="store">Mağaza</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="restock">Yeniden satılabilir iade (%)</Label>
+                    <Input id="restock" type="number" min="0" max="100" value={restock} onChange={(e) => setRestock(e.target.value)} />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="logi">İade lojistiği (% fiyat)</Label>
+                    <Input id="logi" type="number" min="0" max="50" value={logistics} onChange={(e) => setLogistics(e.target.value)} />
+                  </div>
+                </div>
+                <div className="grid gap-1.5">
+                  <Label>Gerçek taban iade oranların (%), boşsa varsayılan</Label>
+                  <div className="grid grid-cols-5 gap-2">
+                    {regions.map((r) => (
+                      <div key={r} className="grid gap-1">
+                        <span className="text-center font-mono text-xs">{r}</span>
+                        <Input type="number" min="0" max="80" placeholder="-" value={baseReturn[r] ?? ""}
+                          onChange={(e) => setBaseReturn((p) => ({ ...p, [r]: e.target.value }))} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </details>
             <Button type="submit" disabled={!canSubmit || loading}>
               {loading && <Loader2 className="animate-spin" />}
               {loading ? "Ajanlar değerlendiriyor…" : "Simülasyonu çalıştır"}
@@ -256,6 +304,16 @@ export default function Dashboard() {
                 {chartRow && <PriceZones row={chartRow} />}
               </CardContent>
             </Card>
+
+            {chartRow?.returns && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>İade oranı tahmini ({chartRow.region})</CardTitle>
+                  <CardDescription>Kalıp, kumaş, kesim ve bölge iade kültürüne göre; kural tabanlı varsayım.</CardDescription>
+                </CardHeader>
+                <CardContent><ReturnsCard row={chartRow} /></CardContent>
+              </Card>
+            )}
 
             {chartRow && chartRow.explanations.length > 0 && (
               <Card>

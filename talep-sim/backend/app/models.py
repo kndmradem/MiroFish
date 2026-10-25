@@ -51,6 +51,14 @@ class Recommendation(BaseModel):
     source: Literal["model", "kural"] = "kural"
 
 
+class Assumptions(BaseModel):
+    """Kullanıcının düzenleyebildiği varsayımlar; boş bırakılanlar varsayılanla çalışır."""
+    channel: Literal["online", "store"] = Field("online", description="Satış kanalı; iade oranını etkiler")
+    return_base_pct: Dict[str, float] = Field(default_factory=dict, description="Bölge bazında taban iade oranı (%) ezmesi, ör. gerçek verin varsa")
+    restock_share: float = Field(0.7, ge=0, le=1, description="İade edilenlerin yeniden satılabilir oranı")
+    reverse_logistics_pct: float = Field(8.0, ge=0, le=50, description="İade lojistiği + işleme maliyeti, satış fiyatının %'si")
+
+
 # --- Girdi (Request) Modeli ---
 class PredictionRequest(BaseModel):
     product_name: str = Field(..., examples=["Kışlık Oversize Yün Kaban"])
@@ -62,6 +70,7 @@ class PredictionRequest(BaseModel):
     brand: Optional[str] = Field(None, examples=["Ipekyol"], description="Marka adı; fiyat politikası markaya göre belirlenir")
     brand_notes: Optional[str] = Field(None, description="Marka profili üretilirken kullanılacak kullanıcı notları")
     brand_profile: Optional[BrandProfile] = Field(None, description="Hazır/düzenlenmiş profil; verilirse yeniden üretilmez")
+    assumptions: Assumptions = Field(default_factory=Assumptions)
     usd_try_rate: Optional[float] = Field(None, gt=0, description="1 USD kaç TL (Türkiye için TL gösterimi); boşsa varsayılan kur")
 
     @field_validator("target_regions")
@@ -114,6 +123,26 @@ class RawAnswer(BaseModel):
     interest: Optional[float] = None
 
 
+class ReturnDriver(BaseModel):
+    label: str
+    points: float = Field(..., description="İade oranına etkisi, yüzde puanı (+ artırır, - azaltır)")
+    detail: str
+    basis: str = Field("kural varsayımı", description="kural varsayımı | kullanıcı verisi | ajan cevabı")
+
+
+class ReturnEstimate(BaseModel):
+    rate_pct: float
+    low_pct: float
+    high_pct: float
+    base_pct: float
+    drivers: List[ReturnDriver] = []
+    gross_margin_pct: float
+    net_margin_pct: float = Field(..., description="İade maliyeti ve iade edilen adetler düşüldükten sonra marj")
+    return_cost_per_sale: Decimal = Field(..., description="Satış başına beklenen iade maliyeti ($)")
+    net_qty_if_sold_out: int = Field(..., description="Önerilen üretimin tamamı satılırsa iade sonrası elde kalan satış adedi")
+    basis: str = "kural tabanlı varsayım (ajan cevabı değil)"
+
+
 # --- Çıktı (Response) Modeli ---
 class RegionPredictionResult(BaseModel):
     region: str
@@ -126,6 +155,7 @@ class RegionPredictionResult(BaseModel):
     van_westendorp: VanWestendorpResult
     explanations: List[Explanation] = []
     price_steps: List[PriceStep] = []
+    returns: Optional[ReturnEstimate] = None
     raw_answers: List[RawAnswer] = Field([], description="Ajanların ham cevapları ve nasıl çözümlendikleri (MiroFish motoru)")
     local_currency: Optional[str] = Field(None, description="Bölgenin yerel para birimi (yalnızca TL gösterilen bölgelerde)")
     local_price: Optional[Decimal] = Field(None, description="Önerilen fiyatın yerel para karşılığı")

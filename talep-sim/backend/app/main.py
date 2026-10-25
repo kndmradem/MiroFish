@@ -15,6 +15,7 @@ from .models import FailedRegion, BrandProfile, BrandProfileRequest, PredictionR
 from .advisor import Advisor
 from .explain import explain_region, methodology_notes
 from . import economy
+from .returns import estimate_returns
 from .pricing import analyze, steps_from_answers, steps_from_votes
 from .config import Settings, settings
 from .services.brand_profiler import BrandProfiler
@@ -168,6 +169,8 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
             key_objections=sim.objections,
             van_westendorp=vw,
             price_steps=_price_steps(sim, vw, best),
+            returns=estimate_returns(card, region, float(best), unit_cost, alloc.quantity, brand,
+                                     req.assumptions, f"{req.product_name} {req.technical_specs}"),
             raw_answers=sim.meta.get("raw_answers", []),
             explanations=explain_region(sim, vw, best, unit_cost, alloc, total_weight,
                                         req.total_production_budget, brand, fx_rate),

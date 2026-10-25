@@ -47,7 +47,35 @@ export interface Recommendation {
   source: "model" | "kural";
 }
 
+export interface Assumptions {
+  channel: "online" | "store";
+  return_base_pct: Record<string, number>;
+  restock_share: number;
+  reverse_logistics_pct: number;
+}
+
+export interface ReturnDriver {
+  label: string;
+  points: number;
+  detail: string;
+  basis: string;
+}
+
+export interface ReturnEstimate {
+  rate_pct: number;
+  low_pct: number;
+  high_pct: number;
+  base_pct: number;
+  drivers: ReturnDriver[];
+  gross_margin_pct: number;
+  net_margin_pct: number;
+  return_cost_per_sale: string;
+  net_qty_if_sold_out: number;
+  basis: string;
+}
+
 export interface PredictionRequest {
+  assumptions?: Assumptions;
   product_name: string;
   image_base64: string;
   technical_specs: string;
@@ -106,6 +134,7 @@ export interface RegionPredictionResult {
   van_westendorp: VanWestendorpResult;
   explanations: Explanation[];
   price_steps?: PriceStep[];
+  returns?: ReturnEstimate | null;
   raw_answers?: RawAnswer[];
   local_currency?: string | null;
   local_price?: string | null;
