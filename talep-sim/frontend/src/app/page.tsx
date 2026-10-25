@@ -5,6 +5,8 @@ import { ImageIcon, Loader2 } from "lucide-react";
 
 import { BrandPanel, SourceBadge } from "@/components/brand-panel";
 import { applyProgress, ProgressPanel, type ProgressState, type RegionStatus } from "@/components/progress-panel";
+import { ExtrasCard } from "@/components/extras-card";
+import { SummaryCard } from "@/components/summary-card";
 import { CampaignsCard, PricePlanCard } from "@/components/scenarios-card";
 import { ForecastCard } from "@/components/forecast-card";
 import { ReturnsCard } from "@/components/returns-card";
@@ -37,6 +39,7 @@ export default function Dashboard() {
   const [channel, setChannel] = useState<"online" | "store">("online");
   const [restock, setRestock] = useState("70");
   const [logistics, setLogistics] = useState("8");
+  const [launchMonth, setLaunchMonth] = useState("");
   const [conversion, setConversion] = useState("2");
   const [competitor, setCompetitor] = useState<Record<string, string>>({});
   const [audience, setAudience] = useState<Record<string, string>>({});
@@ -83,6 +86,7 @@ export default function Dashboard() {
         brand_notes: brandNotes.trim() || undefined,
         brand_profile: profile ?? undefined,
         assumptions: {
+          launch_month: launchMonth ? Number(launchMonth) : undefined,
           conversion_ceiling_pct: Math.max(0.1, Number(conversion) || 2),
           audience: Object.fromEntries(
             Object.entries(audience).filter(([r, v]) => regions.includes(r as RegionCode) && Number(v) > 0).map(([r, v]) => [r, Math.floor(Number(v))]),
@@ -205,6 +209,16 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="grid gap-1.5">
+                  <Label htmlFor="month">Lansman ayı (mevsim uyumu için), boşsa mevsim etkisi yok</Label>
+                  <select id="month" value={launchMonth} onChange={(e) => setLaunchMonth(e.target.value)}
+                    className="h-9 rounded-md border bg-transparent px-2 text-sm">
+                    <option value="">Seçilmedi</option>
+                    {["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"].map((m, i) => (
+                      <option key={m} value={i + 1}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid gap-1.5">
                   <Label htmlFor="conv">Dönüşüm tavanı (% — ilgili ve fiyatı kabul eden kitlenin alıma dönüşen kısmı)</Label>
                   <Input id="conv" type="number" min="0.1" max="30" step="0.1" value={conversion} onChange={(e) => setConversion(e.target.value)} />
                 </div>
@@ -264,6 +278,8 @@ export default function Dashboard() {
           </Card>
         ) : (
           <>
+            <SummaryCard result={result} productName={productName} />
+
             {result.failed_regions.length > 0 && (
               <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
                 <p className="font-medium">
@@ -372,6 +388,16 @@ export default function Dashboard() {
                   <CardDescription>Hedefe göre bu bölgenin müşterisine uygun yapı: stok eritme, satışı artırma ya da rakibe karşı konum koruma.</CardDescription>
                 </CardHeader>
                 <CardContent><CampaignsCard row={chartRow} /></CardContent>
+              </Card>
+            )}
+
+            {chartRow && (chartRow.break_even || chartRow.confidence) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Güvenilirlik ve ek analizler ({chartRow.region})</CardTitle>
+                  <CardDescription>Güven düzeyi, başa baş noktası, fiyat/maliyet duyarlılığı, beden dağılımı, mevsim uyumu.</CardDescription>
+                </CardHeader>
+                <CardContent><ExtrasCard row={chartRow} /></CardContent>
               </Card>
             )}
 

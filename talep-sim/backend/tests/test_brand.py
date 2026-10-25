@@ -385,3 +385,47 @@ def test_competitor_price_drives_defense_discount():
     answers, vw, best, dm, fc, a = _scenario_inputs(qty=100_000, competitor_price_usd={"TR": 30.0})
     d = next(c for c in build_campaigns("TR", dm, answers, best, 25.0, 100_000, 20.0, a, fc) if c.goal == "defend_competition")
     assert "senin girdin" in d.rationale and d.discount_pct > 0
+
+
+def test_extras_sensitivity_break_even_confidence_season_and_sizes():
+    from app.extras import break_even, confidence, seasonal_factor, size_curve, sensitivity
+    from app.models import Assumptions
+    answers, vw, best, dm, fc, a = _scenario_inputs(qty=100_000)
+    rows = sensitivity(dm, answers, best, 25.0, 100_000, 20.0, a)
+    base = next(r for r in rows if r.label == "Önerilen fiyat")
+    assert base.vs_base_pct == 0 and len(rows) == 8
+    cost_up = [r for r in rows if r.kind == "cost"]
+    assert all(r.vs_base_pct < 0 for r in cost_up if "+" in r.label) and any(r.vs_base_pct > 0 for r in cost_up)
+    be = break_even(best, 25.0, 1000, 20.0, a, fc)
+    assert 0 < be.units <= 1000 and be.pct_of_production == round(be.units / 10, 1)
+    assert "ulaşılmıyor" in be.note or "gün" in be.note
+    assert break_even(20.0, 25.0, 1000, 20.0, a, fc).note.startswith("Üretimin tamamı satılsa bile")
+
+    coat = {"features": {"warmth": True}, "climate_fit": "soğuk"}
+    jan = seasonal_factor(coat, "EU", Assumptions(launch_month=11))
+    jun = seasonal_factor(coat, "EU", Assumptions(launch_month=5))
+    assert jan.factor > 1.0 > jun.factor and seasonal_factor(coat, "EU", Assumptions()) is None
+    assert seasonal_factor({"features": {}, "climate_fit": "ılıman"}, "EU", Assumptions(launch_month=5)).factor == 1.0
+    sizes = size_curve("MENA", {"features": {"oversize": True}})
+    assert abs(sum(s.share_pct for s in sizes) - 100) < 0.5
+
+    assert confidence({"engine": "mock"}, None, a, "EU").level == "düşük"
+    good = confidence({"engine": "mirofish", "n_valid": 10, "n_agents": 10, "price_source": "agents"}, True, Assumptions(audience={"EU": 1}), "EU")
+    assert good.level == "yüksek"
+    bad = confidence({"engine": "mirofish", "n_valid": 5, "n_agents": 5, "price_source": "brand_fallback"}, False, a, "EU")
+    assert bad.level == "düşük" and any("varsayım" in r for r in bad.reasons)
+
+
+def test_launch_month_changes_forecast_and_endpoint_returns_extras():
+    from fastapi.testclient import TestClient
+    from app.main import app
+    body = {"product_name": "Kaban", "image_base64": "x", "technical_specs": "yün, kışlık astar", "unit_cost": "25",
+            "total_production_budget": 100000, "target_regions": ["EU"]}
+    c = TestClient(app)
+    winter = c.post("/api/predict", json={**body, "assumptions": {"launch_month": 11}}).json()
+    summer = c.post("/api/predict", json={**body, "assumptions": {"launch_month": 5}}).json()
+    w, s = winter["regional_breakdown"][0], summer["regional_breakdown"][0]
+    assert w["seasonality"]["factor"] > s["seasonality"]["factor"]
+    assert w["forecast"]["milestones"][1]["units"] >= s["forecast"]["milestones"][1]["units"]
+    assert w["break_even"] and w["confidence"]["level"] == "düşük" and len(w["sensitivity"]) == 8 and w["size_curve"]
+    assert "model tabanlı" in winter["disclaimer"]

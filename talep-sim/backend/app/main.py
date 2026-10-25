@@ -16,6 +16,7 @@ from .advisor import Advisor
 from .explain import explain_region, methodology_notes
 from . import economy
 from .forecast import DemandModel, forecast_sales
+from .extras import break_even, confidence, seasonal_factor, sensitivity, size_curve
 from .scenarios import build_campaigns, build_price_plan
 from .returns import estimate_returns
 from .pricing import analyze, purchase_probability, steps_from_answers, steps_from_votes
@@ -164,9 +165,11 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
         ret = estimate_returns(card, region, float(best), unit_cost, alloc.quantity, brand,
                                req.assumptions, f"{req.product_name} {req.technical_specs}")
         prob = purchase_probability(sim.price_answers, float(best))
+        season = seasonal_factor(card, region, req.assumptions)
+        sf = season.factor if season else 1.0
         fc = forecast_sales(region, sim.demand_score, float(best), prob, vw.zones, alloc.quantity,
-                            ret.rate_pct, brand, req.assumptions)
-        dm = DemandModel(region, sim.demand_score, float(best), vw.zones, brand, req.assumptions)
+                            ret.rate_pct, brand, req.assumptions, sf)
+        dm = DemandModel(region, sim.demand_score, float(best), vw.zones, brand, req.assumptions, sf)
         plan = build_price_plan(dm, sim.price_answers, vw, float(best), unit_cost, alloc.quantity, ret.rate_pct, req.assumptions)
         camps = build_campaigns(region, dm, sim.price_answers, float(best), unit_cost, alloc.quantity, ret.rate_pct,
                                 req.assumptions, fc)
@@ -182,6 +185,11 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
             price_steps=_price_steps(sim, vw, best),
             returns=ret,
             forecast=fc, price_plan=plan, campaigns=camps,
+            sensitivity=sensitivity(dm, sim.price_answers, float(best), unit_cost, alloc.quantity, ret.rate_pct,
+                                    req.assumptions),
+            break_even=break_even(float(best), unit_cost, alloc.quantity, ret.rate_pct, req.assumptions, fc),
+            confidence=confidence(sim.meta, brand.known_brand if brand else None, req.assumptions, region),
+            size_curve=size_curve(region, card), seasonality=season,
             raw_answers=sim.meta.get("raw_answers", []),
             explanations=explain_region(sim, vw, best, unit_cost, alloc, total_weight,
                                         req.total_production_budget, brand, fx_rate),

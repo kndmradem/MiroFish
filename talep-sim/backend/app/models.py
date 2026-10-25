@@ -58,6 +58,7 @@ class Assumptions(BaseModel):
     restock_share: float = Field(0.7, ge=0, le=1, description="İade edilenlerin yeniden satılabilir oranı")
     reverse_logistics_pct: float = Field(8.0, ge=0, le=50, description="İade lojistiği + işleme maliyeti, satış fiyatının %'si")
     audience: Dict[str, int] = Field(default_factory=dict, description="Bölge bazında 120 günde ulaşılabilir hedef kitle (kişi) ezmesi")
+    launch_month: Optional[int] = Field(None, ge=1, le=12, description="Lansman ayı; mevsim uyumu hesabına girer, boşsa mevsim etkisi uygulanmaz")
     competitor_price_usd: Dict[str, float] = Field(default_factory=dict, description="Bölge bazında rakip ürün fiyatı ($); girilirse rakip savunma senaryosu bunu kullanır")
     conversion_ceiling_pct: float = Field(2.0, ge=0.1, le=30, description="İlgili ve fiyatı kabul eden kitlenin alıma dönüşme tavanı (%)")
 
@@ -241,6 +242,40 @@ class CampaignScenario(BaseModel):
     basis: str = "fiyat etkisi ajan eğrisinden; kampanya kaldıraçları kural varsayımı"
 
 
+class SensitivityRow(BaseModel):
+    kind: Literal["price", "cost"]
+    label: str
+    price: Decimal
+    unit_cost: Decimal
+    units: int
+    net_profit: Decimal
+    vs_base_pct: float
+
+
+class BreakEven(BaseModel):
+    units: int = Field(..., description="Üretim maliyetini çıkaran satış adedi (iade sonrası)")
+    pct_of_production: float
+    day: Optional[int] = Field(None, description="Orta senaryoda bu adede ulaşılan gün; 120 günde ulaşılmazsa None")
+    note: str = ""
+
+
+class Confidence(BaseModel):
+    level: Literal["düşük", "orta", "yüksek"]
+    reasons: List[str]
+
+
+class SizeShare(BaseModel):
+    size: str
+    share_pct: float
+
+
+class Seasonality(BaseModel):
+    launch_month: int
+    factor: float
+    note: str
+    basis: str = "kural varsayımı"
+
+
 # --- Çıktı (Response) Modeli ---
 class RegionPredictionResult(BaseModel):
     region: str
@@ -257,6 +292,11 @@ class RegionPredictionResult(BaseModel):
     forecast: Optional[SalesForecast] = None
     price_plan: Optional[PricePlan] = None
     campaigns: List[CampaignScenario] = []
+    sensitivity: List[SensitivityRow] = []
+    break_even: Optional[BreakEven] = None
+    confidence: Optional[Confidence] = None
+    size_curve: List[SizeShare] = []
+    seasonality: Optional[Seasonality] = None
     raw_answers: List[RawAnswer] = Field([], description="Ajanların ham cevapları ve nasıl çözümlendikleri (MiroFish motoru)")
     local_currency: Optional[str] = Field(None, description="Bölgenin yerel para birimi (yalnızca TL gösterilen bölgelerde)")
     local_price: Optional[Decimal] = Field(None, description="Önerilen fiyatın yerel para karşılığı")
@@ -279,5 +319,6 @@ class PredictionResponse(BaseModel):
     brand_profile: Optional[BrandProfile] = None
     recommendations: List[Recommendation] = []
     methodology_notes: List[str] = []
+    disclaimer: str = "Bu çıktılar model tabanlı tahmindir, ölçülmüş satış verisi değildir. Her bölüm dayanağını (ajan cevabı, kural varsayımı, kullanıcı girdisi) belirtir; varsayımları kendi verinle değiştir."
     regional_breakdown: List[RegionPredictionResult]
     failed_regions: List[FailedRegion] = []

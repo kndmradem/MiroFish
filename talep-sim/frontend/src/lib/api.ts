@@ -55,6 +55,36 @@ export interface Assumptions {
   audience: Record<string, number>;
   conversion_ceiling_pct: number;
   competitor_price_usd: Record<string, number>;
+  launch_month?: number;
+}
+
+export interface SensitivityRow {
+  kind: "price" | "cost";
+  label: string;
+  price: string;
+  unit_cost: string;
+  units: number;
+  net_profit: string;
+  vs_base_pct: number;
+}
+
+export interface BreakEven {
+  units: number;
+  pct_of_production: number;
+  day: number | null;
+  note: string;
+}
+
+export interface Confidence {
+  level: "düşük" | "orta" | "yüksek";
+  reasons: string[];
+}
+
+export interface Seasonality {
+  launch_month: number;
+  factor: number;
+  note: string;
+  basis: string;
 }
 
 export interface PricePhase {
@@ -236,6 +266,11 @@ export interface RegionPredictionResult {
   forecast?: SalesForecast | null;
   price_plan?: PricePlan | null;
   campaigns?: CampaignScenario[];
+  sensitivity?: SensitivityRow[];
+  break_even?: BreakEven | null;
+  confidence?: Confidence | null;
+  size_curve?: { size: string; share_pct: number }[];
+  seasonality?: Seasonality | null;
   raw_answers?: RawAnswer[];
   local_currency?: string | null;
   local_price?: string | null;
@@ -259,6 +294,7 @@ export interface PredictionResponse {
   brand_profile: BrandProfile | null;
   recommendations: Recommendation[];
   methodology_notes: string[];
+  disclaimer?: string;
   regional_breakdown: RegionPredictionResult[];
   /** Zaman aşımı vb. yüzünden hesaplanamayan bölgeler; diğer bölgeler yine de gösterilir. */
   failed_regions: { region: string; reason: string; raw_answers?: RawAnswer[] }[];

@@ -80,3 +80,12 @@
     @apply bg-background text-foreground font-sans;
   }
 }
+
+@media print {
+  /* Yazdırınca yalnızca yönetici özeti (tek sayfa) basılır */
+  main > :first-child { display: none !important; }
+  main > section > :not(.print-summary) { display: none !important; }
+  .no-print { display: none !important; }
+  main { display: block !important; padding: 0 !important; }
+  body { background: white !important; }
+}

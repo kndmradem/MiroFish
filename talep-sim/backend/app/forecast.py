@@ -37,13 +37,13 @@ def _price_position(best: float, zones: list) -> float:
 class DemandModel:
     """Talep modeli: 120 gün kümülatif talep = taban (kitle x ilgi x dönüşüm) x fiyat kabulü x zaman payı."""
 
-    def __init__(self, region, demand_score, price, zones, brand, assumptions):
+    def __init__(self, region, demand_score, price, zones, brand, assumptions, season: float = 1.0):
         base_audience = DEFAULT_AUDIENCE.get(region, 150_000)
         strength = (brand.regional_strength.get(region, 50) / 50) if brand else 1.0
         user = assumptions.audience.get(region)
         self.user_audience = user is not None
         self.audience = user if user is not None else int(base_audience * max(0.4, min(1.8, strength)))
-        self.base = self.audience * (demand_score / 100) * assumptions.conversion_ceiling_pct / 100
+        self.base = self.audience * (demand_score / 100) * assumptions.conversion_ceiling_pct / 100 * season
         self.tau = TAU_BASE * (1 + 0.6 * _price_position(price, zones))
 
     def share(self, t: float) -> float:
@@ -56,8 +56,8 @@ class DemandModel:
 
 def forecast_sales(region: str, demand_score: int, price: float, purchase_prob: float, zones: list,
                    qty: int, returns_pct: float, brand: Optional[BrandProfile],
-                   assumptions: Assumptions) -> SalesForecast:
-    model = DemandModel(region, demand_score, price, zones, brand, assumptions)
+                   assumptions: Assumptions, season: float = 1.0) -> SalesForecast:
+    model = DemandModel(region, demand_score, price, zones, brand, assumptions, season)
     audience, user_audience, tau = model.audience, model.user_audience, model.tau
     conv = assumptions.conversion_ceiling_pct / 100
     potential = model.base * purchase_prob  # 120. günde, sınırsız stokla

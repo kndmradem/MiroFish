@@ -118,6 +118,11 @@ Kampanya senaryoları hedefe göre (stok eritme / satışı artırma / rakibe ka
 ve White Friday, EU ücretsiz iade ve sezon sonu, US Black Friday ve BNPL, CIS Yılbaşı ve 8 Mart) üretilir. Kaldıraç etkileri kural
 varsayımıdır (aralıklı); fiyat etkisi ajan eğrisindendir. Rakip fiyatını "Varsayımlar"dan girersen rakip savunma senaryosu ona göre hesaplanır.
 
+**Güvenilirlik ve ek analizler.** `app/extras.py`: tahmin güven düzeyi (ajan sayısı, fiyat kaynağı, tahmin edilen eşikler, marka bilgisi),
+başa baş noktası (iade sonrası net gelirle üretim maliyetini çıkaran adet ve gün), fiyat ±%10/%20 ve maliyet ±%10/%20 duyarlılığı
+(120 gün net kâr), bölgeye göre beden dağılımı önerisi ve lansman ayına göre mevsim uyumu (kural varsayımı). Sonuç sayfasının üstünde
+müşteriye sunulabilir "Yönetici özeti" ve "Yazdır / PDF" düğmesi vardır (yazdırınca yalnızca özet basılır).
+
 **Fiyat merdiveni.** Ajanlara serbest fiyat yerine 5 sabit fiyat (referans fiyatın 0,5x-2,1x'i; Türkiye için TL karşılığıyla) sunulur
 ve her biri için tek kelimelik karar istenir (`supheli`, `uygun`, `pahali`, `cok_pahali`). Van Westendorp eşikleri bu kararların
 geçiş noktalarından türetilir. Fiyat alanlarına sayı yerine cümle yazan cevaplar önce LLM ile merdivene çevrilir; yine olmazsa
