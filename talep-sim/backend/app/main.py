@@ -15,7 +15,7 @@ from .models import FailedRegion, BrandProfile, BrandProfileRequest, PredictionR
 from .advisor import Advisor
 from .explain import explain_region, methodology_notes
 from . import economy
-from .pricing import analyze
+from .pricing import analyze, steps_from_answers, steps_from_votes
 from .config import Settings, settings
 from .services.brand_profiler import BrandProfiler
 from .services.llm import LLMClient, LLMError
@@ -82,6 +82,14 @@ async def health() -> dict:
 async def brand_profile(req: BrandProfileRequest, profiler: BrandProfiler = Depends(get_profiler)) -> BrandProfile:
     """Marka adından fiyat/konumlandırma profili çıkarır; kullanıcı sonucu düzenleyip /api/predict'e verebilir."""
     return await profiler.profile(req.brand, req.notes)
+
+
+def _price_steps(sim, vw, best):
+    """Ajanların fiyat basamaklarına verdiği kararlar; merdiven oyu yoksa eşiklerden hesaplanır."""
+    if sim.meta.get("ladder_votes"):
+        return steps_from_votes(sim.meta["ladder"], sim.meta["ladder_votes"])
+    lo, hi = float(vw.curve[0].price), float(vw.curve[-1].price)
+    return steps_from_answers(sim.price_answers, [lo + (hi - lo) * i / 7 for i in range(8)])
 
 
 async def _noop(_: dict) -> None:
@@ -159,6 +167,7 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
             estimated_margin_percentage=round(margin, 1),
             key_objections=sim.objections,
             van_westendorp=vw,
+            price_steps=_price_steps(sim, vw, best),
             raw_answers=sim.meta.get("raw_answers", []),
             explanations=explain_region(sim, vw, best, unit_cost, alloc, total_weight,
                                         req.total_production_budget, brand, fx_rate),

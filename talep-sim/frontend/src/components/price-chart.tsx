@@ -7,6 +7,14 @@ import type { RegionPredictionResult } from "@/lib/api";
 
 const ReactECharts = dynamic(() => import("echarts-for-react"), { ssr: false });
 
+export const ZONE_COLOR: Record<string, string> = {
+  too_cheap: "rgba(148,163,184,0.20)",
+  cheap: "rgba(59,130,246,0.14)",
+  ideal: "rgba(34,197,94,0.22)",
+  expensive: "rgba(245,158,11,0.16)",
+  too_expensive: "rgba(239,68,68,0.14)",
+};
+
 export function VanWestendorpChart({ result }: { result: RegionPredictionResult }) {
   const vw = result.van_westendorp;
   const series = (name: string, key: "too_cheap" | "cheap" | "expensive" | "too_expensive", color: string, dashed = false) => ({
@@ -19,8 +27,20 @@ export function VanWestendorpChart({ result }: { result: RegionPredictionResult 
     data: vw.curve.map((p) => [Number(p.price), Math.round(p[key] * 100)]),
   });
 
+  const xMin = Number(vw.curve[0].price);
+  const xMax = Number(vw.curve[vw.curve.length - 1].price);
+  const zoneAreas = (vw.zones ?? []).map((z) => {
+    const lo = Math.max(xMin, Number(z.low));
+    const hi = z.high == null ? xMax : Math.min(xMax, Number(z.high));
+    const range = z.high == null ? `$${Math.round(Number(z.low))}+` : `$${Math.round(Number(z.low))}-${Math.round(Number(z.high))}`;
+    return [
+      { name: `${z.label}\n${range}`, xAxis: lo, itemStyle: { color: ZONE_COLOR[z.key] }, label: { show: hi - lo >= (xMax - xMin) * 0.12, position: "insideTop" as const, fontSize: 10, color: "#475569" } },
+      { xAxis: hi },
+    ];
+  });
+
   const option: EChartsOption = {
-    grid: { left: 48, right: 24, top: 56, bottom: 48 },
+    grid: { left: 48, right: 24, top: 64, bottom: 48 },
     tooltip: {
       trigger: "axis",
       valueFormatter: (v) => `%${v}`,
@@ -31,18 +51,14 @@ export function VanWestendorpChart({ result }: { result: RegionPredictionResult 
       name: "Fiyat ($)",
       nameLocation: "middle",
       nameGap: 28,
-      min: Number(vw.curve[0].price),
-      max: Number(vw.curve[vw.curve.length - 1].price),
+      min: xMin,
+      max: xMax,
     },
     yAxis: { type: "value", name: "Ajan %", max: 100 },
     series: [
       {
         ...series("Çok ucuz", "too_cheap", "#94a3b8", true),
-        markArea: {
-          silent: true,
-          itemStyle: { color: "rgba(34,197,94,0.08)" },
-          data: [[{ xAxis: Number(vw.acceptable_range_low) }, { xAxis: Number(vw.acceptable_range_high) }]],
-        },
+        markArea: { silent: true, data: zoneAreas as never },
         markLine: {
           symbol: "none",
           label: { formatter: "{b}", position: "insideEndTop" },
@@ -58,5 +74,5 @@ export function VanWestendorpChart({ result }: { result: RegionPredictionResult 
     ],
   };
 
-  return <ReactECharts option={option} style={{ height: 340 }} notMerge />;
+  return <ReactECharts option={option} style={{ height: 380 }} notMerge />;
 }

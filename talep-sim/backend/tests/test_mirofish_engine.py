@@ -271,7 +271,9 @@ async def test_free_text_answers_are_extracted_by_llm(tmp_path):
     card = await engine.fuse_product_card(REQ)
     sim = await engine.simulate_region(card, "EU", 25.0)
     assert llm.calls == 5 and sim.meta["n_valid"] == 5 and sim.meta["n_extracted"] == 5
-    assert sim.meta["n_priced"] == 5 and sim.meta["price_source"] == "agents" and sim.objections == ["Pahalı"]
+    assert sim.meta["n_priced"] == 5 and sim.meta["price_source"] == "agents"
+    assert sim.objections == ["Pahalı"]
+    assert len(sim.meta["ladder_votes"]) == 5 and sim.meta["ladder_votes"][0] == [0, 1, 1, 2, 3]
     raw = sim.meta["raw_answers"]
     assert raw[0]["status"] == "extracted" and FREE_TEXT in raw[0]["text"]
     saved = (tmp_path / "world.json.answers.jsonl").read_text().splitlines()

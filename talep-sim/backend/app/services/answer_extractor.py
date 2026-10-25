@@ -172,7 +172,7 @@ def answer_from_obj(raw: dict, ladder: Optional[List[float]] = None) -> Optional
         for key in ("ladder", "fiyatlar", "prices", "merdiven"):
             ranks = _ladder_ranks(raw.get(key), len(ladder))
             if ranks and (res := thresholds_from_ladder(ladder, ranks)):
-                out.update(prices=res[0], estimated=res[1], price_source="ladder")
+                out.update(prices=res[0], estimated=res[1], price_source="ladder", ranks=ranks)
                 return out
     vals = [to_number(raw.get(k)) for k in ("too_cheap", "cheap", "expensive", "too_expensive")]
     if all(v is not None and v > 0 for v in vals):

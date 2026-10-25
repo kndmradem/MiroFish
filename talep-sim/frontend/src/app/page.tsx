@@ -5,6 +5,7 @@ import { ImageIcon, Loader2 } from "lucide-react";
 
 import { BrandPanel, SourceBadge } from "@/components/brand-panel";
 import { applyProgress, ProgressPanel, type ProgressState, type RegionStatus } from "@/components/progress-panel";
+import { PriceZones } from "@/components/price-zones";
 import { RawAnswers } from "@/components/raw-answers";
 import { VanWestendorpChart } from "@/components/price-chart";
 import { Badge } from "@/components/ui/badge";
@@ -250,7 +251,10 @@ export default function Dashboard() {
                   ))}
                 </div>
               </CardHeader>
-              <CardContent>{chartRow && <VanWestendorpChart result={chartRow} />}</CardContent>
+              <CardContent className="grid gap-4">
+                {chartRow && <VanWestendorpChart result={chartRow} />}
+                {chartRow && <PriceZones row={chartRow} />}
+              </CardContent>
             </Card>
 
             {chartRow && chartRow.explanations.length > 0 && (

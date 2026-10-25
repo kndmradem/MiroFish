@@ -79,12 +79,32 @@ class PricePoint(BaseModel):
     too_expensive: float = Field(..., description="'Asla almam, çok pahalı' bulan oran")
 
 
+class PriceZone(BaseModel):
+    key: str = Field(..., description="too_cheap | cheap | ideal | expensive | too_expensive")
+    label: str
+    low: Decimal
+    high: Optional[Decimal] = Field(None, description="Üst sınır; en üst bölgede None (sınırsız)")
+    description: str = ""
+
+
+class PriceStep(BaseModel):
+    """Bir fiyat basamağında ajanların karar dağılımı (adet)."""
+    price: Decimal
+    suspicious: int = Field(0, description="Çok ucuz, kalite şüphesi")
+    fair: int = Field(0, description="Uygun / alırım")
+    expensive: int = Field(0, description="Pahalı ama düşünürüm")
+    too_expensive: int = Field(0, description="Çok pahalı, almam")
+    n: int = 0
+    basis: str = Field("threshold", description="ladder = ajanın o fiyata verdiği karar; threshold = ajan eşiklerinden hesaplandı")
+
+
 class VanWestendorpResult(BaseModel):
     optimal_price_point: Decimal = Field(..., description="OPP: too_cheap ∩ too_expensive")
     indifference_price_point: Decimal = Field(..., description="IPP: cheap ∩ expensive")
     acceptable_range_low: Decimal = Field(..., description="PMC: too_cheap ∩ expensive")
     acceptable_range_high: Decimal = Field(..., description="PME: cheap ∩ too_expensive")
     curve: List[PricePoint]
+    zones: List[PriceZone] = []
 
 
 class RawAnswer(BaseModel):
@@ -105,6 +125,7 @@ class RegionPredictionResult(BaseModel):
     key_objections: List[str] = Field(..., description="Ajanlardan gelen top 3 eleştiri")
     van_westendorp: VanWestendorpResult
     explanations: List[Explanation] = []
+    price_steps: List[PriceStep] = []
     raw_answers: List[RawAnswer] = Field([], description="Ajanların ham cevapları ve nasıl çözümlendikleri (MiroFish motoru)")
     local_currency: Optional[str] = Field(None, description="Bölgenin yerel para birimi (yalnızca TL gösterilen bölgelerde)")
     local_price: Optional[Decimal] = Field(None, description="Önerilen fiyatın yerel para karşılığı")

@@ -68,7 +68,26 @@ export interface PricePoint {
   too_expensive: number;
 }
 
+export interface PriceZone {
+  key: "too_cheap" | "cheap" | "ideal" | "expensive" | "too_expensive";
+  label: string;
+  low: string;
+  high: string | null;
+  description: string;
+}
+
+export interface PriceStep {
+  price: string;
+  suspicious: number;
+  fair: number;
+  expensive: number;
+  too_expensive: number;
+  n: number;
+  basis: "ladder" | "threshold";
+}
+
 export interface VanWestendorpResult {
+  zones?: PriceZone[];
   optimal_price_point: string;
   indifference_price_point: string;
   acceptable_range_low: string;
@@ -86,6 +105,7 @@ export interface RegionPredictionResult {
   key_objections: string[];
   van_westendorp: VanWestendorpResult;
   explanations: Explanation[];
+  price_steps?: PriceStep[];
   raw_answers?: RawAnswer[];
   local_currency?: string | null;
   local_price?: string | null;

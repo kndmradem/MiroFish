@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Callable, List, Sequence, Tuple
 
-from .models import PricePoint, VanWestendorpResult
+from .models import PricePoint, PriceStep, PriceZone, VanWestendorpResult
 
 
 @dataclass(frozen=True)
@@ -81,6 +81,7 @@ def analyze(answers: Sequence[AgentPriceAnswer], unit_cost: float, steps: int = 
         for a, b, c, d in [_curves(answers, p)]
     ]
     result = VanWestendorpResult(
+        zones=price_zones(pmc, opp, ipp, pme),
         optimal_price_point=_money(opp),
         indifference_price_point=_money(ipp),
         acceptable_range_low=_money(pmc),
@@ -88,3 +89,56 @@ def analyze(answers: Sequence[AgentPriceAnswer], unit_cost: float, steps: int = 
         curve=curve,
     )
     return result, _money(best)
+
+
+def price_zones(pmc: float, opp: float, ipp: float, pme: float) -> List[PriceZone]:
+    """Fiyat eksenini, Van Westendorp kesişimlerinden türeyen 5 bölgeye ayırır (boşluk kalmaz)."""
+    ideal_lo, ideal_hi = sorted((opp, ipp))
+    pmc, pme = min(pmc, ideal_lo), max(pme, ideal_hi)
+    return [
+        PriceZone(key="too_cheap", label="Çok ucuz", low=_money(0), high=_money(pmc),
+                  description="Çoğu ajan bu fiyatta kaliteden şüphelenir."),
+        PriceZone(key="cheap", label="Ucuz / avantajlı", low=_money(pmc), high=_money(ideal_lo),
+                  description="Kabul edilebilir ama kâr bırakılıyor; satışı hızlandırır."),
+        PriceZone(key="ideal", label="İdeal bölge", low=_money(ideal_lo), high=_money(ideal_hi),
+                  description="Ucuz-pahalı dengesi; en az direnç."),
+        PriceZone(key="expensive", label="Pahalı ama kabul edilebilir", low=_money(ideal_hi), high=_money(pme),
+                  description="Marjı yüksek, satış hızı düşer; kararsız müşteri artar."),
+        PriceZone(key="too_expensive", label="Çok pahalı", low=_money(pme), high=None,
+                  description="Çoğu ajan bu fiyatın üstünde almaz."),
+    ]
+
+
+def verdict(a: AgentPriceAnswer, p: float) -> int:
+    """Ajanın eşiklerine göre bir fiyata kararı: 0 şüpheli, 1 uygun, 2 pahalı, 3 çok pahalı."""
+    if p <= a.too_cheap:
+        return 0
+    if p < a.expensive:
+        return 1
+    return 2 if p < a.too_expensive else 3
+
+
+def steps_from_answers(answers: Sequence[AgentPriceAnswer], prices: Sequence[float]) -> List[PriceStep]:
+    out = []
+    for p in prices:
+        counts = [0, 0, 0, 0]
+        for a in answers:
+            counts[verdict(a, p)] += 1
+        out.append(PriceStep(price=_money(p), suspicious=counts[0], fair=counts[1], expensive=counts[2],
+                             too_expensive=counts[3], n=len(answers), basis="threshold"))
+    return out
+
+
+def steps_from_votes(ladder: Sequence[float], votes: Sequence[Sequence[int]]) -> List[PriceStep]:
+    """Merdiven oylarından (her ajanın her basamağa verdiği 0..3 karar) adım tablosu."""
+    out = []
+    for i, p in enumerate(ladder):
+        counts = [0, 0, 0, 0]
+        n = 0
+        for v in votes:
+            if v[i] is not None:
+                counts[v[i]] += 1
+                n += 1
+        out.append(PriceStep(price=_money(p), suspicious=counts[0], fair=counts[1], expensive=counts[2],
+                             too_expensive=counts[3], n=n, basis="ladder"))
+    return out

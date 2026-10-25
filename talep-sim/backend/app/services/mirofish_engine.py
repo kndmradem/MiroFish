@@ -315,6 +315,7 @@ class MiroFishSimulationEngine:
         else:  # fiyat bilgisi yetersiz: eşikler ajanlardan değil, marka/maliyet referansından üretilir
             answers = self._fallback_prices(reference, brand, region, max(len(valid), 5))
             price_source = "brand_fallback"
+        votes = [a["ranks"] for a in priced if a.get("ranks")]
         demand = round(sum(a["interest"] for a in valid) / len(valid))
         counts = Counter(a["objection"] for a in valid if a["objection"])
         objections = [o for o, _ in counts.most_common(3)]
@@ -322,6 +323,6 @@ class MiroFishSimulationEngine:
                 "n_timed_out": timed_out, "n_priced": len(priced), "price_source": price_source,
                 "n_extracted": sum(r["status"] == "extracted" for r in raw_answers),
                 "n_estimated": sum(1 for a in valid if a.get("estimated")), "raw_answers": raw_answers,
-                "mean_interest": demand,
+                "mean_interest": demand, "ladder": ladder, "ladder_votes": votes if price_source == "agents" else [],
                 "objection_counts": counts.most_common(3)}
         return RegionSimulation(region, demand, answers, objections, meta)

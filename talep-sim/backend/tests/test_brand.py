@@ -250,3 +250,16 @@ def test_model_recommendations_keep_fx_risk_warning_for_turkey(isolated_app):
     isolated_app[get_advisor] = lambda: Advisor(fake_llm(good))
     recs = _tr(brand_profile=MASS.model_dump())["recommendations"]
     assert recs[0]["source"] == "model" and any("kur riskini planla" in r["title"] for r in recs)
+
+
+def test_price_zones_cover_axis_without_gaps():
+    from app.pricing import AgentPriceAnswer, analyze, steps_from_answers
+    answers = [AgentPriceAnswer(20 + i, 35 + i, 60 + i, 90 + i) for i in range(10)]
+    vw, best = analyze(answers, 15.0)
+    zones = vw.zones
+    assert [z.key for z in zones] == ["too_cheap", "cheap", "ideal", "expensive", "too_expensive"]
+    for a, b in zip(zones, zones[1:]):
+        assert a.high == b.low and a.low <= a.high
+    assert zones[-1].high is None and zones[1].low == vw.acceptable_range_low
+    steps = steps_from_answers(answers, [10, 40, 70, 120])
+    assert steps[0].suspicious == 10 and steps[-1].too_expensive == 10 and all(s.n == 10 for s in steps)
