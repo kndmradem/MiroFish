@@ -118,3 +118,15 @@ def estimate_returns(card: dict, region: str, price: float, unit_cost: float, qt
         return_cost_per_sale=Decimal(str(round(return_cost, 2))),
         net_qty_if_sold_out=int(qty * (1 - r)),
     )
+
+
+def net_profit_per_sale(price: float, unit_cost: float, rate_pct: float, a: Assumptions) -> float:
+    """Satış başına iade sonrası beklenen kâr ($): kalan satışın kârı - iade lojistiği/zayiat maliyeti."""
+    r = rate_pct / 100
+    loss = price * a.reverse_logistics_pct / 100 + (1 - a.restock_share) * unit_cost
+    return (price - unit_cost) * (1 - r) - r * loss
+
+
+def net_margin_pct(price: float, unit_cost: float, rate_pct: float, a: Assumptions) -> float:
+    kept = price * (1 - rate_pct / 100)
+    return net_profit_per_sale(price, unit_cost, rate_pct, a) / kept * 100 if kept > 0 else 0.0

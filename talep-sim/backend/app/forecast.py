@@ -34,21 +34,35 @@ def _price_position(best: float, zones: list) -> float:
     return (best - hi_ideal) / max(1e-9, hi_exp - hi_ideal)
 
 
+class DemandModel:
+    """Talep modeli: 120 gün kümülatif talep = taban (kitle x ilgi x dönüşüm) x fiyat kabulü x zaman payı."""
+
+    def __init__(self, region, demand_score, price, zones, brand, assumptions):
+        base_audience = DEFAULT_AUDIENCE.get(region, 150_000)
+        strength = (brand.regional_strength.get(region, 50) / 50) if brand else 1.0
+        user = assumptions.audience.get(region)
+        self.user_audience = user is not None
+        self.audience = user if user is not None else int(base_audience * max(0.4, min(1.8, strength)))
+        self.base = self.audience * (demand_score / 100) * assumptions.conversion_ceiling_pct / 100
+        self.tau = TAU_BASE * (1 + 0.6 * _price_position(price, zones))
+
+    def share(self, t: float) -> float:
+        return (1 - math.exp(-t / self.tau)) / (1 - math.exp(-HORIZON / self.tau))
+
+    def demand(self, t0: float, t1: float, prob: float, mult: float = 1.0) -> float:
+        """[t0, t1] günleri arasında, verilen satın alma olasılığıyla stoksuz talep."""
+        return self.base * prob * mult * (self.share(t1) - self.share(t0))
+
+
 def forecast_sales(region: str, demand_score: int, price: float, purchase_prob: float, zones: list,
                    qty: int, returns_pct: float, brand: Optional[BrandProfile],
                    assumptions: Assumptions) -> SalesForecast:
-    base_audience = DEFAULT_AUDIENCE.get(region, 150_000)
-    strength = (brand.regional_strength.get(region, 50) / 50) if brand else 1.0
-    audience = assumptions.audience.get(region)
-    user_audience = audience is not None
-    if audience is None:
-        audience = int(base_audience * max(0.4, min(1.8, strength)))
+    model = DemandModel(region, demand_score, price, zones, brand, assumptions)
+    audience, user_audience, tau = model.audience, model.user_audience, model.tau
     conv = assumptions.conversion_ceiling_pct / 100
-    potential = audience * (demand_score / 100) * purchase_prob * conv  # 120. günde, sınırsız stokla
-
+    potential = model.base * purchase_prob  # 120. günde, sınırsız stokla
     pos = _price_position(price, zones)
-    tau = TAU_BASE * (1 + 0.6 * pos)
-    share = lambda t: (1 - math.exp(-t / tau)) / (1 - math.exp(-HORIZON / tau))  # 0..1, 120. günde 1
+    share = model.share
 
     def cum_demand(t: int, mult: float) -> float:
         return potential * mult * share(t)

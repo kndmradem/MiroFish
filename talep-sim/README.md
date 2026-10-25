@@ -112,6 +112,12 @@ bölümünden değiştirilir. Bu ajan cevabı değil varsayımdır; gerçek veri
 bölümünden kendi verinle değiştir. Satış üretim miktarıyla sınırlıdır (stok bitişi ve kaçan talep gösterilir), düşük/yüksek
 senaryo orta talebin 0,65x ve 1,4x katıdır (güven aralığı değil, varsayım aralığı).
 
+**Fiyat ve kampanya senaryoları.** `app/scenarios.py`: lansman (önerilen fiyat) -> ilk kampanya sonrası (ideal bölge ortası) -> stok eritme
+(ucuz bölge ortası, maliyet tabanlı) fiyat planı, tek fiyatla karşılaştırılır; her aşamada satın alma olasılığı ajan eğrisinden gelir.
+Kampanya senaryoları hedefe göre (stok eritme / satışı artırma / rakibe karşı) ve bölgeye göre (TR taksit ve Efsane Cuma, MENA Ramazan
+ve White Friday, EU ücretsiz iade ve sezon sonu, US Black Friday ve BNPL, CIS Yılbaşı ve 8 Mart) üretilir. Kaldıraç etkileri kural
+varsayımıdır (aralıklı); fiyat etkisi ajan eğrisindendir. Rakip fiyatını "Varsayımlar"dan girersen rakip savunma senaryosu ona göre hesaplanır.
+
 **Fiyat merdiveni.** Ajanlara serbest fiyat yerine 5 sabit fiyat (referans fiyatın 0,5x-2,1x'i; Türkiye için TL karşılığıyla) sunulur
 ve her biri için tek kelimelik karar istenir (`supheli`, `uygun`, `pahali`, `cok_pahali`). Van Westendorp eşikleri bu kararların
 geçiş noktalarından türetilir. Fiyat alanlarına sayı yerine cümle yazan cevaplar önce LLM ile merdivene çevrilir; yine olmazsa

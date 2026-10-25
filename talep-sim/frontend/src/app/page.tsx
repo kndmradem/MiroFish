@@ -5,6 +5,7 @@ import { ImageIcon, Loader2 } from "lucide-react";
 
 import { BrandPanel, SourceBadge } from "@/components/brand-panel";
 import { applyProgress, ProgressPanel, type ProgressState, type RegionStatus } from "@/components/progress-panel";
+import { CampaignsCard, PricePlanCard } from "@/components/scenarios-card";
 import { ForecastCard } from "@/components/forecast-card";
 import { ReturnsCard } from "@/components/returns-card";
 import { PriceZones } from "@/components/price-zones";
@@ -37,6 +38,7 @@ export default function Dashboard() {
   const [restock, setRestock] = useState("70");
   const [logistics, setLogistics] = useState("8");
   const [conversion, setConversion] = useState("2");
+  const [competitor, setCompetitor] = useState<Record<string, string>>({});
   const [audience, setAudience] = useState<Record<string, string>>({});
   const [baseReturn, setBaseReturn] = useState<Record<string, string>>({});
   const [brand, setBrand] = useState("");
@@ -84,6 +86,9 @@ export default function Dashboard() {
           conversion_ceiling_pct: Math.max(0.1, Number(conversion) || 2),
           audience: Object.fromEntries(
             Object.entries(audience).filter(([r, v]) => regions.includes(r as RegionCode) && Number(v) > 0).map(([r, v]) => [r, Math.floor(Number(v))]),
+          ),
+          competitor_price_usd: Object.fromEntries(
+            Object.entries(competitor).filter(([r, v]) => regions.includes(r as RegionCode) && Number(v) > 0).map(([r, v]) => [r, Number(v)]),
           ),
           channel,
           restock_share: Math.min(1, Math.max(0, Number(restock) / 100)),
@@ -179,7 +184,7 @@ export default function Dashboard() {
               </div>
             )}
             <details className="rounded-md border p-3 text-sm">
-              <summary className="cursor-pointer font-medium">Varsayımlar (iade, satış tahmini)</summary>
+              <summary className="cursor-pointer font-medium">Varsayımlar (iade, satış, rakip)</summary>
               <div className="mt-3 grid gap-3">
                 <div className="grid gap-1.5">
                   <Label htmlFor="channel">Satış kanalı</Label>
@@ -211,6 +216,18 @@ export default function Dashboard() {
                         <span className="text-center font-mono text-xs">{r}</span>
                         <Input type="number" min="0" placeholder="-" value={audience[r] ?? ""}
                           onChange={(e) => setAudience((p) => ({ ...p, [r]: e.target.value }))} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="grid gap-1.5">
+                  <Label>Rakip ürün fiyatı ($, rakip savunma senaryosu için), boşsa genel varsayım</Label>
+                  <div className="grid grid-cols-5 gap-2">
+                    {regions.map((r) => (
+                      <div key={r} className="grid gap-1">
+                        <span className="text-center font-mono text-xs">{r}</span>
+                        <Input type="number" min="0" placeholder="-" value={competitor[r] ?? ""}
+                          onChange={(e) => setCompetitor((p) => ({ ...p, [r]: e.target.value }))} />
                       </div>
                     ))}
                   </div>
@@ -335,6 +352,26 @@ export default function Dashboard() {
                   <CardDescription>Üretim miktarıyla sınırlı; talep skoru ve fiyat kabulü ajanlardan, kitle ve dönüşüm varsayımdır.</CardDescription>
                 </CardHeader>
                 <CardContent><ForecastCard row={chartRow} /></CardContent>
+              </Card>
+            )}
+
+            {chartRow?.price_plan && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Fiyat senaryoları: lansman, ilk kampanya sonrası, stok eritme ({chartRow.region})</CardTitle>
+                  <CardDescription>Fiyat kabulü ajan eğrisinden; aşama süreleri varsayım.</CardDescription>
+                </CardHeader>
+                <CardContent><PricePlanCard row={chartRow} /></CardContent>
+              </Card>
+            )}
+
+            {(chartRow?.campaigns?.length ?? 0) > 0 && chartRow && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Kampanya senaryoları ({chartRow.region})</CardTitle>
+                  <CardDescription>Hedefe göre bu bölgenin müşterisine uygun yapı: stok eritme, satışı artırma ya da rakibe karşı konum koruma.</CardDescription>
+                </CardHeader>
+                <CardContent><CampaignsCard row={chartRow} /></CardContent>
               </Card>
             )}
 

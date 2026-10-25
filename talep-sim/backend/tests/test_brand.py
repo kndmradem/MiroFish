@@ -338,3 +338,50 @@ def test_predict_endpoint_includes_forecast():
     for r in rows:
         f = r["forecast"]
         assert len(f["milestones"]) == 4 and f["milestones"][-1]["units"] <= r["recommended_production_qty"]
+
+
+def _scenario_inputs(qty=800, region="TR", **assump):
+    from app.forecast import DemandModel, forecast_sales
+    from app.models import Assumptions
+    from app.pricing import AgentPriceAnswer, analyze, purchase_probability
+    answers = [AgentPriceAnswer(20 + i, 35 + i, 60 + i, 90 + i) for i in range(10)]
+    vw, best = analyze(answers, 25.0)
+    a = Assumptions(**assump)
+    prob = purchase_probability(answers, float(best))
+    fc = forecast_sales(region, 75, float(best), prob, vw.zones, qty, 20.0, None, a)
+    dm = DemandModel(region, 75, float(best), vw.zones, None, a)
+    return answers, vw, float(best), dm, fc, a
+
+
+def test_price_plan_descends_never_below_cost_and_conserves_stock():
+    from app.scenarios import build_price_plan
+    answers, vw, best, dm, fc, a = _scenario_inputs()
+    plan = build_price_plan(dm, answers, vw, best, 25.0, 800, 20.0, a)
+    prices = [float(p.price) for p in plan.phases]
+    assert prices[0] > prices[1] > prices[2] >= 25.0 * 1.05
+    assert [p.name for p in plan.phases] == ["Lansman", "İlk kampanya sonrası", "Stok eritme"]
+    assert plan.total_units + plan.leftover_units == 800
+    assert plan.flat_units + plan.flat_leftover_units == 800
+    assert plan.phases[0].discount_pct == 0 and plan.phases[2].discount_pct > 10
+
+
+def test_campaigns_cover_three_goals_with_one_recommendation():
+    from app.scenarios import build_campaigns
+    answers, vw, best, dm, fc, a = _scenario_inputs(qty=100_000)
+    camps = build_campaigns("TR", dm, answers, best, 25.0, 100_000, 20.0, a, fc)
+    assert [c.goal for c in camps] == ["clear_stock", "boost_sales", "defend_competition"]
+    assert sum(c.recommended for c in camps) == 1 and camps[0].recommended  # stok kalıyor -> eritme
+    assert any("Taksit" in l.label for c in camps for l in c.levers)  # TR için taksit
+    c = camps[0]
+    assert c.units_low <= c.units <= c.units_high and c.discount_pct > 0 and c.margin_impact_pts < 0
+    # stok erken biterse kampanya yerine konum koruma önerilir
+    answers, vw, best, dm, fc, a = _scenario_inputs(qty=100)
+    camps = build_campaigns("MENA", dm, answers, best, 25.0, 100, 20.0, a, fc)
+    assert next(c for c in camps if c.recommended).goal == "defend_competition"
+
+
+def test_competitor_price_drives_defense_discount():
+    from app.scenarios import build_campaigns
+    answers, vw, best, dm, fc, a = _scenario_inputs(qty=100_000, competitor_price_usd={"TR": 30.0})
+    d = next(c for c in build_campaigns("TR", dm, answers, best, 25.0, 100_000, 20.0, a, fc) if c.goal == "defend_competition")
+    assert "senin girdin" in d.rationale and d.discount_pct > 0

@@ -54,6 +54,70 @@ export interface Assumptions {
   reverse_logistics_pct: number;
   audience: Record<string, number>;
   conversion_ceiling_pct: number;
+  competitor_price_usd: Record<string, number>;
+}
+
+export interface PricePhase {
+  name: string;
+  day_from: number;
+  day_to: number;
+  price: string;
+  discount_pct: number;
+  zone: string;
+  purchase_prob_pct: number;
+  units: number;
+  revenue: string;
+  net_profit: string;
+  net_margin_pct: number;
+  note: string;
+}
+
+export interface PricePlan {
+  phases: PricePhase[];
+  total_units: number;
+  total_revenue: string;
+  total_net_profit: string;
+  leftover_units: number;
+  flat_units: number;
+  flat_revenue: string;
+  flat_net_profit: string;
+  flat_leftover_units: number;
+  verdict?: string;
+  assumptions: string[];
+  basis: string;
+}
+
+export interface CampaignLever {
+  label: string;
+  uplift_low_pct: number;
+  uplift_high_pct: number;
+  cost_pct: number;
+  basis: string;
+}
+
+export interface CampaignScenario {
+  goal: "clear_stock" | "boost_sales" | "defend_competition";
+  goal_label: string;
+  name: string;
+  recommended: boolean;
+  why: string;
+  start_day: number;
+  window_days: number;
+  discount_pct: number;
+  campaign_price: string;
+  levers: CampaignLever[];
+  baseline_units: number;
+  units_low: number;
+  units: number;
+  units_high: number;
+  extra_units: number;
+  extra_revenue: string;
+  profit_delta: string;
+  margin_impact_pts: number;
+  timing: string;
+  rationale: string;
+  assumptions: string[];
+  basis: string;
 }
 
 export interface ForecastMilestone {
@@ -170,6 +234,8 @@ export interface RegionPredictionResult {
   price_steps?: PriceStep[];
   returns?: ReturnEstimate | null;
   forecast?: SalesForecast | null;
+  price_plan?: PricePlan | null;
+  campaigns?: CampaignScenario[];
   raw_answers?: RawAnswer[];
   local_currency?: string | null;
   local_price?: string | null;

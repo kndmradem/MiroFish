@@ -15,7 +15,8 @@ from .models import FailedRegion, BrandProfile, BrandProfileRequest, PredictionR
 from .advisor import Advisor
 from .explain import explain_region, methodology_notes
 from . import economy
-from .forecast import forecast_sales
+from .forecast import DemandModel, forecast_sales
+from .scenarios import build_campaigns, build_price_plan
 from .returns import estimate_returns
 from .pricing import analyze, purchase_probability, steps_from_answers, steps_from_votes
 from .config import Settings, settings
@@ -162,6 +163,13 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
         margin = float((best - req.unit_cost) / best * 100) if best > 0 else 0.0
         ret = estimate_returns(card, region, float(best), unit_cost, alloc.quantity, brand,
                                req.assumptions, f"{req.product_name} {req.technical_specs}")
+        prob = purchase_probability(sim.price_answers, float(best))
+        fc = forecast_sales(region, sim.demand_score, float(best), prob, vw.zones, alloc.quantity,
+                            ret.rate_pct, brand, req.assumptions)
+        dm = DemandModel(region, sim.demand_score, float(best), vw.zones, brand, req.assumptions)
+        plan = build_price_plan(dm, sim.price_answers, vw, float(best), unit_cost, alloc.quantity, ret.rate_pct, req.assumptions)
+        camps = build_campaigns(region, dm, sim.price_answers, float(best), unit_cost, alloc.quantity, ret.rate_pct,
+                                req.assumptions, fc)
         breakdown.append(RegionPredictionResult(
             region=region,
             demand_score_100=sim.demand_score,
@@ -173,9 +181,7 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
             van_westendorp=vw,
             price_steps=_price_steps(sim, vw, best),
             returns=ret,
-            forecast=forecast_sales(region, sim.demand_score, float(best),
-                                    purchase_probability(sim.price_answers, float(best)), vw.zones, alloc.quantity,
-                                    ret.rate_pct, brand, req.assumptions),
+            forecast=fc, price_plan=plan, campaigns=camps,
             raw_answers=sim.meta.get("raw_answers", []),
             explanations=explain_region(sim, vw, best, unit_cost, alloc, total_weight,
                                         req.total_production_budget, brand, fx_rate),

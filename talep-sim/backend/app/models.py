@@ -58,6 +58,7 @@ class Assumptions(BaseModel):
     restock_share: float = Field(0.7, ge=0, le=1, description="İade edilenlerin yeniden satılabilir oranı")
     reverse_logistics_pct: float = Field(8.0, ge=0, le=50, description="İade lojistiği + işleme maliyeti, satış fiyatının %'si")
     audience: Dict[str, int] = Field(default_factory=dict, description="Bölge bazında 120 günde ulaşılabilir hedef kitle (kişi) ezmesi")
+    competitor_price_usd: Dict[str, float] = Field(default_factory=dict, description="Bölge bazında rakip ürün fiyatı ($); girilirse rakip savunma senaryosu bunu kullanır")
     conversion_ceiling_pct: float = Field(2.0, ge=0.1, le=30, description="İlgili ve fiyatı kabul eden kitlenin alıma dönüşme tavanı (%)")
 
 
@@ -177,6 +178,69 @@ class SalesForecast(BaseModel):
     basis: str = "varsayım tabanlı model (ajan cevabı: talep skoru ve fiyat kabulü; kitle ve dönüşüm: varsayım)"
 
 
+class PricePhase(BaseModel):
+    name: str
+    day_from: int
+    day_to: int
+    price: Decimal
+    discount_pct: float = Field(..., description="Lansman fiyatına göre indirim %")
+    zone: str = Field("", description="Fiyatın düştüğü bölge etiketi")
+    purchase_prob_pct: float = Field(..., description="Ajan eğrisinden bu fiyatta satın alma olasılığı")
+    units: int
+    revenue: Decimal
+    net_profit: Decimal = Field(..., description="İade maliyeti düşüldükten sonra kâr ($)")
+    net_margin_pct: float
+    note: str = ""
+
+
+class PricePlan(BaseModel):
+    phases: List[PricePhase]
+    total_units: int
+    total_revenue: Decimal
+    total_net_profit: Decimal
+    leftover_units: int
+    flat_units: int = Field(..., description="Aynı dönemde tek fiyatla (lansman fiyatı) satış")
+    flat_revenue: Decimal
+    flat_net_profit: Decimal
+    flat_leftover_units: int
+    verdict: str = Field("", description="Üç aşamalı plan ile tek fiyatın karşılaştırmalı yorumu")
+    assumptions: List[str] = []
+    basis: str = "fiyat kabulü ajan eğrisinden; aşama süreleri ve satış hızı varsayım"
+
+
+class CampaignLever(BaseModel):
+    label: str
+    uplift_low_pct: float
+    uplift_high_pct: float
+    cost_pct: float = Field(0.0, description="Ciroya oranla maliyet %")
+    basis: str = "kural varsayımı"
+
+
+class CampaignScenario(BaseModel):
+    goal: Literal["clear_stock", "boost_sales", "defend_competition"]
+    goal_label: str
+    name: str
+    recommended: bool = False
+    why: str = ""
+    start_day: int
+    window_days: int
+    discount_pct: float
+    campaign_price: Decimal
+    levers: List[CampaignLever]
+    baseline_units: int
+    units_low: int
+    units: int
+    units_high: int
+    extra_units: int
+    extra_revenue: Decimal
+    profit_delta: Decimal
+    margin_impact_pts: float
+    timing: str = ""
+    rationale: str = ""
+    assumptions: List[str] = []
+    basis: str = "fiyat etkisi ajan eğrisinden; kampanya kaldıraçları kural varsayımı"
+
+
 # --- Çıktı (Response) Modeli ---
 class RegionPredictionResult(BaseModel):
     region: str
@@ -191,6 +255,8 @@ class RegionPredictionResult(BaseModel):
     price_steps: List[PriceStep] = []
     returns: Optional[ReturnEstimate] = None
     forecast: Optional[SalesForecast] = None
+    price_plan: Optional[PricePlan] = None
+    campaigns: List[CampaignScenario] = []
     raw_answers: List[RawAnswer] = Field([], description="Ajanların ham cevapları ve nasıl çözümlendikleri (MiroFish motoru)")
     local_currency: Optional[str] = Field(None, description="Bölgenin yerel para birimi (yalnızca TL gösterilen bölgelerde)")
     local_price: Optional[Decimal] = Field(None, description="Önerilen fiyatın yerel para karşılığı")
