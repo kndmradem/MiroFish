@@ -107,6 +107,11 @@ kumaş, kesim (dekolte vb., bölgeye göre), iklim uyumsuzluğu ve marka segment
 nedeniyle gösterilir. Kanal, yeniden satılabilir oran ve iade lojistiği ile kendi gerçek taban oranların arayüzde "Varsayımlar (iade)"
 bölümünden değiştirilir. Bu ajan cevabı değil varsayımdır; gerçek veri girildikçe değiştir.
 
+**30/60/90/120 gün satış tahmini.** `app/forecast.py`: 120 günlük potansiyel = hedef kitle x ilgi (ajan talep skoru) x fiyat kabulü
+(ajan eşiklerinden satın alma olasılığı) x dönüşüm tavanı (%2). Hedef kitle ve dönüşüm tavanı VARSAYIMDIR; arayüzde "Varsayımlar"
+bölümünden kendi verinle değiştir. Satış üretim miktarıyla sınırlıdır (stok bitişi ve kaçan talep gösterilir), düşük/yüksek
+senaryo orta talebin 0,65x ve 1,4x katıdır (güven aralığı değil, varsayım aralığı).
+
 **Fiyat merdiveni.** Ajanlara serbest fiyat yerine 5 sabit fiyat (referans fiyatın 0,5x-2,1x'i; Türkiye için TL karşılığıyla) sunulur
 ve her biri için tek kelimelik karar istenir (`supheli`, `uygun`, `pahali`, `cok_pahali`). Van Westendorp eşikleri bu kararların
 geçiş noktalarından türetilir. Fiyat alanlarına sayı yerine cümle yazan cevaplar önce LLM ile merdivene çevrilir; yine olmazsa

@@ -57,6 +57,8 @@ class Assumptions(BaseModel):
     return_base_pct: Dict[str, float] = Field(default_factory=dict, description="Bölge bazında taban iade oranı (%) ezmesi, ör. gerçek verin varsa")
     restock_share: float = Field(0.7, ge=0, le=1, description="İade edilenlerin yeniden satılabilir oranı")
     reverse_logistics_pct: float = Field(8.0, ge=0, le=50, description="İade lojistiği + işleme maliyeti, satış fiyatının %'si")
+    audience: Dict[str, int] = Field(default_factory=dict, description="Bölge bazında 120 günde ulaşılabilir hedef kitle (kişi) ezmesi")
+    conversion_ceiling_pct: float = Field(2.0, ge=0.1, le=30, description="İlgili ve fiyatı kabul eden kitlenin alıma dönüşme tavanı (%)")
 
 
 # --- Girdi (Request) Modeli ---
@@ -143,6 +145,38 @@ class ReturnEstimate(BaseModel):
     basis: str = "kural tabanlı varsayım (ajan cevabı değil)"
 
 
+class ForecastMilestone(BaseModel):
+    day: int
+    units_low: int
+    units: int
+    units_high: int
+    period_units: int = Field(..., description="Bu dönemde (önceki kilometre taşından beri) satılan, orta senaryo")
+    revenue: Decimal = Field(..., description="Kümülatif brüt ciro, orta senaryo ($)")
+    net_revenue: Decimal = Field(..., description="İade sonrası kümülatif ciro, orta senaryo ($)")
+    stock_left: int
+
+
+class ForecastPoint(BaseModel):
+    day: int
+    demand: int = Field(..., description="Kümülatif talep (stok sınırı yokmuş gibi), orta")
+    sold: int = Field(..., description="Kümülatif satış (stokla sınırlı), orta")
+    sold_low: int
+    sold_high: int
+
+
+class SalesForecast(BaseModel):
+    milestones: List[ForecastMilestone]
+    curve: List[ForecastPoint]
+    stockout_day: Optional[int] = Field(None, description="Orta senaryoda stoğun bittiği gün; bitmezse None")
+    leftover_units: int = Field(..., description="120. günde kalan stok, orta senaryo")
+    lost_units: int = Field(..., description="Stok yetmediği için kaçan talep, orta senaryo")
+    sell_through_pct: float
+    audience: int
+    purchase_prob_pct: float
+    assumptions: List[str] = []
+    basis: str = "varsayım tabanlı model (ajan cevabı: talep skoru ve fiyat kabulü; kitle ve dönüşüm: varsayım)"
+
+
 # --- Çıktı (Response) Modeli ---
 class RegionPredictionResult(BaseModel):
     region: str
@@ -156,6 +190,7 @@ class RegionPredictionResult(BaseModel):
     explanations: List[Explanation] = []
     price_steps: List[PriceStep] = []
     returns: Optional[ReturnEstimate] = None
+    forecast: Optional[SalesForecast] = None
     raw_answers: List[RawAnswer] = Field([], description="Ajanların ham cevapları ve nasıl çözümlendikleri (MiroFish motoru)")
     local_currency: Optional[str] = Field(None, description="Bölgenin yerel para birimi (yalnızca TL gösterilen bölgelerde)")
     local_price: Optional[Decimal] = Field(None, description="Önerilen fiyatın yerel para karşılığı")

@@ -52,6 +52,40 @@ export interface Assumptions {
   return_base_pct: Record<string, number>;
   restock_share: number;
   reverse_logistics_pct: number;
+  audience: Record<string, number>;
+  conversion_ceiling_pct: number;
+}
+
+export interface ForecastMilestone {
+  day: number;
+  units_low: number;
+  units: number;
+  units_high: number;
+  period_units: number;
+  revenue: string;
+  net_revenue: string;
+  stock_left: number;
+}
+
+export interface ForecastPoint {
+  day: number;
+  demand: number;
+  sold: number;
+  sold_low: number;
+  sold_high: number;
+}
+
+export interface SalesForecast {
+  milestones: ForecastMilestone[];
+  curve: ForecastPoint[];
+  stockout_day: number | null;
+  leftover_units: number;
+  lost_units: number;
+  sell_through_pct: number;
+  audience: number;
+  purchase_prob_pct: number;
+  assumptions: string[];
+  basis: string;
 }
 
 export interface ReturnDriver {
@@ -135,6 +169,7 @@ export interface RegionPredictionResult {
   explanations: Explanation[];
   price_steps?: PriceStep[];
   returns?: ReturnEstimate | null;
+  forecast?: SalesForecast | null;
   raw_answers?: RawAnswer[];
   local_currency?: string | null;
   local_price?: string | null;

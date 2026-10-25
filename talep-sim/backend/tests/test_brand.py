@@ -307,3 +307,34 @@ def test_predict_endpoint_includes_returns_with_assumptions():
     rows = {x["region"]: x["returns"] for x in r.json()["regional_breakdown"]}
     assert rows["MENA"]["rate_pct"] > 0 and rows["MENA"]["net_margin_pct"] < rows["MENA"]["gross_margin_pct"]
     assert any("dekolte" in d["label"].lower() or "Açık kesim" in d["label"] for d in rows["MENA"]["drivers"])
+
+
+def test_forecast_is_monotonic_capped_and_reports_stockout():
+    from app.forecast import forecast_sales
+    from app.models import Assumptions, PriceZone
+    zones = [PriceZone(key=k, label=k, low=lo, high=hi) for k, lo, hi in
+             [("too_cheap", 0, 30), ("cheap", 30, 40), ("ideal", 40, 60), ("expensive", 60, 80), ("too_expensive", 80, None)]]
+    big = forecast_sales("EU", 80, 50.0, 0.6, zones, 100_000, 20.0, None, Assumptions())
+    small = forecast_sales("EU", 80, 50.0, 0.6, zones, 500, 20.0, None, Assumptions())
+    sold = [p.sold for p in small.curve]
+    assert sold == sorted(sold) and max(sold) == 500 and small.stockout_day is not None and small.lost_units > 0
+    assert big.stockout_day is None and big.leftover_units > 0 and big.sell_through_pct < 100
+    m = big.milestones
+    assert [x.day for x in m] == [30, 60, 90, 120] and m[0].units < m[1].units < m[2].units < m[3].units
+    assert m[0].units_low < m[0].units < m[0].units_high
+    assert sum(x.period_units for x in m) == m[-1].units and m[-1].net_revenue < m[-1].revenue
+    pricey = forecast_sales("EU", 80, 75.0, 0.6, zones, 100_000, 20.0, None, Assumptions())
+    assert pricey.milestones[0].units / pricey.milestones[-1].units < m[0].units / m[-1].units  # pahalıda hız düşer
+    own = forecast_sales("EU", 80, 50.0, 0.6, zones, 100_000, 20.0, None, Assumptions(audience={"EU": 1000}))
+    assert own.audience == 1000 and "senin girdin" in own.assumptions[0]
+
+
+def test_predict_endpoint_includes_forecast():
+    from fastapi.testclient import TestClient
+    from app.main import app
+    body = {"product_name": "Kaban", "image_base64": "x", "technical_specs": "yün", "unit_cost": "25",
+            "total_production_budget": 100000, "target_regions": ["EU", "TR"]}
+    rows = TestClient(app).post("/api/predict", json=body).json()["regional_breakdown"]
+    for r in rows:
+        f = r["forecast"]
+        assert len(f["milestones"]) == 4 and f["milestones"][-1]["units"] <= r["recommended_production_qty"]

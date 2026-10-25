@@ -15,8 +15,9 @@ from .models import FailedRegion, BrandProfile, BrandProfileRequest, PredictionR
 from .advisor import Advisor
 from .explain import explain_region, methodology_notes
 from . import economy
+from .forecast import forecast_sales
 from .returns import estimate_returns
-from .pricing import analyze, steps_from_answers, steps_from_votes
+from .pricing import analyze, purchase_probability, steps_from_answers, steps_from_votes
 from .config import Settings, settings
 from .services.brand_profiler import BrandProfiler
 from .services.llm import LLMClient, LLMError
@@ -159,6 +160,8 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
         local = {"local_currency": currency, "local_price": economy.local_price(best, fx_rate),
                  "fx_rate": fx_rate} if currency == "TRY" else {}
         margin = float((best - req.unit_cost) / best * 100) if best > 0 else 0.0
+        ret = estimate_returns(card, region, float(best), unit_cost, alloc.quantity, brand,
+                               req.assumptions, f"{req.product_name} {req.technical_specs}")
         breakdown.append(RegionPredictionResult(
             region=region,
             demand_score_100=sim.demand_score,
@@ -169,8 +172,10 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
             key_objections=sim.objections,
             van_westendorp=vw,
             price_steps=_price_steps(sim, vw, best),
-            returns=estimate_returns(card, region, float(best), unit_cost, alloc.quantity, brand,
-                                     req.assumptions, f"{req.product_name} {req.technical_specs}"),
+            returns=ret,
+            forecast=forecast_sales(region, sim.demand_score, float(best),
+                                    purchase_probability(sim.price_answers, float(best)), vw.zones, alloc.quantity,
+                                    ret.rate_pct, brand, req.assumptions),
             raw_answers=sim.meta.get("raw_answers", []),
             explanations=explain_region(sim, vw, best, unit_cost, alloc, total_weight,
                                         req.total_production_budget, brand, fx_rate),

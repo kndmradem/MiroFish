@@ -5,6 +5,7 @@ import { ImageIcon, Loader2 } from "lucide-react";
 
 import { BrandPanel, SourceBadge } from "@/components/brand-panel";
 import { applyProgress, ProgressPanel, type ProgressState, type RegionStatus } from "@/components/progress-panel";
+import { ForecastCard } from "@/components/forecast-card";
 import { ReturnsCard } from "@/components/returns-card";
 import { PriceZones } from "@/components/price-zones";
 import { RawAnswers } from "@/components/raw-answers";
@@ -35,6 +36,8 @@ export default function Dashboard() {
   const [channel, setChannel] = useState<"online" | "store">("online");
   const [restock, setRestock] = useState("70");
   const [logistics, setLogistics] = useState("8");
+  const [conversion, setConversion] = useState("2");
+  const [audience, setAudience] = useState<Record<string, string>>({});
   const [baseReturn, setBaseReturn] = useState<Record<string, string>>({});
   const [brand, setBrand] = useState("");
   const [brandNotes, setBrandNotes] = useState("");
@@ -78,6 +81,10 @@ export default function Dashboard() {
         brand_notes: brandNotes.trim() || undefined,
         brand_profile: profile ?? undefined,
         assumptions: {
+          conversion_ceiling_pct: Math.max(0.1, Number(conversion) || 2),
+          audience: Object.fromEntries(
+            Object.entries(audience).filter(([r, v]) => regions.includes(r as RegionCode) && Number(v) > 0).map(([r, v]) => [r, Math.floor(Number(v))]),
+          ),
           channel,
           restock_share: Math.min(1, Math.max(0, Number(restock) / 100)),
           reverse_logistics_pct: Math.max(0, Number(logistics) || 0),
@@ -172,7 +179,7 @@ export default function Dashboard() {
               </div>
             )}
             <details className="rounded-md border p-3 text-sm">
-              <summary className="cursor-pointer font-medium">Varsayımlar (iade)</summary>
+              <summary className="cursor-pointer font-medium">Varsayımlar (iade, satış tahmini)</summary>
               <div className="mt-3 grid gap-3">
                 <div className="grid gap-1.5">
                   <Label htmlFor="channel">Satış kanalı</Label>
@@ -190,6 +197,22 @@ export default function Dashboard() {
                   <div className="grid gap-1.5">
                     <Label htmlFor="logi">İade lojistiği (% fiyat)</Label>
                     <Input id="logi" type="number" min="0" max="50" value={logistics} onChange={(e) => setLogistics(e.target.value)} />
+                  </div>
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="conv">Dönüşüm tavanı (% — ilgili ve fiyatı kabul eden kitlenin alıma dönüşen kısmı)</Label>
+                  <Input id="conv" type="number" min="0.1" max="30" step="0.1" value={conversion} onChange={(e) => setConversion(e.target.value)} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label>120 günde ulaşabileceğin kitle (kişi), boşsa varsayılan</Label>
+                  <div className="grid grid-cols-5 gap-2">
+                    {regions.map((r) => (
+                      <div key={r} className="grid gap-1">
+                        <span className="text-center font-mono text-xs">{r}</span>
+                        <Input type="number" min="0" placeholder="-" value={audience[r] ?? ""}
+                          onChange={(e) => setAudience((p) => ({ ...p, [r]: e.target.value }))} />
+                      </div>
+                    ))}
                   </div>
                 </div>
                 <div className="grid gap-1.5">
@@ -304,6 +327,16 @@ export default function Dashboard() {
                 {chartRow && <PriceZones row={chartRow} />}
               </CardContent>
             </Card>
+
+            {chartRow?.forecast && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>30 / 60 / 90 / 120 gün satış potansiyeli ({chartRow.region})</CardTitle>
+                  <CardDescription>Üretim miktarıyla sınırlı; talep skoru ve fiyat kabulü ajanlardan, kitle ve dönüşüm varsayımdır.</CardDescription>
+                </CardHeader>
+                <CardContent><ForecastCard row={chartRow} /></CardContent>
+              </Card>
+            )}
 
             {chartRow?.returns && (
               <Card>

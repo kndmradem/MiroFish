@@ -142,3 +142,9 @@ def steps_from_votes(ladder: Sequence[float], votes: Sequence[Sequence[int]]) ->
         out.append(PriceStep(price=_money(p), suspicious=counts[0], fair=counts[1], expensive=counts[2],
                              too_expensive=counts[3], n=n, basis="ladder"))
     return out
+
+
+def purchase_probability(answers: Sequence[AgentPriceAnswer], p: float) -> float:
+    """Fiyatta satın alma olasılığı: çok ucuz/çok pahalı bulan almaz, pahalı bulan yarı olasılıkla alır."""
+    tc, _, ex, te = _curves(answers, p)
+    return max(0.0, min(1.0, 1 - tc - te - 0.5 * (ex - te)))
