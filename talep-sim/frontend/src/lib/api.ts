@@ -310,28 +310,47 @@ export interface ProgressEvent {
   detail?: string;
   done?: number;
   total?: number;
+  answered?: number;
+  agents?: number;
+  chunk?: number;
+  chunks?: number;
+  phase?: string;
 }
 
-/** NDJSON akışlı tahmin: ilerleme olaylarını `onProgress`e iletir. Akış uç noktası yoksa (eski API) /api/predict'e düşer. */
-export async function predictStream(body: PredictionRequest, onProgress: (e: ProgressEvent) => void): Promise<PredictionResponse> {
-  const res = await fetch(`${API_URL}/api/predict/stream`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (res.status === 404 || res.status === 405 || !res.body) return predict(body);
-  if (!res.ok) throw new Error(`Simülasyon başarısız (${res.status}): ${await res.text()}`);
+export interface StreamHandlers {
+  onProgress: (e: ProgressEvent) => void;
+  /** Sunucudan gelen her şey (ilerleme ya da kalp atışı) için: sunucunun canlı olduğunu gösterir. */
+  onAlive?: (serverElapsedS?: number) => void;
+  onConnection?: (state: "ok" | "reconnecting") => void;
+  onRun?: (id: string, startedMs: number) => void;
+}
 
-  const reader = res.body.getReader();
+const RUN_KEY = "talep-sim-run";
+export const savedRun = (): string | null => {
+  try { return sessionStorage.getItem(RUN_KEY); } catch { return null; }
+};
+const saveRun = (id: string | null) => {
+  try {
+    if (id) sessionStorage.setItem(RUN_KEY, id);
+    else sessionStorage.removeItem(RUN_KEY);
+  } catch { /* yok say */ }
+};
+
+interface StreamCtx { runId: string | null; nextSeq: number; result: PredictionResponse | null; error: Error | null }
+
+async function readStream(res: Response, ctx: StreamCtx, h: StreamHandlers): Promise<void> {
+  const reader = res.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-  let result: PredictionResponse | null = null;
   const handle = (line: string) => {
     if (!line.trim()) return;
     const ev = JSON.parse(line);
-    if (ev.type === "progress") onProgress(ev);
-    else if (ev.type === "result") result = normalizePrediction(ev.data);
-    else if (ev.type === "error") throw new Error(`Simülasyon başarısız (${ev.status}): ${ev.detail}`);
+    h.onAlive?.(ev.elapsed);
+    if (typeof ev.seq === "number") ctx.nextSeq = ev.seq + 1;
+    if (ev.type === "run") { ctx.runId = ev.id; saveRun(ev.id); h.onRun?.(ev.id, Math.round(ev.started * 1000)); }
+    else if (ev.type === "progress") h.onProgress(ev);
+    else if (ev.type === "result") ctx.result = normalizePrediction(ev.data);
+    else if (ev.type === "error") ctx.error = new Error(`Simülasyon başarısız (${ev.status}): ${ev.detail}`);
   };
   for (;;) {
     const { done, value } = await reader.read();
@@ -342,8 +361,56 @@ export async function predictStream(body: PredictionRequest, onProgress: (e: Pro
     lines.forEach(handle);
   }
   handle(buffer);
-  if (!result) throw new Error("Simülasyon sonuç döndürmeden bağlantı kapandı.");
-  return result;
+}
+
+/** Akışı okur; bağlantı koparsa koşu kimliğiyle kaldığı yerden yeniden bağlanır (sunucu koşuyu sürdürür). */
+async function consume(first: Response | null, ctx: StreamCtx, h: StreamHandlers): Promise<PredictionResponse> {
+  let res = first;
+  for (let attempt = 0; attempt <= 8; attempt++) {
+    try {
+      if (res) {
+        h.onConnection?.("ok");
+        await readStream(res, ctx, h);
+      }
+    } catch {
+      /* bağlantı koptu: aşağıda yeniden bağlanılır */
+    }
+    if (ctx.result) { saveRun(null); return ctx.result; }
+    if (ctx.error) { saveRun(null); throw ctx.error; }
+    if (!ctx.runId) throw new Error("Bağlantı koptu ve koşu kimliği alınamadı; API'nin çalıştığını kontrol et.");
+    h.onConnection?.("reconnecting");
+    await new Promise((r) => setTimeout(r, 2000));
+    try {
+      res = await fetch(`${API_URL}/api/runs/${ctx.runId}/events?start=${ctx.nextSeq}`);
+    } catch {
+      res = null;
+      continue;
+    }
+    if (res.status === 404) {
+      saveRun(null);
+      throw new Error("Bağlantı koptu ve sunucu koşuyu bulamadı (API yeniden başlatılmış olabilir). Simülasyonu yeniden çalıştır.");
+    }
+  }
+  throw new Error("Sunucuya yeniden bağlanılamadı. API'nin çalıştığını kontrol et.");
+}
+
+/** NDJSON akışlı tahmin: ilerleme, kalp atışı ve otomatik yeniden bağlanma. Akış uç noktası yoksa /api/predict'e düşer. */
+export async function predictStream(body: PredictionRequest, h: StreamHandlers): Promise<PredictionResponse> {
+  const res = await fetch(`${API_URL}/api/predict/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (res.status === 404 || res.status === 405 || !res.body) return predict(body);
+  if (!res.ok) throw new Error(`Simülasyon başarısız (${res.status}): ${await res.text()}`);
+  return consume(res, { runId: null, nextSeq: 0, result: null, error: null }, h);
+}
+
+/** Sayfa yenilendiyse sürmekte olan koşuya baştan bağlanır (olaylar sunucuda saklı). */
+export async function resumeRun(id: string, h: StreamHandlers): Promise<PredictionResponse> {
+  const res = await fetch(`${API_URL}/api/runs/${id}/events?start=0`);
+  if (res.status === 404) { saveRun(null); throw new Error("Önceki koşu bulunamadı (API yeniden başlatılmış olabilir)."); }
+  return consume(res, { runId: id, nextSeq: 0, result: null, error: null }, h);
 }
 
 export async function predict(body: PredictionRequest): Promise<PredictionResponse> {

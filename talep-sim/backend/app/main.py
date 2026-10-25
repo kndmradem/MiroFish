@@ -2,8 +2,10 @@
 import asyncio
 import json
 import os
+import time
 import uuid
 from decimal import Decimal
+from typing import Dict, Optional
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException
@@ -224,32 +226,84 @@ async def predict(req: PredictionRequest, engine: SimulationEngine = Depends(get
     return await run_prediction(req, engine, profiler, advisor)
 
 
+class Run:
+    """Sunucu tarafında yürüyen bir tahmin koşusu. İstemci kopsa/sayfa yenilense de koşu sürer, olaylar saklanır."""
+
+    def __init__(self) -> None:
+        self.id = uuid.uuid4().hex[:12]
+        self.events: list = []
+        self.done = False
+        self.started = time.time()
+        self.cond = asyncio.Condition()
+        self.task: Optional[asyncio.Task] = None
+
+    async def publish(self, event: dict) -> None:
+        async with self.cond:
+            self.events.append({"seq": len(self.events), **event})
+            self.cond.notify_all()
+
+
+RUNS: Dict[str, Run] = {}
+RUN_TTL_S = 3600
+HEARTBEAT_S = 5.0
+
+
+def _gc_runs() -> None:
+    for rid in [r for r, run in RUNS.items() if run.done and time.time() - run.started > RUN_TTL_S]:
+        RUNS.pop(rid, None)
+
+
+async def _follow(run: Run, start: int):
+    """Olayları `start` sırasından itibaren NDJSON satırı olarak verir; sessizlikte kalp atışı (ping) yollar."""
+    i = start
+    while True:
+        while i < len(run.events):
+            yield json.dumps(run.events[i], ensure_ascii=False) + "\n"
+            i += 1
+        if run.done:
+            return
+        try:
+            async with run.cond:
+                await asyncio.wait_for(run.cond.wait(), timeout=HEARTBEAT_S)
+        except asyncio.TimeoutError:
+            yield json.dumps({"type": "ping", "elapsed": round(time.time() - run.started)}) + "\n"
+
+
+_STREAM_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+
+
 @app.post("/api/predict/stream")
 async def predict_stream(req: PredictionRequest, engine: SimulationEngine = Depends(get_engine),
                          profiler: BrandProfiler = Depends(get_profiler),
                          advisor: Advisor = Depends(get_advisor)) -> StreamingResponse:
-    """NDJSON akışı: her satır {"type":"progress",...} / {"type":"result","data":...} / {"type":"error",...}."""
-    queue: asyncio.Queue = asyncio.Queue()
-
-    async def emit(event: dict) -> None:
-        await queue.put({"type": "progress", **event})
+    """NDJSON akışı: run / progress / ping / result / error. Koşu istemciden bağımsız sürer;
+    bağlantı koparsa GET /api/runs/{id}/events?from=N ile kaldığı yerden devam edilir."""
+    _gc_runs()
+    run = Run()
+    RUNS[run.id] = run
 
     async def work() -> None:
+        await run.publish({"type": "run", "id": run.id, "started": run.started})
         try:
-            result = await run_prediction(req, engine, profiler, advisor, emit)
-            await queue.put({"type": "result", "data": json.loads(result.model_dump_json())})
+            result = await run_prediction(req, engine, profiler, advisor,
+                                          lambda ev: run.publish({"type": "progress", **ev}))
+            await run.publish({"type": "result", "data": json.loads(result.model_dump_json())})
         except HTTPException as e:
-            await queue.put({"type": "error", "status": e.status_code, "detail": e.detail})
+            await run.publish({"type": "error", "status": e.status_code, "detail": e.detail})
         except Exception as e:  # akış kopmasın, hata istemciye iletilsin
-            await queue.put({"type": "error", "status": 500, "detail": f"{type(e).__name__}: {e}"})
-        await queue.put(None)
+            await run.publish({"type": "error", "status": 500, "detail": f"{type(e).__name__}: {e}"})
+        run.done = True
+        async with run.cond:
+            run.cond.notify_all()
 
-    async def body():
-        task = asyncio.create_task(work())
-        try:
-            while (event := await queue.get()) is not None:
-                yield json.dumps(event, ensure_ascii=False) + "\n"
-        finally:
-            task.cancel()
+    run.task = asyncio.create_task(work())  # referans tutulur; istemci kopsa da iptal edilmez
+    return StreamingResponse(_follow(run, 0), media_type="application/x-ndjson", headers=_STREAM_HEADERS)
 
-    return StreamingResponse(body(), media_type="application/x-ndjson")
+
+@app.get("/api/runs/{run_id}/events")
+async def run_events(run_id: str, start: int = 0) -> StreamingResponse:
+    """Çalışan ya da biten bir koşunun olaylarını `start` sırasından itibaren yeniden akıtır."""
+    run = RUNS.get(run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Koşu bulunamadı (sunucu yeniden başlatılmış ya da süresi dolmuş olabilir)")
+    return StreamingResponse(_follow(run, max(0, start)), media_type="application/x-ndjson", headers=_STREAM_HEADERS)

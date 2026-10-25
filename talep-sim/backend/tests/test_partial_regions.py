@@ -59,3 +59,33 @@ def test_stream_reports_error_event(isolated_app):
     with TestClient(app).stream("POST", "/api/predict/stream", json=BODY) as r:
         events = [json.loads(line) for line in r.iter_lines() if line]
     assert events[-1]["type"] == "error" and events[-1]["status"] == 502
+
+
+def test_run_events_can_be_replayed_after_disconnect(isolated_app):
+    isolated_app[get_engine] = lambda: FlakyEngine()
+    client = TestClient(app)
+    with client.stream("POST", "/api/predict/stream", json=BODY) as r:
+        events = [json.loads(line) for line in r.iter_lines() if line]
+    run = events[0]
+    assert run["type"] == "run" and all("seq" in e for e in events if e["type"] != "ping")
+    # Kopma simülasyonu: 3. olaydan sonrasını yeniden iste
+    with client.stream("GET", f"/api/runs/{run['id']}/events", params={"start": 3}) as r:
+        again = [json.loads(line) for line in r.iter_lines() if line]
+    assert again[0]["seq"] == 3 and again[-1]["type"] == "result" and len(again) == len(events) - 3
+    assert client.get("/api/runs/yok/events").status_code == 404
+
+
+def test_heartbeat_ping_during_silence(isolated_app, monkeypatch):
+    import asyncio
+    import app.main as m
+
+    class SlowEngine(FlakyEngine):
+        async def simulate_region(self, *a, **k):
+            await asyncio.sleep(0.35)
+            return await super().simulate_region(*a, **k)
+
+    monkeypatch.setattr(m, "HEARTBEAT_S", 0.1)
+    isolated_app[get_engine] = lambda: SlowEngine(bad=())
+    with TestClient(app).stream("POST", "/api/predict/stream", json=BODY) as r:
+        events = [json.loads(line) for line in r.iter_lines() if line]
+    assert any(e["type"] == "ping" for e in events) and events[-1]["type"] == "result"

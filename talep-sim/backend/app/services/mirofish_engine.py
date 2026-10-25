@@ -245,9 +245,9 @@ class MiroFishSimulationEngine:
                               fx_rates: Optional[dict] = None,
                               progress: Optional[Progress] = None,
                               scope: Optional[Sequence[str]] = None) -> RegionSimulation:
-        async def note(detail: str) -> None:
+        async def note(detail: str, **counts) -> None:
             if progress:
-                await progress({"stage": "interview", "region": region, "detail": detail})
+                await progress({"stage": "interview", "region": region, "detail": detail, **counts})
 
         await note("Simülasyon dünyası hazırlanıyor")
         world = await self._ensure_world(scope or [region], progress)
@@ -278,7 +278,8 @@ class MiroFishSimulationEngine:
             chunks = [pending[i:i + self.batch_size] for i in range(0, len(pending), self.batch_size)]
             consecutive_timeouts = 0
             for n, chunk in enumerate(chunks, 1):
-                await note(f"Ajanlar röportaj ediliyor ({len(parsed)}/{len(agent_ids)} cevap, grup {n}/{len(chunks)})")
+                await note(f"Ajanlar röportaj ediliyor ({len(parsed)}/{len(agent_ids)} cevap, grup {n}/{len(chunks)})",
+                           answered=len(parsed), agents=len(agent_ids), chunk=n, chunks=len(chunks), phase="interview")
                 try:
                     responses = await self._interview_chunk(world["simulation_id"], chunk, prompt)
                 except MiroFishTimeout:
@@ -290,12 +291,15 @@ class MiroFishSimulationEngine:
                     continue
                 consecutive_timeouts = 0
                 for agent_id, text in responses.items():
-                    await note(f"Ajan {agent_id} cevabı çözümleniyor")
+                    await note(f"Ajan {agent_id} cevabı çözümleniyor", answered=len(parsed), agents=len(agent_ids),
+                               chunk=n, chunks=len(chunks), phase="parse")
                     answer, how = await self._understand(text, currency_note, ladder, try_rate)
                     raw[agent_id] = {"agent": agent_id, "status": how, "text": (text or "")[:RAW_CHARS]}
                     if answer:
                         parsed[agent_id] = answer
                         raw[agent_id]["interest"] = answer["interest"]
+                        await note(f"{len(parsed)}/{len(agent_ids)} ajan cevapladı", answered=len(parsed),
+                                   agents=len(agent_ids), chunk=n, chunks=len(chunks), phase="answered")
         valid = list(parsed.values())
         raw_answers = list(raw.values())
         self._persist(region, raw_answers)

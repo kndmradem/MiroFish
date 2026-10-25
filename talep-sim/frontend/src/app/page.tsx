@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ImageIcon, Loader2 } from "lucide-react";
 
 import { BrandPanel, SourceBadge } from "@/components/brand-panel";
-import { applyProgress, ProgressPanel, type ProgressState, type RegionStatus } from "@/components/progress-panel";
+import { applyProgress, initialProgress, ProgressPanel, type ProgressState } from "@/components/progress-panel";
 import { ExtrasCard } from "@/components/extras-card";
 import { SummaryCard } from "@/components/summary-card";
 import { CampaignsCard, PricePlanCard } from "@/components/scenarios-card";
@@ -22,7 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { predictStream, REGIONS, TIER_LABEL, try_, usd, type BrandProfile, type PredictionResponse, type RegionCode } from "@/lib/api";
+import { predictStream, REGIONS, resumeRun, savedRun, type StreamHandlers, TIER_LABEL, try_, usd, type BrandProfile, type PredictionResponse, type RegionCode } from "@/lib/api";
 
 function demandTone(score: number) {
   if (score >= 70) return "text-green-600";
@@ -68,12 +68,35 @@ export default function Dashboard() {
 
   const canSubmit = !!image && productName && specs && Number(unitCost) > 0 && Number(budget) > 0 && regions.length > 0;
 
+  const handlers = (selected: string[]): StreamHandlers => ({
+    onProgress: (ev) => setProgress((prev) => applyProgress(prev, ev, selected)),
+    onAlive: () => setProgress((prev) => (prev ? { ...prev, lastEventAt: Date.now(), connection: "ok" } : prev)),
+    onConnection: (state) => setProgress((prev) => (prev ? { ...prev, connection: state } : prev)),
+    onRun: (_id, startedMs) => setProgress((prev) => (prev ? { ...prev, startedAt: startedMs } : prev)),
+  });
+
+  // Sayfa yenilense de sunucuda süren koşuya yeniden bağlan
+  useEffect(() => {
+    const id = savedRun();
+    if (!id) return;
+    setLoading(true);
+    setProgress(initialProgress([], "Önceki koşuya yeniden bağlanılıyor…"));
+    resumeRun(id, handlers([]))
+      .then((res) => {
+        if (res.brand_profile) setProfile(res.brand_profile);
+        setResult(res);
+        setChartRegion(res.regional_breakdown[0]?.region ?? null);
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)))
+      .finally(() => { setLoading(false); setProgress(null); });
+  }, []);
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!image) return;
     setLoading(true);
     setError(null);
-    setProgress({ message: "Başlatılıyor…", regions: Object.fromEntries(regions.map((r) => [r, "waiting" as RegionStatus])) });
+    setProgress(initialProgress(regions));
     try {
       const res = await predictStream({
         product_name: productName,
@@ -102,7 +125,7 @@ export default function Dashboard() {
           ),
         },
         usd_try_rate: regions.includes("TR") && Number(usdTry) > 0 ? Number(usdTry) : undefined,
-      }, (ev) => setProgress((prev) => applyProgress(prev, ev, regions)));
+      }, handlers(regions));
       if (res.brand_profile) setProfile(res.brand_profile);
       setResult(res);
       setChartRegion(res.regional_breakdown[0]?.region ?? null);
@@ -265,17 +288,20 @@ export default function Dashboard() {
               {loading ? "Ajanlar değerlendiriyor…" : "Simülasyonu çalıştır"}
             </Button>
             {!image && <p className="text-xs text-muted-foreground">Simülasyon için görsel gerekli.</p>}
-            {loading && progress && <ProgressPanel progress={progress} />}
+            {loading && <p className="text-xs text-muted-foreground">İlerleme sağdaki panelde görünür.</p>}
             {error && <p className="text-sm text-destructive">{error}</p>}
           </form>
         </CardContent>
       </Card>
 
       <section className="grid min-w-0 content-start gap-6">
+        {loading && progress && <ProgressPanel progress={progress} />}
         {!result ? (
-          <Card className="grid min-h-64 place-items-center text-muted-foreground">
-            <p className="p-6 text-center text-sm">Sonuçlar burada görünecek.</p>
-          </Card>
+          loading ? null : (
+            <Card className="grid min-h-64 place-items-center text-muted-foreground">
+              <p className="p-6 text-center text-sm">Sonuçlar burada görünecek.</p>
+            </Card>
+          )
         ) : (
           <>
             <SummaryCard result={result} productName={productName} />
