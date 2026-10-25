@@ -36,6 +36,7 @@ class Settings:
     mirofish_batch_size: int = field(default_factory=lambda: int(_env("MIROFISH_BATCH_SIZE", "3")))
     mirofish_timeout_retries: int = field(default_factory=lambda: int(_env("MIROFISH_TIMEOUT_RETRIES", "1")))
     mirofish_concurrency: int = field(default_factory=lambda: int(_env("MIROFISH_CONCURRENCY", "1")))
+    mirofish_agents_per_region: int = field(default_factory=lambda: int(_env("MIROFISH_AGENTS_PER_REGION", "10")))
     mirofish_min_valid: int = field(default_factory=lambda: int(_env("MIROFISH_MIN_VALID", "2")))
 
     # Görsel + metin füzyonu için OpenAI uyumlu vision modeli (Qwen-VL, GPT-4o, Claude vb.)

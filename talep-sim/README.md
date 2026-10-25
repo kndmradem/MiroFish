@@ -179,3 +179,15 @@ MiroFish bu adım olmadan çalışmıyor ve yalnızca Zep Cloud'a bağlanıyor (
 üzerinden hizmet olarak sunarsan kaynak kodunu kullanıcılara açma
 yükümlülüğü doğar. Ticari kapalı ürün düşünülüyorsa MiroFish'i ayrı bir
 servis olarak HTTP üzerinden çağırmak ve hukuki görüş almak gerekir.
+
+## Dünyayı sıfırlama ve grafik kalitesi
+
+- **Dünyayı sıfırla ve baştan kur** (formda onay kutusu / API: `reset_world: true`): seçili bölgelerin önbellekteki
+  dünyasını unutur, MiroFish'te eski simülasyon ortamını kapatır, projeyi siler (MiroFish bağlı Zep grafiğini de siler)
+  ve güncel profil/prompt ile yeniden kurar. Silme başarısız olursa yeni dünya yine kurulur; eski grafik yalnızca Zep
+  Cloud'da artık kalır (panelden `mirofish_` grafiklerini elle silebilirsin).
+- `WORLD_VERSION` (`services/personas.py`): persona/seed/prompt mantığı değişince artırılır; eski önbellek dünyaları
+  otomatik geçersiz olur.
+- Bölge başına 10 tüketici, 9 basamaklı fiyat merdiveni. Van Westendorp eşikleri log-fiyatta yumuşatılır (az ajanda
+  basamaklı/çökmüş eğri olmaz), bölgeler sıralı ve en az %4 genişliktedir. Ajan sayısı < 6 ise grafikte "düşük örneklem"
+  uyarısı çıkar. Ajan sayısı `MIROFISH_AGENTS_PER_REGION` ile sınırlanır.

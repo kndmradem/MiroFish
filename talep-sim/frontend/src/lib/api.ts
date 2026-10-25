@@ -214,6 +214,7 @@ export interface PredictionRequest {
   brand_notes?: string;
   brand_profile?: BrandProfile;
   usd_try_rate?: number;
+  reset_world?: boolean;
 }
 
 export interface PricePoint {
@@ -249,6 +250,8 @@ export interface VanWestendorpResult {
   acceptable_range_low: string;
   acceptable_range_high: string;
   curve: PricePoint[];
+  quality?: "low" | "medium" | "high";
+  quality_note?: string;
 }
 
 export interface RegionPredictionResult {

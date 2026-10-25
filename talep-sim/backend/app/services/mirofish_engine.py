@@ -96,7 +96,8 @@ class MiroFishSimulationEngine:
                  max_rounds: int = 3, interview_timeout: int = 180,
                  poll_s: float = 5, env_wait_s: float = 3600, retries: int = 1,
                  batch_size: int = 3, timeout_retries: int = 1, max_concurrency: int = 1,
-                 min_valid: int = 2, extractor: Optional[AnswerExtractor] = None):
+                 min_valid: int = 2, extractor: Optional[AnswerExtractor] = None,
+                 agents_per_region: int = 10):
         self.client = client
         self.fuser = fuser
         self.state_path = Path(state_file)
@@ -112,6 +113,7 @@ class MiroFishSimulationEngine:
         self.max_concurrency = max(1, max_concurrency)
         self.min_valid = max(1, min_valid)
         self.extractor = extractor
+        self.agents_per_region = max(1, agents_per_region)
         self._worlds: Optional[Dict[str, dict]] = None
         self._lock = asyncio.Lock()
 
@@ -125,12 +127,7 @@ class MiroFishSimulationEngine:
         regions = scope_of(scope)
         key = seed_hash(regions)
         async with self._lock:
-            if self._worlds is None:
-                self._worlds = {}
-                if self.state_path.exists():
-                    saved = json.loads(self.state_path.read_text())
-                    # Eski biçim: tek dünya {"seed_hash": ..., ...}
-                    self._worlds = {saved["seed_hash"]: saved} if "seed_hash" in saved else saved
+            self._load_state()
             world = self._worlds.get(key)
             if world is not None and await self._world_alive(world):
                 return world
@@ -138,6 +135,52 @@ class MiroFishSimulationEngine:
             self._worlds[key] = world
             self.state_path.write_text(json.dumps(self._worlds))
             return world
+
+    async def reset_world(self, scope: Optional[Sequence[str]] = None,
+                          progress: Optional[Progress] = None) -> List[str]:
+        """Seçili bölgelerin önbellekteki dünyasını unutur ve MiroFish/Zep tarafında silmeyi dener.
+
+        Silme en iyi çabayla yapılır: başarısız olsa bile bir sonraki çağrı yeni proje ve yeni Zep grafiğiyle
+        sıfırdan kurar (eski kayıt yalnızca Zep Cloud'da artık kalır). Dönüş: kullanıcıya gösterilecek notlar.
+        """
+        regions = scope_of(scope)
+        key = seed_hash(regions)
+        notes: List[str] = []
+        async with self._lock:
+            self._load_state()
+            world = self._worlds.pop(key, None)
+            self.state_path.write_text(json.dumps(self._worlds))
+            # Eski sürümden kalan, artık kullanılmayan kayıtlar da bu bölge kapsamı için temizlenir.
+            stale = [k for k, w in self._worlds.items() if sorted(w.get("regions", [])) == sorted(regions)]
+            olds = ([world] if world else []) + [self._worlds.pop(k) for k in stale]
+            if stale:
+                self.state_path.write_text(json.dumps(self._worlds))
+        if not olds:
+            return ["Önbellekte bu bölgeler için dünya yoktu; sıfırdan kurulacak."]
+        for w in olds:
+            if progress:
+                await progress({"stage": "world", "detail": f"Eski dünya siliniyor ({', '.join(regions)})"})
+            for label, call in (("ortam kapatıldı", lambda: self.client.close_env(w["simulation_id"])),
+                                ("simülasyon durduruldu", lambda: self.client.stop(w["simulation_id"]))):
+                try:
+                    await call()
+                except MiroFishError as e:
+                    log.info("Dünya sıfırlama: %s atlandı: %s", label, e)
+            try:
+                await self.client.delete_project(w["project_id"])
+                notes.append(f"Eski proje ve Zep grafiği silindi ({w['project_id']}).")
+            except MiroFishError as e:
+                log.warning("Eski proje silinemedi: %s", e)
+                notes.append(f"Eski proje silinemedi ({w['project_id']}): Zep Cloud panelinden 'mirofish_' grafiklerini elle silebilirsin. Yeni dünya yine de sıfırdan kuruldu.")
+        return notes
+
+    def _load_state(self) -> None:
+        if self._worlds is None:
+            self._worlds = {}
+            if self.state_path.exists():
+                saved = json.loads(self.state_path.read_text())
+                # Eski biçim: tek dünya {"seed_hash": ..., ...}
+                self._worlds = {saved["seed_hash"]: saved} if "seed_hash" in saved else saved
 
     async def _world_alive(self, world: dict) -> bool:
         try:
@@ -251,7 +294,7 @@ class MiroFishSimulationEngine:
 
         await note("Simülasyon dünyası hazırlanıyor")
         world = await self._ensure_world(scope or [region], progress)
-        agent_ids = world["agents"].get(region, [])
+        agent_ids = world["agents"].get(region, [])[: self.agents_per_region]
         if not agent_ids:
             raise RegionUnavailable(f"{region} bölgesi için ajan bulunamadı")
 

@@ -11,6 +11,7 @@ Kullanılan uç noktalar (MiroFish backend/app/api):
   POST /api/simulation/env-status     ortam röportaja hazır mı
   GET  /api/simulation/<id>/profiles  ajan profilleri
   POST /api/simulation/interview/batch
+  POST /api/simulation/close-env, /stop ; DELETE /api/graph/project/<id>   (dünyayı sıfırlama)
 """
 import asyncio
 from typing import Any, Dict, List, Optional
@@ -119,6 +120,16 @@ class MiroFishClient:
     async def profiles(self, simulation_id: str) -> List[Dict[str, Any]]:
         data = await self._call("GET", f"/api/simulation/{simulation_id}/profiles", params={"platform": "reddit"})
         return data["profiles"]
+
+    async def close_env(self, simulation_id: str) -> None:
+        await self._call("POST", "/api/simulation/close-env", json={"simulation_id": simulation_id, "timeout": 30})
+
+    async def stop(self, simulation_id: str) -> None:
+        await self._call("POST", "/api/simulation/stop", json={"simulation_id": simulation_id})
+
+    async def delete_project(self, project_id: str) -> None:
+        """Projeyi siler; MiroFish projeye bağlı Zep Cloud grafiğini de siler (grafik kullanımdaysa 409)."""
+        await self._call("DELETE", f"/api/graph/project/{project_id}")
 
     async def interview_batch(self, simulation_id: str, agent_ids: List[int], prompt: str, timeout: int) -> Dict[int, str]:
         data = await self._call("POST", "/api/simulation/interview/batch", json={

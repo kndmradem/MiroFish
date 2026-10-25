@@ -58,6 +58,7 @@ def build_engine(cfg: Settings) -> SimulationEngine:
         max_rounds=cfg.mirofish_max_rounds, interview_timeout=cfg.mirofish_interview_timeout,
         batch_size=cfg.mirofish_batch_size, timeout_retries=cfg.mirofish_timeout_retries,
         max_concurrency=cfg.mirofish_concurrency, env_wait_s=cfg.mirofish_build_timeout, min_valid=cfg.mirofish_min_valid, extractor=extractor,
+        agents_per_region=cfg.mirofish_agents_per_region,
     )
 
 
@@ -117,6 +118,14 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
         card = await engine.fuse_product_card(req)
     except (MiroFishError, LLMError, httpx.HTTPError) as e:
         raise HTTPException(status_code=502, detail=f"Simülasyon servisi hatası: {type(e).__name__}: {e}") from e
+
+    if req.reset_world and hasattr(engine, "reset_world"):
+        await emit({"stage": "world", "detail": "Dünya sıfırlanıyor: eski proje/Zep grafiği siliniyor, baştan kurulacak"})
+        try:
+            for note in await engine.reset_world(req.target_regions, emit):
+                await emit({"stage": "world", "detail": note})
+        except (MiroFishError, httpx.HTTPError, OSError) as e:
+            await emit({"stage": "world", "detail": f"Sıfırlama kısmen başarısız ({type(e).__name__}: {e}); yeni dünya yine de kurulacak"})
 
     # Yavaş yerel modelde bölgeler sırayla koşar (motorun max_concurrency'si); mock'ta hepsi paralel.
     gate = asyncio.Semaphore(getattr(engine, "max_concurrency", len(req.target_regions)))

@@ -234,7 +234,7 @@ def test_default_fx_rate_used_when_not_given():
 
 def test_turkey_seed_and_region_mapping():
     from app.services.personas import SEED_CONSUMERS, build_seed_document, region_of, seed_hash
-    assert len(SEED_CONSUMERS["TR"]) == 5 and "TR paneli" in build_seed_document()
+    assert len(SEED_CONSUMERS["TR"]) == 10 and "TR paneli" in build_seed_document()
     assert region_of("Elif Demir, pazarlama uzmanı") == "TR" and region_of("someone in Izmir") == "TR"
     assert len(seed_hash()) == 12
 

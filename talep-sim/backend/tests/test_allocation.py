@@ -58,3 +58,18 @@ def test_predict_endpoint_end_to_end():
     # Aynı girdi aynı sonucu vermeli (deterministik mock)
     again = client.post("/api/predict", json=body).json()
     assert again["regional_breakdown"] == data["regional_breakdown"]
+
+
+def test_tiny_sample_zones_are_ordered_with_minimum_width():
+    from app.pricing import AgentPriceAnswer, analyze
+    answers = [AgentPriceAnswer(40, 55, 60, 61), AgentPriceAnswer(40, 55, 60, 61)]  # neredeyse çakışık eşikler
+    vw, best = analyze(answers, 25.0)
+    zs = vw.zones
+    assert vw.quality == "low" and "ajan" in vw.quality_note
+    for a, b in zip(zs, zs[1:]):
+        assert a.high == b.low
+    for z in zs[1:4]:
+        assert float(z.high) > float(z.low) * 1.02
+    curve = vw.curve
+    assert all(x.too_cheap >= y.too_cheap for x, y in zip(curve, curve[1:]))  # yumuşatılmış, monoton eğri
+    assert all(0 <= p.too_expensive <= 1 for p in curve)

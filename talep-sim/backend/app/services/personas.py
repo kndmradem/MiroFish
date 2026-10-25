@@ -89,6 +89,11 @@ SEED_CONSUMERS: Dict[str, List[str]] = {
         "Camille Laurent, 38, Lyon, öğretmen; doğal lif, sade kesim, makul fiyat",
         "Sofia Rossi, 24, Milano, moda öğrencisi; trendleri takip eder ama hızlı modaya karşıdır",
         "Pieter de Vries, 45, Amsterdam, mimar; minimalist, uzun ömürlü parçalar için fazla ödemeye hazır",
+        "Anna Kowalski, 34, Münih, ürün müdürü; kalite odaklı, indirim dönemlerini bekler, iade politikasına bakar",
+        "Mats Eriksson, 29, Stockholm, yazılımcı; sürdürülebilir markalar, sade renkler, fazla ödemeye ancak şeffaflıkla razı",
+        "Isabel Moreno, 41, Madrid, avukat; şık iş kıyafeti, klasik kesim, kaliteli ama makul fiyat",
+        "Tomás Silva, 22, Lizbon, öğrenci; bütçesi dar, ikinci el ve outlet tercih eder",
+        "Greta Novak, 50, Viyana, emekli öğretmen; konfor, doğal kumaş, uzun ömürlü parçalar",
     ],
     "MENA": [
         "Fatima Al Mansoori, 29, Dubai, pazarlama yöneticisi; lüks markalar, parlak kumaşlar, gösterişli detay",
@@ -96,6 +101,11 @@ SEED_CONSUMERS: Dict[str, List[str]] = {
         "Layla Nasser, 26, Doha, influencer; fotoğrafta iyi duran, dikkat çeken ürünler",
         "Khalid Al Farsi, 42, Abu Dabi, banka müdürü; klimalı ortamlar için ince, kaliteli kumaş",
         "Noor Saleh, 33, Kuveyt, diş hekimi; muhafazakâr kesim, ipek ve saten sever",
+        "Mariam Al Hashimi, 31, Şarja, butik sahibi; trendleri izler, kumaş kalitesine ve işlemeye bakar",
+        "Yousef Karim, 27, Kahire, mühendis; fiyat/performans, markalı ama indirimli ürün arar",
+        "Huda Al Qahtani, 39, Cidde, öğretmen; mütevazı kesim, rahat kumaş, aile alışverişi",
+        "Tariq Mansour, 45, Amman, işletmeci; klasik ve kaliteli, uzun süre giyilecek parçalar",
+        "Salma Benali, 24, Kazablanka, içerik üreticisi; renkli ve trend parçalar, uygun fiyat",
     ],
     "CIS": [
         "Aigerim Seitkali, 30, Almatı, mühendis; -25°C kışlar, ısı yalıtımı her şeyden önce gelir",
@@ -103,6 +113,11 @@ SEED_CONSUMERS: Dict[str, List[str]] = {
         "Nino Beridze, 28, Tiflis, grafik tasarımcı; sıcak tutan ama şık parçalar",
         "Rustam Aliyev, 36, Bakü, satış müdürü; rüzgarlı şehir, su itici dış giyim, fiyat/performans",
         "Olga Smirnova, 52, Yekaterinburg, muhasebeci; uzun yıllar giyilecek kalın, sağlam kumaş",
+        "Anton Petrov, 33, Moskova, danışman; kaliteli dış giyim için ödemeye hazır, marka bilinci yüksek",
+        "Madina Karimova, 27, Taşkent, öğretmen; bütçeli alışveriş, sıcak ve dayanıklı kumaş",
+        "Vladislav Kovalenko, 39, Kiev, yazılımcı; teknik kumaş, rüzgar geçirmezlik, sade tasarım",
+        "Zarina Akhmetova, 44, Astana, işletmeci; şık ve sıcak, mevsim sonu indirimlerini kollar",
+        "Giorgi Kapanadze, 31, Tiflis, şef; mutfakta uzun saat, rahat ve dayanıklı giyim, fiyata duyarlı",
     ],
     "US": [
         "Emily Carter, 29, New York, ürün yöneticisi; rahat oversize kesim, marka hikâyesi önemli",
@@ -110,6 +125,11 @@ SEED_CONSUMERS: Dict[str, List[str]] = {
         "Ashley Nguyen, 23, Los Angeles, üniversite öğrencisi; TikTok trendleri, uygun fiyat",
         "Daniel Brooks, 46, Seattle, yazılımcı; yağmura dayanıklı, sade ve teknik giyim",
         "Rachel Kim, 38, Austin, emlakçı; şık ama rahat, online alışveriş, kolay iade",
+        "Jessica Martinez, 32, Houston, hemşire; rahat ve dayanıklı, kolay bakım, indirim kuponlarını kullanır",
+        "Tyler Anderson, 26, Denver, outdoor rehberi; teknik kumaş, su geçirmezlik, marka sadakati",
+        "Priya Patel, 35, San Francisco, veri analisti; minimalist, sürdürülebilir marka, online alışveriş",
+        "Robert Miller, 55, Detroit, işletmeci; klasik kesim, dayanıklılık, makul fiyat",
+        "Olivia Thompson, 21, Boston, üniversite öğrencisi; hızlı moda alışkanlığı, bütçe dar, trendleri izler",
     ],
     "TR": [
         "Elif Demir, 29, Istanbul, pazarlama uzmanı; kira ve enflasyon baskısı altında, indirim dönemlerini bekler, taksitle alır",
@@ -117,6 +137,11 @@ SEED_CONSUMERS: Dict[str, List[str]] = {
         "Zeynep Kaya, 25, Izmir, üniversite öğrencisi; sosyal medya trendlerini izler ama bütçesi dar, uygun fiyat arar",
         "Burak Şahin, 34, Bursa, mühendis; kalite/fiyat dengesine bakar, yerli markalarla kıyaslar, kampanyaları takip eder",
         "Ayşe Çelik, 45, Antalya, esnaf; sezonluk alışveriş yapar, nakit ile taksit arasında hesap yapar, iade kolaylığı önemli",
+        "Can Özdemir, 31, Istanbul, yazılımcı; markalı ürüne para verir ama kampanya ve taksit bekler",
+        "Selin Arslan, 27, Eskişehir, öğretmen; maaşa göre alışveriş, outlet ve indirim takibi",
+        "Hasan Koç, 49, Konya, esnaf; dayanıklı ve sade giyim, nakit fiyatı pazarlık eder",
+        "Deniz Aydın, 23, Istanbul, üniversite öğrencisi; çok bütçeli, ikinci el ve sosyal medya fenomenlerinden etkilenir",
+        "Merve Polat, 36, Gaziantep, ev hanımı; aile bütçesi, kaliteli ama uygun fiyatlı parça, iade kolaylığı",
     ],
 }
 
@@ -138,10 +163,14 @@ def scope_of(regions: Optional[Sequence[str]] = None) -> List[str]:
     return [r for r in SEED_CONSUMERS if not regions or r in regions]
 
 
+# Persona/seed/prompt mantığı anlamlı biçimde değiştiğinde artır: eski önbellek dünyaları otomatik geçersiz olur.
+WORLD_VERSION = 2
+
+
 def seed_hash(regions: Optional[Sequence[str]] = None) -> str:
-    """Seed dokümanın özeti: seçili bölge/tüketici listesi değişince farklı bir MiroFish dünyası gerekir."""
+    """Seed doküman + WORLD_VERSION özeti: seçili bölge/tüketici listesi ya da sürüm değişince yeni bir MiroFish dünyası gerekir."""
     import hashlib
-    return hashlib.sha256(build_seed_document(regions).encode()).hexdigest()[:12]
+    return hashlib.sha256(f"v{WORLD_VERSION}\n{build_seed_document(regions)}".encode()).hexdigest()[:12]
 
 
 def build_seed_document(regions: Optional[Sequence[str]] = None) -> str:

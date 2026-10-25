@@ -76,6 +76,7 @@ class PredictionRequest(BaseModel):
     brand_profile: Optional[BrandProfile] = Field(None, description="Hazır/düzenlenmiş profil; verilirse yeniden üretilmez")
     assumptions: Assumptions = Field(default_factory=Assumptions)
     usd_try_rate: Optional[float] = Field(None, gt=0, description="1 USD kaç TL (Türkiye için TL gösterimi); boşsa varsayılan kur")
+    reset_world: bool = Field(False, description="Seçili bölgelerin önbellekteki MiroFish dünyasını (ve Zep grafiğini) silip baştan kurar")
 
     @field_validator("target_regions")
     @classmethod
@@ -118,6 +119,8 @@ class VanWestendorpResult(BaseModel):
     acceptable_range_high: Decimal = Field(..., description="PME: cheap ∩ too_expensive")
     curve: List[PricePoint]
     zones: List[PriceZone] = []
+    quality: str = Field("high", description="low | medium | high: ajan sayısına göre güvenilirlik")
+    quality_note: str = ""
 
 
 class RawAnswer(BaseModel):

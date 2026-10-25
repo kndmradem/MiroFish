@@ -1,7 +1,7 @@
 """Ajan cevaplarını yapılandırılmış veriye çevirir.
 
 Küçük yerel modeller (Qwen 7B) sayı yerine cümle yazar, dili karıştırır, JSON'u bozar. Bu yüzden:
-1. Ajana serbest fiyat yerine sabit bir fiyat merdiveni (5 fiyat) sorulur ve her basamak için tek
+1. Ajana serbest fiyat yerine sabit bir fiyat merdiveni (9 fiyat) sorulur ve her basamak için tek
    kelimelik karar istenir (supheli / uygun / pahali / cok_pahali). Küçük modeller bunu çok daha iyi yapar.
 2. Cevap hoşgörülü okunur (kod bloğu, metin içi JSON, sayı yerine yazı, etiket eş anlamlıları).
 3. Olmazsa cevap ayrı bir LLM çağrısıyla (örnekli, katı prompt) aynı şemaya çevrilir.
@@ -14,7 +14,7 @@ from typing import Dict, List, Optional
 
 from .llm import LLMClient, LLMError
 
-LADDER_MULTIPLIERS = (0.5, 0.8, 1.1, 1.5, 2.1)
+LADDER_MULTIPLIERS = (0.5, 0.65, 0.8, 0.95, 1.1, 1.3, 1.5, 1.8, 2.2)
 LABELS = ("supheli", "uygun", "pahali", "cok_pahali")
 
 SYSTEM = (
@@ -42,7 +42,7 @@ Cevaba göre doldur:
 
 
 def make_ladder(reference: float) -> List[float]:
-    """Referans fiyatın etrafında 5 basamaklı, yuvarlanmış artan fiyat merdiveni (USD)."""
+    """Referans fiyatın etrafında 9 basamaklı, yuvarlanmış artan fiyat merdiveni (USD)."""
     out: List[float] = []
     for m in LADDER_MULTIPLIERS:
         v = reference * m
@@ -61,8 +61,8 @@ def ladder_text(ladder: List[float], try_rate: Optional[float] = None) -> str:
 
 
 def example_ladder(n: int) -> str:
-    cycle = ["supheli", "uygun", "uygun", "pahali", "cok_pahali"]
-    return json.dumps({str(i + 1): cycle[min(i, 4)] for i in range(n)})
+    cycle = ["supheli", "uygun", "uygun", "uygun", "pahali", "pahali", "pahali", "cok_pahali", "cok_pahali"]
+    return json.dumps({str(i + 1): cycle[min(i, len(cycle) - 1)] for i in range(n)})
 
 
 def label_rank(value) -> Optional[int]:

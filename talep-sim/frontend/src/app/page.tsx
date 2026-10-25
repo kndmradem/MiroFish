@@ -49,6 +49,7 @@ export default function Dashboard() {
   const [profile, setProfile] = useState<BrandProfile | null>(null);
   const [regions, setRegions] = useState<RegionCode[]>(["EU", "MENA", "CIS"]);
   const [image, setImage] = useState<{ name: string; dataUrl: string } | null>(null);
+  const [resetWorld, setResetWorld] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -125,7 +126,9 @@ export default function Dashboard() {
           ),
         },
         usd_try_rate: regions.includes("TR") && Number(usdTry) > 0 ? Number(usdTry) : undefined,
+        reset_world: resetWorld || undefined,
       }, handlers(regions));
+      setResetWorld(false);
       if (res.brand_profile) setProfile(res.brand_profile);
       setResult(res);
       setChartRegion(res.regional_breakdown[0]?.region ?? null);
@@ -283,6 +286,16 @@ export default function Dashboard() {
                 </div>
               </div>
             </details>
+            <label className="flex items-start gap-2 rounded-md border p-3 text-sm">
+              <Checkbox checked={resetWorld} onCheckedChange={(v) => setResetWorld(v === true)} className="mt-0.5" />
+              <span>
+                <span className="font-medium">Dünyayı sıfırla ve baştan kur</span>
+                <span className="block text-xs text-muted-foreground">
+                  Seçili bölgelerin önbellekteki MiroFish dünyasını ve Zep grafiğini siler; ajanlar güncel profil ve
+                  promptlarla sıfırdan kurulur (yerel modelde 10-30 dk). Yalnızca bir sonraki koşuda uygulanır.
+                </span>
+              </span>
+            </label>
             <Button type="submit" disabled={!canSubmit || loading}>
               {loading && <Loader2 className="animate-spin" />}
               {loading ? "Ajanlar değerlendiriyor…" : "Simülasyonu çalıştır"}
