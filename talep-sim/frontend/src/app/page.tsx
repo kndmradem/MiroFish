@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { ImageIcon, Loader2 } from "lucide-react";
 
 import { BrandPanel, SourceBadge } from "@/components/brand-panel";
@@ -150,7 +151,10 @@ export default function Dashboard() {
       <Card className="h-fit">
         <CardHeader>
           <CardTitle>Ürün Girdisi</CardTitle>
-          <CardDescription>Tasarımı ve maliyetleri gir, bölgesel talebi simüle et.</CardDescription>
+          <CardDescription>
+            Tasarımı ve maliyetleri gir, bölgesel talebi simüle et.{" "}
+            <Link className="underline" href="/yeni-magaza">Yeni mağaza öngörüsü</Link>
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="grid gap-4">

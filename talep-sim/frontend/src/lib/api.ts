@@ -493,3 +493,59 @@ export const try_ = (v: string | number) => `₺${Math.round(Number(v)).toLocale
 
 export const usd = (v: string | number) =>
   Number(v).toLocaleString("tr-TR", { style: "currency", currency: "USD" });
+
+// --- Yeni mağaza öngörüsü ---
+export interface LocationProfile {
+  ulke: string;
+  sehir: string;
+  nufus?: number | null;
+  kisi_basi_gelir_usd?: number | null;
+  alim_gucu_endeksi?: number | null;
+  turist_yillik?: number | null;
+  avm_ziyaretci_yillik?: number | null;
+  kaynak_url: string;
+  tarih?: string | null;
+}
+
+export interface NewStoreCandidate {
+  ulke: string;
+  sehir: string;
+  lokasyon_tipi: "avm" | "cadde" | "outlet";
+  metrekare: number;
+  profil?: LocationProfile | null;
+}
+
+export interface NewStoreEstimate {
+  region: string | null;
+  annual_revenue_usd: number;
+  low_usd: number;
+  high_usd: number;
+  per_sqm_usd: number;
+  confidence: "düşük" | "orta" | "yüksek";
+  own_data: "şehir" | "ülke" | "bölge" | "yok";
+  warnings: string[];
+  analogs: {
+    magaza: string; sehir: string; ulke: string; lokasyon_tipi: string; metrekare: number;
+    yillik_ciro_usd: number; m2_ciro_usd: number; benzerlik: number; kapandi: boolean;
+  }[];
+  features_used: string[];
+  profile_source: string;
+  assumptions: string[];
+  basis: string;
+}
+
+export async function fetchLocations(): Promise<LocationProfile[]> {
+  const res = await fetch(`${API_URL}/api/new-store/locations`);
+  if (!res.ok) throw new Error(`Lokasyonlar alınamadı (${res.status}): ${await res.text()}`);
+  return res.json();
+}
+
+export async function estimateNewStore(body: NewStoreCandidate): Promise<NewStoreEstimate> {
+  const res = await fetch(`${API_URL}/api/new-store/estimate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Öngörü başarısız (${res.status}): ${await res.text()}`);
+  return res.json();
+}

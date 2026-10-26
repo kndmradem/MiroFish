@@ -17,6 +17,7 @@ from fastapi.responses import StreamingResponse
 from .allocation import DemandSignal, RegionSignal, allocate_by_sales_velocity, allocate_production_budget
 from .models import Explanation, FailedRegion, BrandProfile, BrandProfileRequest, PredictionRequest, PredictionResponse, RegionPredictionResult
 from .advisor import Advisor
+from .newstore import Candidate as NewStoreCandidate, NewStoreEstimate
 from .explain import allocation_note, allocation_view, explain_region, methodology_notes
 from . import economy
 from .forecast import DemandModel, forecast_sales
@@ -130,6 +131,53 @@ async def panel_status() -> dict:
             "regions": library_status(store, list(ALL_REGIONS)),
             "calibration": {"fitted_at": cal.fitted_at, "regions": {k: vars(v) for k, v in cal.regions.items()}},
             "drift": DriftMonitor(store.root / "accuracy.jsonl").report()}
+
+
+_NEWSTORE_CACHE: dict = {}
+
+
+def _newstore_data(cfg: Settings):
+    """(mağaza istatistikleri, veri notları, profiller); ERP dosyaları değişmedikçe önbellekten."""
+    from pathlib import Path
+    from . import newstore
+    if not cfg.newstore_erp_dir:
+        raise HTTPException(status_code=400, detail="NEWSTORE_ERP_DIR ayarlı değil: ERP veri sözleşmesi CSV klasörünü ver.")
+    erp = Path(cfg.newstore_erp_dir)
+    default = Path(__file__).resolve().parents[1] / "panel_data"
+    prof_path = Path(cfg.newstore_profiles) if cfg.newstore_profiles else (
+        default / "lokasyon_profilleri.csv" if (default / "lokasyon_profilleri.csv").exists()
+        else default / "lokasyon_profilleri.ornek.csv")
+    rates = {k.strip(): float(v) for k, v in (x.split("=") for x in cfg.newstore_fixed_rates.split(",") if "=" in x)}
+    try:
+        stamp = tuple((erp / f).stat().st_mtime for f in ("magazalar.csv", "satislar.csv")) + (prof_path.stat().st_mtime,)
+    except OSError as e:
+        raise HTTPException(status_code=400, detail=f"Yeni mağaza verisi okunamadı: {e}") from e
+    key = (str(erp), str(prof_path), tuple(sorted(rates.items())))
+    hit = _NEWSTORE_CACHE.get(key)
+    if hit is None or hit[0] != stamp:
+        stats, notes = newstore.store_stats(erp, rates)
+        if prof_path.name.endswith(".ornek.csv"):
+            notes.append("Lokasyon profilleri ÖRNEK dosyadan geldi (yaklaşık, kaynaksız değerler); gerçek dış veriyle değiştir.")
+        hit = (stamp, stats, notes, newstore.load_profiles(prof_path))
+        _NEWSTORE_CACHE[key] = hit
+    return hit[1], hit[2], hit[3]
+
+
+@app.get("/api/new-store/locations")
+async def new_store_locations() -> list:
+    _, _, profiles = _newstore_data(settings)
+    return [p.model_dump(mode="json") for p in profiles.values()]
+
+
+@app.post("/api/new-store/estimate", response_model=NewStoreEstimate)
+async def new_store_estimate(cand: NewStoreCandidate) -> NewStoreEstimate:
+    """Aday lokasyon için yıllık ciro aralığı, benzer mağazalar ve uyarılar."""
+    from . import newstore
+    stats, notes, profiles = _newstore_data(settings)
+    try:
+        return newstore.estimate(cand, stats, profiles, data_notes=notes)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @app.post("/api/brand-profile", response_model=BrandProfile)

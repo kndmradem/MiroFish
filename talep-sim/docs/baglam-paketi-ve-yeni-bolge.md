@@ -102,3 +102,44 @@ Nüfus ve gelir: ulusal istatistik kurumları, Dünya Bankası, OECD. Turizm: ul
 UNWTO. AVM ziyaretçi sayısı: genelde AVM yönetimlerinin ya da sektör derneklerinin (TR'de AYD) yayınları,
 ya da ücretli konum verisi sağlayıcıları. Şehir bazında ve güncel AVM trafiği kamuya açık olarak çoğu zaman
 yoktur. Bu kaynakların erişimini ve kullanım koşullarını bu çalışmada kontrol etmedim.
+
+## Kullanım (uygulanan kısım)
+
+### Bağlam paketi
+
+Kod: `backend/app/contextpacks/` (taslak, onay, imzalı paket, içe aktarma).
+
+```bash
+cd talep-sim/backend
+# bizim sunucumuzda
+.venv/bin/python -m app.contextpacks anahtar --cikti ~/anahtarlar            # bir kez; ozel.pem gizli kalır
+CONTEXT_LLM_BASE_URL=... CONTEXT_LLM_MODEL=... CONTEXT_LLM_API_KEY=... CONTEXT_LLM_EXTRA='{"tools": [...]}' \
+  .venv/bin/python -m app.contextpacks taslak TR --tarih 2026-11-01 --cikti taslak/TR.json
+#   -> rapor: tutulan/atılan bilgi; taslak/TR.json'daki her linki aç, kontrol et, düzelt
+.venv/bin/python -m app.contextpacks onayla taslak/TR.json --onaylayan "Adem" --cikti onayli/TR.json
+.venv/bin/python -m app.contextpacks paketle onayli/*.json --anahtar ~/anahtarlar/ozel.pem --cikti baglam-2026-11.tar.gz
+# müşteri kurulumunda (acik.pem kurulumla birlikte gelir)
+.venv/bin/python -m app.contextpacks ice-aktar baglam-2026-11.tar.gz --acik-anahtar acik.pem
+```
+
+Müşteri kurulumunda `.env` içine `PANEL_REQUIRE_VERIFIED=true` yazılır: yerel model yalnızca onaylı paketleri
+görür. Geliştirmede bu ayar kapalıdır, taslak paketler de kullanılır ama uyarı verir.
+
+### Yeni mağaza öngörüsü
+
+Kod: `backend/app/newstore.py`, ekran: `http://localhost:3100/yeni-magaza`.
+
+```
+NEWSTORE_ERP_DIR=/yol/erp_csv            # magazalar.csv, satislar.csv, (varsa) doviz_kurlari.csv
+NEWSTORE_PROFILES=/yol/lokasyon_profilleri.csv   # boşsa panel_data/lokasyon_profilleri.ornek.csv
+NEWSTORE_FIXED_RATES=USD=42,EUR=48       # doviz_kurlari.csv yoksa sabit kur (varsayım, ekranda belirtilir)
+```
+
+`panel_data/lokasyon_profilleri.ornek.csv` yalnızca deneme içindir: nüfus ve gelir değerleri yaklaşık ve
+kaynaksızdır, turist ve AVM alanları boştur. Ekran bunu uyarı olarak gösterir. Gerçek kullanımda her satır
+kaynak linki ve tarihiyle doldurulmalı.
+
+Kapanan mağazalar da hesaba girer. Onları dışarıda bırakmak tahmini olduğundan iyimser yapardı, bu yüzden
+benzer mağazalar arasında kapanmış olan varsa ekranda belirtilir. Sentetik ERP verisiyle (21 mağaza)
+denendi. Örneğin Atina için aynı bölgedeki Amsterdam, Berlin ve Paris (kapanmış) mağazaları seçildi,
+güven "düşük" çıktı ve "bu ülkede kendi veri yok" uyarısı gösterildi.
