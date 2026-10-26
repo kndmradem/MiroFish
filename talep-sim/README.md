@@ -199,3 +199,10 @@ satışına göre yinelemeli dağıtılır: her adımda bir parti, "sonraki biri
 (talep ±%40 belirsizlik senaryolarıyla, azalan getiri). Böylece bir bölgede stok kalırken diğerinde talep karşılanamaz
 olmaz. Bütçe toplam talepten büyükse fazlası üretime ayrılmaz ve sonuçta "daha az üret" notu çıkar. Net fiyatı maliyetin
 altında kalan bölge üretim almaz. Sonuçta her bölge için eski (kâr ağırlıklı) ve yeni dağıtım yan yana gösterilir.
+
+## ERP verisiyle tahmin ve geriye dönük test (`tahmin/`)
+
+Ajan simülasyonundan bağımsız ikinci motor: müşterinin ERP verisinden (satış, stok, fiyat, kampanya, iade,
+satın alma, görsel) yeni tasarımın talebini aralıklarıyla tahmin eder ve geçmiş sezonlarla basit yöntemlere
+karşı test eder. Veri sözleşmesi, müşteriye veri talep listesi, KVKK notları, sentetik veri üreteci ve
+geriye dönük test raporu burada. Ayrıntı: [`tahmin/README.md`](tahmin/README.md).
