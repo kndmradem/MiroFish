@@ -27,6 +27,8 @@ class Settings:
     # --- SIM_ENGINE=panel: doğrudan persona paneli (Zep/MiroFish yok) ---
     # Persona kütüphanesi, bağlam paketleri, active.json ve calibration.json bu klasörde (boşsa backend/panel_data)
     panel_data_dir: Optional[str] = field(default_factory=lambda: _env("PANEL_DATA_DIR"))
+    # true (üretim): yerel model yalnızca insan onaylı, imzalı paketle gelen bağlamı görür
+    panel_require_verified: bool = field(default_factory=lambda: _env("PANEL_REQUIRE_VERIFIED", "false").lower() in ("1", "true", "yes", "on"))
     panel_size: int = field(default_factory=lambda: int(_env("PANEL_SIZE", "12")))          # bölge başına kişi
     panel_min_valid: int = field(default_factory=lambda: int(_env("PANEL_MIN_VALID", "4")))
     panel_concurrency: int = field(default_factory=lambda: int(_env("PANEL_CONCURRENCY", "2")))  # aynı anda LLM çağrısı

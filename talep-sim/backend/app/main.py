@@ -47,7 +47,7 @@ def _fuser(cfg: Settings, mock: MockSimulationEngine):
 
 def panel_store(cfg: Settings):
     from .panel.library import PanelStore
-    return PanelStore(cfg.panel_data_dir)
+    return PanelStore(cfg.panel_data_dir, require_verified=cfg.panel_require_verified)
 
 
 def build_panel_engine(cfg: Settings, mock: MockSimulationEngine):

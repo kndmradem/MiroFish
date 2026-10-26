@@ -75,10 +75,19 @@ class PersonaLibrary(_Dated):
         return self
 
 
+class Source(BaseModel):
+    """Bir bilginin dayanağı: link ve tarih zorunlu (onaylı pakette)."""
+    url: str = Field(..., pattern=r"^https?://\S+$")
+    title: str = ""
+    published_at: Optional[date] = None
+    retrieved_at: Optional[date] = None
+
+
 class Trend(BaseModel):
     note: str
     as_of: Optional[date] = None
     source: str = ""
+    sources: List[Source] = []
 
 
 class CompetitorPrice(BaseModel):
@@ -86,6 +95,7 @@ class CompetitorPrice(BaseModel):
     price_usd: float = Field(..., gt=0)
     as_of: Optional[date] = None
     source: str = ""
+    sources: List[Source] = []
 
 
 class Macro(BaseModel):
@@ -103,6 +113,10 @@ class ContextPack(_Dated):
     trends: List[Trend] = []
     competitor_prices: List[CompetitorPrice] = []
     shopping_notes: str = ""
+    # Kaynak ve onay (bkz. app/contextpacks): makro/sezon alanı adı -> kaynaklar
+    field_sources: Dict[str, List[Source]] = Field(default_factory=dict)
+    approved_by: Optional[str] = None
+    approved_at: Optional[date] = None
 
 
 @dataclass(frozen=True)
@@ -130,8 +144,10 @@ def _read(path: Path, model):
 class PanelStore:
     """Veri klasörüne erişim. Müşteri kendi klasörünü PANEL_DATA_DIR ile verir; varsayılan klasör örnektir."""
 
-    def __init__(self, root: Optional[Path | str] = None):
+    def __init__(self, root: Optional[Path | str] = None, require_verified: bool = False):
         self.root = Path(root) if root else DEFAULT_DATA_DIR
+        # Üretimde true: yerel model yalnızca insan onaylı (verified) bağlam paketlerini görür
+        self.require_verified = require_verified
 
     # --- personalar -----------------------------------------------------
     def persona_versions(self) -> List[str]:
@@ -180,7 +196,7 @@ class PanelStore:
             return None
         at = at or date.today()
         packs = [_read(p, ContextPack) for p in sorted(d.glob("*.json"))]
-        valid = [p for p in packs if p.as_of <= at]
+        valid = [p for p in packs if p.as_of <= at and (p.verified or not self.require_verified)]
         return max(valid, key=lambda p: p.as_of) if valid else None
 
 
