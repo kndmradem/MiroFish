@@ -21,8 +21,24 @@ def _env(name: str, default: Optional[str] = None) -> Optional[str]:
 
 @dataclass(frozen=True)
 class Settings:
-    # "mock" | "mirofish"
+    # "mock" | "panel" (MiroFish'siz, önerilen) | "mirofish"
     sim_engine: str = field(default_factory=lambda: _env("SIM_ENGINE", "mock"))
+
+    # --- SIM_ENGINE=panel: doğrudan persona paneli (Zep/MiroFish yok) ---
+    # Persona kütüphanesi, bağlam paketleri, active.json ve calibration.json bu klasörde (boşsa backend/panel_data)
+    panel_data_dir: Optional[str] = field(default_factory=lambda: _env("PANEL_DATA_DIR"))
+    panel_size: int = field(default_factory=lambda: int(_env("PANEL_SIZE", "12")))          # bölge başına kişi
+    panel_min_valid: int = field(default_factory=lambda: int(_env("PANEL_MIN_VALID", "4")))
+    panel_concurrency: int = field(default_factory=lambda: int(_env("PANEL_CONCURRENCY", "2")))  # aynı anda LLM çağrısı
+    # json_schema (vLLM, Ollama >= 0.5) | json_object | none; desteklenmezse otomatik bir alta iner
+    panel_guided: str = field(default_factory=lambda: _env("PANEL_GUIDED", "json_schema"))
+    panel_temperature: float = field(default_factory=lambda: float(_env("PANEL_TEMPERATURE", "0.7")))
+    panel_timeout: int = field(default_factory=lambda: int(_env("PANEL_TIMEOUT", "180")))
+    panel_repair_retries: int = field(default_factory=lambda: int(_env("PANEL_REPAIR_RETRIES", "1")))
+    panel_peer_round: bool = field(default_factory=lambda: _env("PANEL_PEER_ROUND", "false").lower() in ("1", "true", "yes", "on"))
+    # Boşsa LLM_* ayarları kullanılır (aynı yerel model)
+    panel_llm_base_url: Optional[str] = field(default_factory=lambda: _env("PANEL_LLM_BASE_URL"))
+    panel_llm_model: Optional[str] = field(default_factory=lambda: _env("PANEL_LLM_MODEL"))
 
     # MiroFish backend'i (kendi .env'inde LLM_* ve ZEP_API_KEY tanımlı olmalı)
     mirofish_url: str = field(default_factory=lambda: _env("MIROFISH_URL", "http://localhost:5001"))

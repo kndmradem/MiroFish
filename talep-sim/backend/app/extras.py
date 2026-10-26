@@ -111,10 +111,10 @@ def confidence(meta: dict, brand_known: Optional[bool], a: Assumptions, region: 
     reasons: List[str] = []
     score = 2  # 0 düşük, 1 orta, 2 yüksek; düşüşler aşağıda
     engine = meta.get("engine", "mock")
-    if engine != "mirofish":
+    if engine not in ("mirofish", "panel"):
         return Confidence(level="düşük", reasons=[
             "Mock motor: ürün anahtar kelimelerinden üretilen deterministik örnek; gerçek ajan görüşü değil.",
-            "Gerçek ajan simülasyonu için SIM_ENGINE=mirofish kullan."])
+            "Gerçek ajan simülasyonu için SIM_ENGINE=panel (önerilen) ya da SIM_ENGINE=mirofish kullan."])
     n = meta.get("n_valid", 0)
     if n < 8:
         score -= 1
@@ -127,6 +127,17 @@ def confidence(meta: dict, brand_known: Optional[bool], a: Assumptions, region: 
         reasons.append(f"{meta['n_estimated']} ajanın bazı fiyat eşikleri tahmin edildi.")
     if meta.get("n_valid", 0) < meta.get("n_agents", 0):
         reasons.append("Bazı ajanlar zaman aşımı/bozuk cevap yüzünden hesaba katılmadı.")
+    if engine == "panel":
+        cal = meta.get("calibration") or {}
+        if not cal.get("n_obs"):
+            score = min(score, 1)
+            reasons.append("Panel gerçek satış verisiyle kalibre edilmedi (en fazla 'orta' güven).")
+        stale = [w for w in meta.get("freshness_warnings", []) if "tarihli" in w or "yok" in w]
+        if stale:
+            score -= 1
+            reasons += stale
+        if any("doğrulanmamış" in w for w in meta.get("freshness_warnings", [])):
+            reasons.append("Persona seti ya da bağlam paketi doğrulanmamış taslak.")
     if brand_known is False:
         score -= 1
         reasons.append("Marka modelce tanınmıyor; marka profili genel varsayım.")

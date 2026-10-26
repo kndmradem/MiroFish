@@ -5,6 +5,38 @@ import type { PredictionResponse } from "@/lib/api";
 import { usd } from "@/lib/api";
 
 const n = (v: number) => v.toLocaleString("tr-TR");
+const ENGINE_LABEL: Record<string, string> = {
+  mock: "mock (örnek)",
+  panel: "persona paneli (yerel model)",
+  mirofish: "MiroFish ajan simülasyonu",
+};
+
+/** Panel motorunda verinin tarihi ve eskime uyarıları: sonuç, ancak bu verinin güncelliği kadar doğrudur. */
+function DataBasisNote({ result }: { result: PredictionResponse }) {
+  const rows = result.regional_breakdown.filter((r) => r.data_basis);
+  if (rows.length === 0) return null;
+  const warnings = Array.from(new Set(rows.flatMap((r) => r.data_basis!.freshness_warnings)));
+  return (
+    <div className="rounded-md border p-2 text-xs">
+      <b>Veri dayanağı:</b>{" "}
+      {rows.map((r) => {
+        const b = r.data_basis!;
+        const cal = b.calibration.n_obs ? `kalibre (${b.calibration.n_obs} gözlem)` : "kalibre edilmedi";
+        return (
+          <span key={r.region} className="mr-3 inline-block">
+            <span className="font-mono">{r.region}</span>: persona {b.persona_version} ({b.persona_as_of}), bağlam{" "}
+            {b.context_as_of ? `${b.context_as_of} itibarıyla` : "yok"}, {cal}
+          </span>
+        );
+      })}
+      {warnings.length > 0 && (
+        <ul className="mt-1 list-disc pl-4 text-amber-700">
+          {warnings.map((w) => <li key={w}>{w}</li>)}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 /** Müşteriye sunulabilir tek sayfalık özet; "Yazdır / PDF" ile kaydedilir. */
 export function SummaryCard({ result, productName }: { result: PredictionResponse; productName: string }) {
@@ -14,7 +46,7 @@ export function SummaryCard({ result, productName }: { result: PredictionRespons
         <div>
           <h2 className="text-lg font-semibold">Yönetici özeti: {productName}</h2>
           <p className="text-xs text-muted-foreground">
-            {result.brand_profile ? `Marka: ${result.brand_profile.name}. ` : ""}Motor: {result.engine === "mirofish" ? "MiroFish ajan simülasyonu" : "mock (örnek)"} ·
+            {result.brand_profile ? `Marka: ${result.brand_profile.name}. ` : ""}Motor: {ENGINE_LABEL[result.engine] ?? result.engine} ·
             toplam üretim {n(result.total_produced_qty)} adet
           </p>
         </div>
@@ -50,6 +82,7 @@ export function SummaryCard({ result, productName }: { result: PredictionRespons
           </tbody>
         </table>
       </div>
+      <DataBasisNote result={result} />
       {result.failed_regions.length > 0 && (
         <p className="text-xs text-amber-700">Hesaplanamayan bölgeler: {result.failed_regions.map((f) => f.region).join(", ")}.</p>
       )}

@@ -294,15 +294,30 @@ export interface RegionPredictionResult {
   size_curve?: { size: string; share_pct: number }[];
   seasonality?: Seasonality | null;
   raw_answers?: RawAnswer[];
+  /** Panel motoru: hangi persona/bağlam sürümüyle, hangi tarih itibarıyla hesaplandı. */
+  data_basis?: DataBasis | null;
   local_currency?: string | null;
   local_price?: string | null;
   fx_rate?: number | null;
 }
 
+export interface DataBasis {
+  persona_version: string;
+  persona_as_of: string;
+  context_version: string | null;
+  context_as_of: string | null;
+  freshness_warnings: string[];
+  calibration: { demand_scale: number; price_scale: number; sensitivity_scale: number; trend_scale: number; n_obs: number };
+  peer_round: boolean;
+  segments: Record<string, number>;
+  elapsed_s: number;
+}
+
 export interface RawAnswer {
   agent: number;
-  status: "json" | "partial" | "extracted" | "failed" | "empty";
+  status: "json" | "partial" | "extracted" | "repaired" | "failed" | "empty" | "error";
   text: string;
+  segment?: string | null;
   interest?: number | null;
 }
 

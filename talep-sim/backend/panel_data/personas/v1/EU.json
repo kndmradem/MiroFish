@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "region": "EU",
+  "version": "v1",
+  "as_of": "2026-10-26",
+  "review_by": "2027-01-31",
+  "source": "Başlangıç taslağı: genel pazar bilgisinden yazıldı, ölçülmüş veri değil. ERP/CRM müşteri verisi ve pazar araştırmasıyla güncellenmeli.",
+  "owner": "talep-sim varsayılanı (müşteri kendi sahibini yazmalı)",
+  "verified": false,
+  "price_level": 2.6,
+  "segments": [
+    {
+      "id": "eu-urban-conscious",
+      "label": "Kentli bilinçli tüketici",
+      "city": "Berlin",
+      "weight": 0.25,
+      "age_range": [
+        26,
+        40
+      ],
+      "female_share": 0.6,
+      "income_band": "orta-üst",
+      "style_affinity": [
+        "minimalist",
+        "kapsül gardırop",
+        "doğal lif"
+      ],
+      "price_sensitivity": 0.5,
+      "trend_affinity": 0.5,
+      "channel_habits": [
+        "online",
+        "marka mağazası",
+        "ikinci el"
+      ],
+      "climate": "ılıman-soğuk kış, yağışlı",
+      "dress_norms": "sade, logosuz, fonksiyonel",
+      "notes": "Sertifika (GOTS, geri dönüştürülmüş içerik) ve şeffaflık arar."
+    },
+    {
+      "id": "eu-value",
+      "label": "Fiyat/performans arayan",
+      "city": "Madrid",
+      "weight": 0.25,
+      "age_range": [
+        30,
+        55
+      ],
+      "female_share": 0.6,
+      "income_band": "orta",
+      "style_affinity": [
+        "klasik",
+        "rahat"
+      ],
+      "price_sensitivity": 0.7,
+      "trend_affinity": 0.3,
+      "channel_habits": [
+        "indirim dönemi",
+        "AVM zinciri",
+        "online"
+      ],
+      "climate": "ılıman",
+      "dress_norms": "klasik, ofise uygun",
+      "notes": ""
+    },
+    {
+      "id": "eu-young-trend",
+      "label": "Genç trend takipçisi",
+      "city": "Milano",
+      "weight": 0.2,
+      "age_range": [
+        18,
+        28
+      ],
+      "female_share": 0.65,
+      "income_band": "orta-alt",
+      "style_affinity": [
+        "trend",
+        "sokak stili"
+      ],
+      "price_sensitivity": 0.75,
+      "trend_affinity": 0.85,
+      "channel_habits": [
+        "sosyal medya",
+        "online",
+        "hızlı moda"
+      ],
+      "climate": "ılıman",
+      "dress_norms": "rahat, deneysel",
+      "notes": ""
+    },
+    {
+      "id": "eu-premium",
+      "label": "Kalite odaklı yüksek gelir",
+      "city": "Amsterdam",
+      "weight": 0.15,
+      "age_range": [
+        35,
+        60
+      ],
+      "female_share": 0.55,
+      "income_band": "yüksek",
+      "style_affinity": [
+        "uzun ömürlü",
+        "premium kumaş"
+      ],
+      "price_sensitivity": 0.25,
+      "trend_affinity": 0.4,
+      "channel_habits": [
+        "marka mağazası",
+        "online"
+      ],
+      "climate": "ılıman-soğuk, rüzgarlı",
+      "dress_norms": "sade lüks",
+      "notes": ""
+    },
+    {
+      "id": "eu-nordic-function",
+      "label": "İşlevsellik odaklı",
+      "city": "Stockholm",
+      "weight": 0.15,
+      "age_range": [
+        25,
+        50
+      ],
+      "female_share": 0.5,
+      "income_band": "orta-üst",
+      "style_affinity": [
+        "teknik",
+        "outdoor",
+        "sade renk"
+      ],
+      "price_sensitivity": 0.45,
+      "trend_affinity": 0.35,
+      "channel_habits": [
+        "online",
+        "marka mağazası"
+      ],
+      "climate": "soğuk, uzun kış",
+      "dress_norms": "katmanlı, fonksiyonel",
+      "notes": ""
+    }
+  ]
+}

@@ -38,19 +38,45 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+def _fuser(cfg: Settings, mock: MockSimulationEngine):
+    if cfg.vision_enabled:
+        from .services.vision import VisionFusion
+        return VisionFusion(cfg.vision_api_key, cfg.vision_base_url, cfg.vision_model).fuse_product_card
+    return mock.fuse_product_card
+
+
+def panel_store(cfg: Settings):
+    from .panel.library import PanelStore
+    return PanelStore(cfg.panel_data_dir)
+
+
+def build_panel_engine(cfg: Settings, mock: MockSimulationEngine):
+    from .panel import calibration
+    from .panel.engine import DirectPanelEngine
+    from .panel.questioner import PanelLLM
+
+    store = panel_store(cfg)
+    llm = PanelLLM(cfg.panel_llm_base_url or cfg.llm_base_url, cfg.panel_llm_model or cfg.llm_model,
+                   cfg.llm_api_key or "local", guided=cfg.panel_guided, temperature=cfg.panel_temperature,
+                   timeout=cfg.panel_timeout, concurrency=cfg.panel_concurrency,
+                   repair_retries=cfg.panel_repair_retries)
+    return DirectPanelEngine(store, llm, _fuser(cfg, mock), panel_size=cfg.panel_size, min_valid=cfg.panel_min_valid,
+                             peer_round=cfg.panel_peer_round,
+                             calibration=calibration.load(store.root / "calibration.json"))
+
+
 def build_engine(cfg: Settings) -> SimulationEngine:
-    """SIM_ENGINE=mirofish ise gerçek ajan sürüsü, aksi halde mock."""
+    """SIM_ENGINE=panel: doğrudan persona paneli, mirofish: MiroFish ajan sürüsü, aksi halde mock."""
     mock = MockSimulationEngine()
+    if cfg.sim_engine == "panel":
+        return build_panel_engine(cfg, mock)
     if cfg.sim_engine != "mirofish":
         return mock
 
     from .services.mirofish_client import MiroFishClient
     from .services.mirofish_engine import MiroFishSimulationEngine
-    from .services.vision import VisionFusion
 
-    fuser = mock.fuse_product_card
-    if cfg.vision_enabled:
-        fuser = VisionFusion(cfg.vision_api_key, cfg.vision_base_url, cfg.vision_model).fuse_product_card
+    fuser = _fuser(cfg, mock)
     extractor = None
     if cfg.llm_enabled:  # ajan serbest metni, yerel/uzak LLM ile alanlara çevrilir
         from .services.answer_extractor import AnswerExtractor
@@ -87,6 +113,25 @@ async def health() -> dict:
     return {"status": "ok", "engine": settings.sim_engine, "vision": settings.vision_enabled, "llm": settings.llm_enabled}
 
 
+@app.get("/api/panel/status")
+async def panel_status() -> dict:
+    """Persona ve bağlam verisinin sürümü, tarihi ve eskime uyarıları (panel motoru için)."""
+    from .models import ALL_REGIONS
+    from .panel import calibration
+    from .panel.drift import DriftMonitor
+    from .panel.library import LibraryError, library_status
+    store = panel_store(settings)
+    try:
+        active = store.active_version()
+    except LibraryError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    cal = calibration.load(store.root / "calibration.json")
+    return {"data_dir": str(store.root), "active_persona_version": active, "versions": store.persona_versions(),
+            "regions": library_status(store, list(ALL_REGIONS)),
+            "calibration": {"fitted_at": cal.fitted_at, "regions": {k: vars(v) for k, v in cal.regions.items()}},
+            "drift": DriftMonitor(store.root / "accuracy.jsonl").report()}
+
+
 @app.post("/api/brand-profile", response_model=BrandProfile)
 async def brand_profile(req: BrandProfileRequest, profiler: BrandProfiler = Depends(get_profiler)) -> BrandProfile:
     """Marka adından fiyat/konumlandırma profili çıkarır; kullanıcı sonucu düzenleyip /api/predict'e verebilir."""
@@ -99,6 +144,15 @@ def _price_steps(sim, vw, best):
         return steps_from_votes(sim.meta["ladder"], sim.meta["ladder_votes"])
     lo, hi = float(vw.curve[0].price), float(vw.curve[-1].price)
     return steps_from_answers(sim.price_answers, [lo + (hi - lo) * i / 7 for i in range(8)])
+
+
+def _data_basis(meta: dict):
+    """Panel motorunda kullanılan persona/bağlam sürümü ve tarihleri (arayüzde 'as of' olarak gösterilir)."""
+    if meta.get("engine") != "panel":
+        return None
+    keys = ("persona_version", "persona_as_of", "context_version", "context_as_of", "freshness_warnings",
+            "calibration", "peer_round", "segments", "elapsed_s")
+    return {k: meta.get(k) for k in keys}
 
 
 async def _noop(_: dict) -> None:
@@ -220,6 +274,7 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
             confidence=confidence(sim.meta, brand.known_brand if brand else None, req.assumptions, region),
             size_curve=size_curve(region, card), seasonality=season,
             raw_answers=sim.meta.get("raw_answers", []),
+            data_basis=_data_basis(sim.meta),
             explanations=[e if e.key != "quantity" else Explanation(
                 key="quantity", label=e.label, value=f"{alloc.quantity:,}", how=view.why,
                 assumptions=["Talep 120 günlük ajan talebi + kural varsayımlarından (kitle, dönüşüm) gelir; stok sınırsız varsayıldığında beklenen satıştır.",

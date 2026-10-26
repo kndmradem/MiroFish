@@ -127,8 +127,9 @@ class VanWestendorpResult(BaseModel):
 
 class RawAnswer(BaseModel):
     agent: int
-    status: str = Field(..., description="json | extracted | failed | empty")
+    status: str = Field(..., description="json | extracted | repaired | partial | failed | empty | error")
     text: str = Field("", description="Ajanın ham cevabı (kısaltılmış)")
+    segment: Optional[str] = Field(None, description="Panel motorunda kişinin segmenti")
     interest: Optional[float] = None
 
 
@@ -322,6 +323,7 @@ class RegionPredictionResult(BaseModel):
     size_curve: List[SizeShare] = []
     seasonality: Optional[Seasonality] = None
     raw_answers: List[RawAnswer] = Field([], description="Ajanların ham cevapları ve nasıl çözümlendikleri (MiroFish motoru)")
+    data_basis: Optional[dict] = Field(None, description="Panel motoru: persona/bağlam sürümü, 'as of' tarihleri, eskime uyarıları, kalibrasyon")
     local_currency: Optional[str] = Field(None, description="Bölgenin yerel para birimi (yalnızca TL gösterilen bölgelerde)")
     local_price: Optional[Decimal] = Field(None, description="Önerilen fiyatın yerel para karşılığı")
     fx_rate: Optional[float] = Field(None, description="Kullanılan kur: 1 USD = fx_rate yerel para")

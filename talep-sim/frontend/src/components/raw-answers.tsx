@@ -4,6 +4,8 @@ const STATUS: Record<RawAnswer["status"], string> = {
   json: "JSON",
   partial: "yalnızca ilgi puanı",
   extracted: "metinden çıkarıldı",
+  repaired: "onarım sorusuyla düzeltildi",
+  error: "model hatası",
   failed: "çözümlenemedi",
   empty: "boş cevap",
 };
@@ -22,7 +24,7 @@ export function RawAnswers({ groups }: { groups: { region: string; answers: RawA
             {g.answers.map((a) => (
               <div key={a.agent} className="rounded bg-muted/50 p-2">
                 <p className="text-xs text-muted-foreground">
-                  Ajan {a.agent} · {STATUS[a.status] ?? a.status}
+                  Ajan {a.agent}{a.segment ? ` (${a.segment})` : ""} · {STATUS[a.status] ?? a.status}
                   {a.interest != null && ` · ilgi ${Math.round(a.interest)}`}
                 </p>
                 <p className="whitespace-pre-wrap break-words text-xs">{a.text || "(boş)"}</p>

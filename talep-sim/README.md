@@ -66,6 +66,13 @@ ve arayüzde/açıklamalarda belirtilir:
 - **MiroFish:** seed dokümana TR paneli eklendi. Kayıtlı dünya (`.mirofish_world.json`) seed özetiyle
   karşılaştırılır; TR'siz eski dünya otomatik yeniden kurulur (ilk istek uzun sürer).
 
+## Persona paneli motoru (MiroFish'siz, önerilen)
+
+`SIM_ENGINE=panel`: Zep, dünya kurma ve MiroFish olmadan; sürümlü persona kütüphanesinden örneklenen
+kişilere tarihli bağlam paketiyle yerel LLM'de tek çağrılık yapılandırılmış soru sorulur. Kalibrasyon,
+sapma izleme ve persona sürümü karşılaştırması (backtest) dahil. Ayrıntı, Mac/Ollama ayarları ve kalite
+sınırları: [docs/panel-motoru.md](docs/panel-motoru.md). Kod: `backend/app/panel/`, veri: `backend/panel_data/`.
+
 ## MiroFish entegrasyonu
 
 `SIM_ENGINE=mirofish` ile mock yerine MiroFish ajan sürüsü kullanılır

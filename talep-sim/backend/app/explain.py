@@ -27,7 +27,33 @@ def _usd(x) -> str:
 
 def _demand(sim: RegionSimulation, region: str, brand: Optional[BrandProfile]) -> Explanation:
     m = sim.meta
-    if m.get("engine") == "mirofish":
+    if m.get("engine") == "panel":
+        segs = ", ".join(f"{k} ×{v}" for k, v in m.get("segments", {}).items())
+        cal = m.get("calibration", {})
+        how = (f"{m['n_agents']} kişilik persona paneli ({m['persona_version']} sürümü; {segs}) ürün kartını, "
+               f"{region} bağlam paketiyle ({m.get('context_as_of') or 'bağlam yok'} itibarıyla) değerlendirdi; "
+               f"{m['n_valid']} kişiden geçerli cevap geldi. İlgi puanlarının ortalaması {m['mean_interest']}")
+        how += (f", kalibrasyon çarpanı ×{cal['demand_scale']:g} ({cal['n_obs']} gerçek satış gözleminden) ile "
+                f"{sim.demand_score}." if cal.get("demand_scale", 1) != 1 else f"; talep endeksi {sim.demand_score}.")
+        assumptions = ["Panel üyeleri, veri dosyasındaki segmentlerden örneklenip bir dil modeline canlandırılan sentetik "
+                       "tüketicilerdir; gerçek satış verisi değildir.",
+                       "Modelin kendi moda/trend bilgisi eskidir; güncel durum yalnızca tarihli bağlam paketinden gelir.",
+                       "Sonuç modelin kalitesine bağlıdır; küçük yerel modeller tutarsız puan verebilir."]
+        if not cal.get("n_obs"):
+            assumptions.append("Panel henüz gerçek satışla kalibre edilmedi: mutlak seviyeler (adet) göreli karşılaştırma "
+                               "kadar güvenilir değildir.")
+        if m.get("peer_round"):
+            assumptions.append("Akran turu açıktı: kişiler ilk turdaki yorumların özetini görüp yeniden cevapladı.")
+        assumptions += m.get("freshness_warnings", [])
+        if m.get("n_extracted"):
+            assumptions.append(f"{m['n_extracted']} kişinin ilk cevabı biçime uymadı, onarım sorusuyla düzeltildi.")
+        if m.get("price_source") == "brand_fallback":
+            assumptions.append(
+                "Panelden kullanılabilir fiyat kararı gelmedi; fiyat eğrisi marka profili ve maliyetten üretilen referans "
+                "fiyat etrafında kuruldu. Önerilen fiyatı panel görüşü değil varsayım olarak değerlendir.")
+        if m["n_valid"] < m["n_agents"]:
+            assumptions.append(f"{m['n_agents'] - m['n_valid']} kişinin cevabı alınamadı ya da okunamadı; sonuç kısmi örneklemle üretildi.")
+    elif m.get("engine") == "mirofish":
         how = (f"{m['n_agents']} ajan ürün kartını ve {region} personasını değerlendirdi; {m['n_valid']} ajandan geçerli "
                f"cevap geldi. Talep endeksi bu ajanların 0-100 arası ilgi puanlarının ortalamasıdır ({m['mean_interest']}).")
         assumptions = ["Ajanlar bir dil modelinin canlandırdığı sentetik tüketicilerdir, gerçek satış verisi değildir.",
@@ -57,8 +83,8 @@ def _demand(sim: RegionSimulation, region: str, brand: Optional[BrandProfile]) -
         parts.append(f"deterministik rastgelelik {_signed(m['noise_points'])}")
         how = "Mock simülasyon: " + " + ".join(parts) + f" = {sim.demand_score} (0-100 arasına sıkıştırılır)."
         assumptions = ["Bu bir mock modeldir: ürün özellikleri anahtar kelimeyle çıkarılır, ajanlar gerçek LLM değildir.",
-                       "Gerçek ajan sürüsü için SIM_ENGINE=mirofish kullanılmalı."]
-    if brand is not None and m.get("engine") == "mirofish":
+                       "Gerçek ajan cevapları için SIM_ENGINE=panel (önerilen) ya da SIM_ENGINE=mirofish kullanılmalı."]
+    if brand is not None and m.get("engine") in ("mirofish", "panel"):
         assumptions.append(f"Ajanlara {brand.name} markasının profili ve {region} bilinirliği "
                            f"({brandlib.region_strength(brand, region)}/100) verildi.")
     return Explanation(key="demand", label="Talep endeksi", value=f"{sim.demand_score}/100", how=how, assumptions=assumptions)
@@ -138,8 +164,10 @@ def explain_region(sim: RegionSimulation, vw: VanWestendorpResult, best: Decimal
 
 def methodology_notes(engine: str, brand: Optional[BrandProfile]) -> List[str]:
     notes = ["Sonuçlar sentetik ajan simülasyonundan gelir; gerçek satış verisiyle doğrulanmadı. Karar için tek başına kullanılmamalı."]
-    notes.append("Bu çalıştırma MOCK simülasyon kullandı (gerçek LLM ajanları yok)." if engine == "mock"
-                 else "Bu çalıştırma MiroFish ajan sürüsü kullandı.")
+    notes.append({"mock": "Bu çalıştırma MOCK simülasyon kullandı (gerçek LLM ajanları yok).",
+                  "panel": "Bu çalıştırma doğrudan persona paneli kullandı (MiroFish/Zep yok): segment verisinden "
+                           "örneklenen kişiler, tarihli bağlam paketiyle yerel dil modeline soruldu."}
+                 .get(engine, "Bu çalıştırma MiroFish ajan sürüsü kullandı."))
     if brand is None:
         notes.append("Marka girilmedi: fiyatlama nötr kitlesel varsayımla yapıldı.")
     return notes
