@@ -253,3 +253,28 @@ async def test_pipeline_predictor_runs_full_chain(store):
     out = await pred(_case(1, 1.0), Candidate("v1", "v1"), Calibration())
     units, price = out["EU"]
     assert units > 0 and price > 25
+
+
+def _write_csv(path, header, rows):
+    path.write_text("\n".join([",".join(header)] + [",".join(map(str, r)) for r in rows]) + "\n", encoding="utf-8")
+
+
+def test_erp_cases_from_contract_csvs(tmp_path):
+    from app.panel.erp_cases import load_cases
+    _write_csv(tmp_path / "urunler.csv", ["urun_kodu", "urun_adi", "kategori", "ilk_satis_tarihi", "birim_maliyet",
+                                          "maliyet_para_birimi", "kumas_karisimi", "kalip", "desen"],
+               [["U1", "Yün kaban", "kaban", "2025-09-01", "840", "TRY", "%80 yün", "oversize", "duz"]])
+    _write_csv(tmp_path / "skular.csv", ["sku_kodu", "urun_kodu"], [["U1-M", "U1"]])
+    _write_csv(tmp_path / "magazalar.csv", ["magaza_kodu", "ulke", "para_birimi"],
+               [["M-IST", "TR", "TRY"], ["M-BER", "DE", "EUR"]])
+    _write_csv(tmp_path / "doviz_kurlari.csv", ["tarih", "para_birimi", "try_karsiligi"],
+               [["2025-08-01", "USD", "42"], ["2025-08-01", "EUR", "48"]])
+    _write_csv(tmp_path / "satislar.csv", ["tarih", "magaza_kodu", "sku_kodu", "adet", "net_tutar", "kampanya_kodu"],
+               [["2025-09-02", "M-IST", "U1-M", 2, 4200, ""], ["2025-10-01", "M-IST", "U1-M", 1, 1500, "K1"],
+                ["2025-09-10", "M-BER", "U1-M", 3, 300, ""], ["2026-03-01", "M-IST", "U1-M", 9, 1, ""]])
+    [case] = load_cases(tmp_path)
+    assert case.launch_date == date(2025, 9, 1) and float(case.request.unit_cost) == 20.0
+    assert case.actuals["TR"].units == 3  # 120 gün dışındaki satış sayılmaz
+    assert case.actuals["TR"].full_price == pytest.approx(50.0)  # kampanyasız: 4200 TL / 2 / 42
+    assert case.actuals["EU"].full_price == pytest.approx(100 * 48 / 42)
+    assert case.request.target_regions == ["EU", "TR"]

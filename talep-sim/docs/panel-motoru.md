@@ -76,7 +76,21 @@ Katsayılar bölge başına (1.0 = düzeltme yok): `demand_scale` (talep), `pric
 az gözlemde 1.0'a doğru büzülür (2-3 ürünle aşırı düzeltme yapılmaz). Diğer ikisi backtest adaylarıyla
 denenir.
 
-ERP verisi (Nebim V3 → PostgreSQL aktarımı) hazır olduğunda kullanım:
+ERP verisi, ERP tahmin çalışmasındaki CSV veri sözleşmesiyle (`talep-sim/tahmin`, Nebim V3 → PostgreSQL
+aktarımı ya da `python -m tahmin sentetik` çıktısı) doğrudan okunur (`app/panel/erp_cases.py`):
+
+```bash
+cd talep-sim/backend
+.venv/bin/python -m app.panel durum
+.venv/bin/python -m app.panel geriye-test <csv_klasoru> --surum v1 --surum v2 --usd-try 42 --en-fazla 30 --kisi 8 --terfi
+```
+
+Her ürün × bölge × kişi bir LLM çağrısıdır ve adaylar ile kalibrasyonlu tekrar koşu bunu katlar; Mac'te
+30 ürünlük bir karşılaştırma saatler sürebilir, gece çalıştır ya da `--en-fazla 10 --bolge TR` ile küçült.
+Sentetik veriyle (242 ürün) akış sınandı; sahte LLM ile çıkan isabet sayıları anlamsızdır. Stok bitişi bu
+adaptörde henüz düzeltilmiyor (stoğu erken biten ürünün talebi düşük görünür).
+
+Python'dan kullanım:
 
 ```python
 from datetime import date
@@ -95,7 +109,7 @@ print(promote(store, results))             # en az 5 puan daha iyiyse v2 aktif o
 Ürünler zaman sırasına göre bölünür: eski ürünlerde katsayılar uydurulur, yeni ürünlerde sınanır. Gerçek
 satış geldikçe `DriftMonitor(store.root / "accuracy.jsonl").record(...)` ile kaydedilir; son 90 günün hatası
 önceki dönemden belirgin kötüyse ya da tahminler hep aynı yöne kayıyorsa bölge "sapma var" olarak işaretlenir.
-ERP aktarımı henüz yok; arayüzler hazır ve sentetik verilerle test edildi.
+Gerçek müşteri verisi henüz yok; akış sentetik veriyle test edildi.
 
 ## Adem'in Mac'inde çalıştırma (MacBook Air M2, 16 GB, Ollama)
 
