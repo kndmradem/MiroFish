@@ -222,7 +222,7 @@ async def stop(cid: str) -> RunStatus:
 
 def _result(cid: str, store: CollectionStore, whatif: Optional[WhatIf]) -> CollectionResult:
     col = _load(store, cid)
-    return summarize(col, store.results(cid, [i.sku for i in col.items]), _fx(col), whatif)
+    return summarize(col, store.results(cid, [i.sku for i in col.items]), _fx(col), whatif, showcase=store.showcase(cid))
 
 
 @router.get("/{cid}/result", response_model=CollectionResult)

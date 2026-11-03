@@ -111,6 +111,13 @@ class CollectionStore:
     def results(self, cid: str, skus: List[str]) -> Dict[str, dict]:
         return {s: r for s in skus if (r := self.load_result(cid, s)) is not None}
 
+    def showcase(self, cid: str) -> Dict[str, list]:
+        from .showcase import load_jsonl
+        base = self.dir(cid) / "showcase"
+        if not base.exists():
+            return {}
+        return {p.stem: list(load_jsonl(p).values()) for p in sorted(base.glob("*.jsonl"))}
+
     def save_brand(self, cid: str, profile: dict) -> None:
         (self.dir(cid) / "brand.json").write_text(json.dumps(profile, ensure_ascii=False), encoding="utf-8")
 

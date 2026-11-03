@@ -49,21 +49,21 @@ class PanelLLM:
         self.gate = asyncio.Semaphore(max(1, concurrency))
         self.calls = 0
 
-    def _format(self, n_steps: int) -> Optional[dict]:
+    def _format(self, n_steps: int, schema: Optional[dict] = None) -> Optional[dict]:
         if self.guided == "json_schema":
             return {"type": "json_schema", "json_schema": {"name": "panel_answer", "strict": True,
-                                                           "schema": answer_schema(n_steps)}}
+                                                           "schema": schema or answer_schema(n_steps)}}
         if self.guided == "json_object":
             return {"type": "json_object"}
         return None
 
-    async def _chat(self, messages: List[dict], n_steps: int, seed: Optional[int]) -> str:
+    async def _chat(self, messages: List[dict], n_steps: int, seed: Optional[int], schema: Optional[dict] = None) -> str:
         body = {"model": self.model, "messages": messages, "temperature": self.temperature,
                 "max_tokens": self.max_tokens}
         if seed is not None:
             body["seed"] = seed
         while True:
-            fmt = self._format(n_steps)
+            fmt = self._format(n_steps, schema)
             if fmt:
                 body["response_format"] = fmt
             else:
@@ -82,6 +82,31 @@ class PanelLLM:
             if resp.status_code >= 400:
                 raise httpx.HTTPStatusError(http_error_text(resp), request=resp.request, response=resp)
             return resp.json()["choices"][0]["message"]["content"] or ""
+
+    async def ask_json(self, system: str, user: str, schema: dict, parse, seed: Optional[int] = None) -> PanelReply:
+        """Şemalı genel soru (ör. koleksiyon vitrin turu). `parse(text)` geçerli cevabı ya da None döner;
+        okunamazsa bir kez düzeltme istenir."""
+        messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+        async with self.gate:
+            try:
+                text = await self._chat(messages, 0, seed, schema)
+            except (httpx.HTTPError, KeyError, IndexError, ValueError) as e:
+                return PanelReply(None, "error", "", f"{type(e).__name__}: {e}")
+            answer = parse(text)
+            if answer is not None:
+                return PanelReply(answer, "json", text)
+            for _ in range(self.repair_retries):
+                messages += [{"role": "assistant", "content": text[:1500]},
+                             {"role": "user", "content": "Cevabın okunamadı. Yalnızca istenen biçimde geçerli bir JSON nesnesi yaz, "
+                                                         "harfleri listede verilenlerden seç."}]
+                try:
+                    text = await self._chat(messages, 0, seed, schema)
+                except (httpx.HTTPError, KeyError, IndexError, ValueError):
+                    break
+                answer = parse(text)
+                if answer is not None:
+                    return PanelReply(answer, "repaired", text)
+            return PanelReply(None, "failed", text)
 
     async def ask(self, system: str, user: str, ladder: List[float], seed: Optional[int] = None) -> PanelReply:
         messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]

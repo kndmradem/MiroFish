@@ -52,8 +52,29 @@ ya da ekrandan.
 Yeni bağımlılıklar: `openpyxl`, `python-multipart` (`requirements.txt`). Koleksiyonlar `backend/collections_data/`
 altında saklanır (`COLLECTIONS_DIR` ile değiştirilebilir, git'e girmez).
 
+## Marka
+
+Marka tekli ekrandaki gibi ekranda girilir: ad, notlar, "Profil çıkar", sonra segment, fiyat çarpanı, fiyat
+duyarlılığı, çekim gücü ve bölge bilinirliği elle düzeltilebilir. Ekrandaki profil Excel'deki marka alanından önce
+gelir. Marka yoksa nötr varsayılan (× 2.7) kullanılır. Marka değişirse ürünler yeniden sorulur (girdi özeti markayı da
+içerir). Özet sekmesindeki "Marka etkisi" kartı fiyat seviyesine etkiyi (çarpan ÷ 2.7 − 1) ve her bölgede talep
+puanına etkisini dayanak etiketleriyle gösterir. Hiçbir marka adı kodda sabit değildir.
+
+## Vitrin turu (panel motoru)
+
+Tek tek değerlendirmeden sonra aynı kişiler ürünleri gruplar halinde bir arada görür (varsayılan en fazla 8 ürün;
+7B model için daha büyüğü önerilmez). Koleksiyon tek gruba sığıyorsa sıra kişiden kişiye döndürülür; sığmıyorsa
+her kişi için ürünler iki kez karıştırılıp eşit gruplara bölünür. Ürünler A, B, C harfleriyle verilir, SKU prompta
+girmez. Sorular: en çok almak istediği (en fazla 3), kesinlikle almayacağı (en fazla 2), birlikte alacağı çiftler,
+birbirinin yerine geçen çiftler, kaç parça alacağı, tek cümle yorum. Cevaplar `showcase/<bölge>.jsonl` dosyasına
+yazılır; koşu kesilirse kalan gruplar sorulur.
+
+Sonuç "Vitrin" sekmesinde: vitrin sırası (en çok seçilen − almam denen), kombin ve ikame çiftleri, tek tek sıralama ile
+uyum (sıra korelasyonu), **sıra etkisi kontrolü** (seçimlerin listede ilk/orta/son konuma dağılımı beklenene göre;
+beklenenin 1.5 katını aşarsa ve en az 20 seçim varsa uyarı). Kombin ve vitrinde belirgin güçlü/zayıf ürünler öneri
+olarak Özet'e de düşer. Ek süre: kişi başı grup sayısı × bölge kadar ek LLM sorusu.
+
 ## Henüz yok (sonraki adım)
 
-Vitrin turu (panel ürünleri 8'li gruplar halinde, kişiye göre karıştırılmış sırayla bir arada görüp seçim yapar),
-kombin çiftleri, sıra etkisi teşhisi, ERP'den beden/renk kırılımı. Tasarım: proje dosyalarında
+ERP'den beden/renk kırılımı, vitrin sonucunun bütçe dağılımına katılması. Tasarım: proje dosyalarında
 `talep-sim/koleksiyon/koleksiyon-degerlendirme-tasarimi.md`.

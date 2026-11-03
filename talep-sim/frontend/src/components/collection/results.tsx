@@ -42,7 +42,7 @@ function Tile({ label, value, sub, m }: { label: string; value: string; sub?: st
   );
 }
 
-const TABS = ["Özet", "Ürünler", "Bölgeler", "Fiyat", "Bütçe"] as const;
+const TABS = ["Özet", "Ürünler", "Vitrin", "Bölgeler", "Fiyat", "Bütçe"] as const;
 type Tab = (typeof TABS)[number];
 const FIT_CLASS = { "altında": "text-sky-700", "içinde": "text-emerald-700", "üstünde": "text-rose-700" } as const;
 
@@ -113,6 +113,7 @@ export function CollectionResults({ base }: { base: CollectionResult }) {
       <CardContent>
         {tab === "Özet" && <Summary res={res} m={m} />}
         {tab === "Ürünler" && <Items res={res} items={allItems} excluded={excluded} onExclude={toggleExclude} m={m} />}
+        {tab === "Vitrin" && <Showcase res={res} />}
         {tab === "Bölgeler" && <Heatmap res={res} />}
         {tab === "Fiyat" && <Prices res={res} m={m} scenario={scenario} setScenario={setScenario} />}
         {tab === "Bütçe" && <Budget res={res} m={m} scenario={scenario} setScenario={setScenario} />}
@@ -143,7 +144,7 @@ function Summary({ res, m }: { res: CollectionResult; m: (v: number | null | und
         <div className="grid gap-1 rounded-lg border p-3">
           <div className="flex items-center justify-between text-xs text-muted-foreground">Ürün rolleri<BasisChip basis="kural varsayımı" how="Koleksiyon içi sıra, hevesli kişi oranı ve görüş ayrılığından kurallarla" /></div>
           <div className="flex flex-wrap gap-1.5 pt-1">
-            {(["hero", "çekirdek", "destek", "riskli"] as const).map((r) => (
+            {(["hero", "çekirdek", "tamamlayıcı", "destek", "riskli"] as const).filter((r) => r !== "tamamlayıcı" || s.roles[r]).map((r) => (
               <span key={r} className={cn("rounded-full border px-2 py-0.5 text-xs", ROLE_CLASS[r])}>{ROLE_LABEL[r]} {s.roles[r] ?? 0}</span>
             ))}
           </div>
@@ -260,7 +261,7 @@ function Items({ res, items, excluded, onExclude, m }: {
         <TableHeader>
           <TableRow>
             <TableHead className="w-6" /><TableHead>Ürün</TableHead><TableHead>Sıra</TableHead><TableHead className="text-right">Talep</TableHead>
-            <TableHead>Koleksiyona göre</TableHead><TableHead className="text-right">Hevesli</TableHead><TableHead>Rol (hedef → panel)</TableHead>
+            <TableHead>Koleksiyona göre</TableHead><TableHead className="text-right">Hevesli</TableHead><TableHead className="text-right">Vitrin sırası</TableHead><TableHead>Rol (hedef → panel)</TableHead>
             <TableHead>Fiyat uyumu</TableHead><TableHead className="text-right">Önerilen adet</TableHead><TableHead>Bayraklar</TableHead><TableHead>Çıkar</TableHead>
           </TableRow>
         </TableHeader>
@@ -300,6 +301,9 @@ function Items({ res, items, excluded, onExclude, m }: {
                     )}
                   </TableCell>
                   <TableCell className="text-right">{it.enthusiast_pct.value != null ? `%${it.enthusiast_pct.value}` : "–"}</TableCell>
+                  <TableCell className="text-right" title="Ürünler bir arada gösterildiğinde seçilme sırası">
+                    {it.showcase ? <><b>{it.showcase.rank}</b><div className="text-[11px] text-muted-foreground">en çok %{it.showcase.best_pct}</div></> : "–"}
+                  </TableCell>
                   <TableCell title={it.role_why}>
                     <span className="text-xs text-muted-foreground">{it.declared_role ? `${it.declared_role} → ` : ""}</span>
                     <span className={cn("rounded-full border px-2 py-0.5 text-xs", ROLE_CLASS[it.role])}>{ROLE_LABEL[it.role]}</span>
@@ -314,7 +318,7 @@ function Items({ res, items, excluded, onExclude, m }: {
                 </TableRow>
                 {open === it.sku && (
                   <TableRow className="bg-muted/30 hover:bg-muted/30">
-                    <TableCell colSpan={11}>
+                    <TableCell colSpan={12}>
                       <div className="grid gap-2 py-1">
                         <div className="text-xs text-muted-foreground">{it.role_why}</div>
                         <Table>
@@ -351,6 +355,87 @@ function Items({ res, items, excluded, onExclude, m }: {
           })}
         </TableBody>
       </Table>
+    </div>
+  );
+}
+
+function Showcase({ res }: { res: CollectionResult }) {
+  const v = res.showcase;
+  if (!v) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Bu koşuda vitrin turu yok. Panel motoruyla (SIM_ENGINE=panel) &quot;Vitrin turu&quot; kutusu işaretli çalıştırın; tek tek sonuçlar
+        yeniden sorulmaz, yalnızca vitrin soruları eklenir.
+      </p>
+    );
+  }
+  const name = (sku: string) => res.items.find((i) => i.sku === sku)?.name ?? sku;
+  const items = res.items.filter((i) => i.showcase).sort((a, b) => a.showcase!.rank - b.showcase!.rank);
+  const bar = (p: number, cls: string) => <div className="h-2 rounded bg-muted"><div className={cn("h-2 rounded", cls)} style={{ width: `${Math.min(100, p)}%` }} /></div>;
+  return (
+    <div className="grid gap-5">
+      <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+        Panel ürünleri en fazla {v.block_size} ürünlük gruplar halinde, her kişide farklı karıştırılmış sırayla bir arada gördü ve seçti
+        <BasisChip basis="ajan" />. {v.n_persons} kişi, {v.n_answers} grup cevabı{v.n_failed ? `, ${v.n_failed} okunamadı` : ""}
+        {v.mean_n_buy != null ? ` · kişi başı bir gruptan ortalama ${v.mean_n_buy} parça` : ""}.
+        {v.agreement_pct != null && ` Tek tek sıralama ile vitrin sıralaması ${
+          v.agreement_pct >= 60 ? "büyük ölçüde aynı" : v.agreement_pct >= 30 ? "kısmen benzer" : v.agreement_pct > -30 ? "birbirinden bağımsız" : "çoğunlukla ters"
+        } (sıra korelasyonu ${(v.agreement_pct / 100).toFixed(2)}; 1 tam aynı, 0 ilişkisiz, -1 tam ters). Fark büyükse ürünler yan yana görülünce farklı algılanıyor demektir.`}
+      </p>
+      <div className={cn("rounded-md border p-3 text-sm", v.position_warning ? "border-amber-300 bg-amber-50" : "")}>
+        <div className="mb-2 flex items-center gap-2 font-medium">Sıra etkisi kontrolü <BasisChip basis="ajan" how="Seçilen ürünlerin listedeki konumu" /></div>
+        <div className="grid gap-1 sm:grid-cols-3">
+          {v.position.map((p) => (
+            <div key={p.position} className="text-xs">
+              <div>{p.position === "ilk" ? "Listede ilk" : p.position === "son" ? "Listede son" : "Ortadakiler"}: seçimlerin %{p.pick_pct} <span className="text-muted-foreground">(beklenen %{p.expected_pct})</span></div>
+              {bar(p.expected_pct ? (50 * p.pick_pct) / p.expected_pct : 0, p.expected_pct && p.pick_pct > 1.5 * p.expected_pct ? "bg-amber-500" : "bg-emerald-500")}
+            </div>
+          ))}
+        </div>
+        <div className="mt-2 text-xs">{v.position_warning ?? "Seçimler listedeki konuma göre belirgin kaymıyor."}</div>
+      </div>
+      <Table>
+        <TableHeader><TableRow>
+          <TableHead>Vitrin sırası</TableHead><TableHead>Ürün</TableHead><TableHead>En çok seçilen</TableHead><TableHead>Almam denen</TableHead>
+          <TableHead className="text-right">Kombinde</TableHead><TableHead className="text-right">Tek tek sırası</TableHead><TableHead>Not</TableHead>
+        </TableRow></TableHeader>
+        <TableBody>
+          {items.map((i) => {
+            const x = i.showcase!;
+            return (
+              <TableRow key={i.sku}>
+                <TableCell><b>{x.rank}</b></TableCell>
+                <TableCell>{i.name}<div className="text-[11px] text-muted-foreground">{x.shown} kez gösterildi</div></TableCell>
+                <TableCell className="w-40"><div className="text-xs">%{x.best_pct}</div>{bar(x.best_pct, "bg-emerald-500")}</TableCell>
+                <TableCell className="w-40"><div className="text-xs">%{x.worst_pct}</div>{bar(x.worst_pct, "bg-rose-400")}</TableCell>
+                <TableCell className="text-right">{x.together}</TableCell>
+                <TableCell className="text-right">{x.single_rank ?? "–"}</TableCell>
+                <TableCell className="text-xs">{i.flags.filter((f) => f.startsWith("vitrinde")).join(", ")}{i.role === "tamamlayıcı" ? " tamamlayıcı parça" : ""}</TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid content-start gap-1">
+          <h3 className="text-sm font-medium">Birlikte alınan ürünler (kombin)</h3>
+          {v.together_pairs.length ? v.together_pairs.map((p) => (
+            <div key={p.a + p.b} className="text-sm">{name(p.a)} + {name(p.b)} <span className="text-muted-foreground">· {p.count} kez, yan yana gösterildiklerinde %{p.pct}</span></div>
+          )) : <p className="text-xs text-muted-foreground">En az 2 kez birlikte seçilen çift yok.</p>}
+        </div>
+        <div className="grid content-start gap-1">
+          <h3 className="text-sm font-medium">Birbirinin yerine geçen ürünler</h3>
+          {v.substitute_pairs.length ? v.substitute_pairs.map((p) => (
+            <div key={p.a + p.b} className="text-sm">{name(p.a)} / {name(p.b)} <span className="text-muted-foreground">· {p.count} kişi &quot;ikisinden birini&quot; dedi</span></div>
+          )) : <p className="text-xs text-muted-foreground">En az 2 kişinin işaretlediği çift yok.</p>}
+        </div>
+      </div>
+      {v.comments.length > 0 && (
+        <div className="grid gap-1">
+          <h3 className="flex items-center gap-2 text-sm font-medium">Koleksiyon hakkında panel yorumlarından örnekler <BasisChip basis="ajan" /></h3>
+          {v.comments.map((c, i) => <div key={i} className="text-sm text-muted-foreground">“{c}”</div>)}
+        </div>
+      )}
     </div>
   );
 }

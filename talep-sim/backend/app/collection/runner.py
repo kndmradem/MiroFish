@@ -17,6 +17,7 @@ from typing import Awaitable, Callable, Dict, Optional
 from ..advisor import Advisor
 from ..models import Assumptions, BrandProfile, PredictionRequest
 from .models import Collection, CollectionItem, RunOptions, RunStatus
+from . import showcase
 from .store import CollectionStore
 
 log = logging.getLogger("talep-sim.collection")
@@ -113,6 +114,56 @@ class CollectionRunner:
         store.save_brand(col.id, {"profile": json.loads(brand.model_dump_json()), "notes": col.meta.brand_notes})
         return brand
 
+    @staticmethod
+    async def _showcase(col, opts, store, engine, brand, regions, fx_rate, say, st):
+        """Tek tek turdan sonra vitrin turu. Yalnızca panel motorunda (kişi ve LLM erişimi gerekir)."""
+        if not (hasattr(engine, "llm") and hasattr(engine, "store") and hasattr(engine.llm, "ask_json")):
+            say("Vitrin turu atlandı: yalnızca panel motorunda (SIM_ENGINE=panel) çalışır")
+            return
+        res = store.results(col.id, [i.sku for i in col.items])
+        ok = {s: r for s, r in res.items() if r.get("response")}
+        if len(ok) < 3:
+            say("Vitrin turu atlandı: en az 3 değerlendirilmiş ürün gerekli")
+            return
+        to_usd = (lambda v: v / fx_rate) if col.meta.currency == "TRY" else (lambda v: v)
+        items = {i.sku: i for i in col.items}
+        cards = {s: r["response"].get("product_card") or {"product_name": items[s].name} for s, r in ok.items()}
+        sig = hashlib.sha1(json.dumps([sorted((s, r.get("input_hash")) for s, r in ok.items()),
+                                       brand.model_dump_json() if brand else "", opts.block_size,
+                                       {s: items[s].planned_price for s in ok}],
+                                      sort_keys=True, default=str).encode()).hexdigest()[:16]
+        base = store.dir(col.id) / "showcase"
+        base.mkdir(parents=True, exist_ok=True)
+        for region in regions:
+            path = base / f"{region}.jsonl"
+            meta = base / f"{region}.sig"
+            if opts.rerun or not meta.exists() or meta.read_text() != sig:
+                path.unlink(missing_ok=True)
+                meta.write_text(sig)
+            prices = {}
+            for s, r in ok.items():
+                pp = items[s].planned_price
+                reg = next((x for x in r["response"]["regional_breakdown"] if x["region"] == region), None)
+                prices[s] = to_usd(pp) if pp else (float(reg["optimal_sale_price"]) if reg else None)
+            done = showcase.load_jsonl(path)
+
+            def save(rec, _p=path):
+                with _p.open("a", encoding="utf-8") as f:
+                    f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+            def note(msg):
+                st.detail = msg
+
+            say(f"{region} vitrin turu başlıyor ({len(ok)} ürün, en fazla {opts.block_size} ürünlük gruplar)")
+            try:
+                await showcase.run_region(engine, region, f"koleksiyon:{col.id}", brand, cards, prices,
+                                          fx_rate if region == "TR" else None, opts.block_size, done, save, note)
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                log.exception("Vitrin turu düştü: %s", region)
+                say(f"{region} vitrin turu hata verdi: {type(e).__name__}: {e}")
+
     async def _run(self, col, opts, store, engine, profiler, predict, fx_rate, st: RunStatus):
         def say(msg: str):
             st.detail = msg
@@ -181,6 +232,8 @@ class CollectionRunner:
                     store.save_result(col.id, it.sku, {"error": str(detail)[:500], "input_hash": h})
                     say(f"{it.name}: hata ({str(detail)[:160]})")
                 st.done += 1
+            if opts.showcase:
+                await self._showcase(col, opts, store, engine, brand, regions, fx_rate, say, st)
             col.status = "bitti"
             say(f"Bitti: {st.done - len(st.failed)} ürün değerlendirildi" + (f", {len(st.failed)} hata" if st.failed else ""))
         except asyncio.CancelledError:

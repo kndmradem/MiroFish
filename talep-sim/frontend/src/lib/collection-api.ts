@@ -4,7 +4,7 @@ import { normalizePrediction, try_, usd, type BrandProfile, type PredictionRespo
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export type Basis = "ajan" | "kural varsayımı" | "LLM tahmini" | "ERP" | "kullanıcı girdisi";
-export type Role = "hero" | "çekirdek" | "destek" | "riskli" | "belirsiz";
+export type Role = "hero" | "çekirdek" | "tamamlayıcı" | "destek" | "riskli" | "belirsiz";
 export type DeclaredRole = "hero" | "çekirdek" | "tamamlayıcı" | "deneme";
 
 export interface CollectionItem {
@@ -109,6 +109,24 @@ export interface ItemResult {
   planned_qty: number | null;
   flags: string[];
   failed_regions: string[];
+  showcase: ShowcaseItem | null;
+}
+
+export interface ShowcaseItem { shown: number; best: number; worst: number; score: number; best_pct: number; worst_pct: number; rank: number; single_rank: number | null; together: number }
+export interface PairCount { a: string; b: string; count: number; pct: number }
+export interface ShowcaseSummary {
+  n_answers: number;
+  n_failed: number;
+  n_persons: number;
+  block_size: number;
+  by_region: Record<string, number>;
+  together_pairs: PairCount[];
+  substitute_pairs: PairCount[];
+  position: { position: string; pick_pct: number; expected_pct: number }[];
+  position_warning: string | null;
+  mean_n_buy: number | null;
+  comments: string[];
+  agreement_pct: number | null;
 }
 
 export interface ReachPoint { k: number; sku: string; name: string; reach_pct: number; added_pct: number }
@@ -164,6 +182,7 @@ export interface CollectionResult {
   data_basis: Record<string, unknown> | null;
   panel_shared: boolean;
   brand_effect: BrandEffect | null;
+  showcase: ShowcaseSummary | null;
 }
 
 export interface WhatIf {
@@ -217,7 +236,7 @@ export async function updateMeta(cid: string, meta: CollectionMeta): Promise<Col
   }));
 }
 
-export async function startRun(cid: string, opts: { regions?: string[]; only?: string[]; rerun?: boolean } = {}): Promise<RunStatus> {
+export async function startRun(cid: string, opts: { regions?: string[]; only?: string[]; rerun?: boolean; showcase?: boolean; block_size?: number } = {}): Promise<RunStatus> {
   return json(await fetch(`${API_URL}/api/collections/${cid}/run`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(opts),
   }));
@@ -242,11 +261,12 @@ export const money = (usdValue: number | null | undefined, currency: "TRY" | "US
   usdValue == null ? "–" : currency === "TRY" ? try_(usdValue * fx) : usd(usdValue);
 
 export const ROLE_LABEL: Record<Role, string> = {
-  hero: "Hero", "çekirdek": "Çekirdek", destek: "Destek", riskli: "Riskli", belirsiz: "Belirsiz",
+  hero: "Hero", "çekirdek": "Çekirdek", "tamamlayıcı": "Tamamlayıcı", destek: "Destek", riskli: "Riskli", belirsiz: "Belirsiz",
 };
 export const ROLE_CLASS: Record<Role, string> = {
   hero: "bg-emerald-100 text-emerald-900 border-emerald-300",
   "çekirdek": "bg-sky-100 text-sky-900 border-sky-300",
+  "tamamlayıcı": "bg-violet-100 text-violet-900 border-violet-300",
   destek: "bg-slate-100 text-slate-800 border-slate-300",
   riskli: "bg-rose-100 text-rose-900 border-rose-300",
   belirsiz: "bg-muted text-muted-foreground",

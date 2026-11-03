@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from ..models import Assumptions, BrandProfile, Region
 
 Basis = Literal["ajan", "kural varsayımı", "LLM tahmini", "ERP", "kullanıcı girdisi"]
-Role = Literal["hero", "çekirdek", "destek", "riskli", "belirsiz"]
+Role = Literal["hero", "çekirdek", "tamamlayıcı", "destek", "riskli", "belirsiz"]
 DeclaredRole = Literal["hero", "çekirdek", "tamamlayıcı", "deneme"]
 Currency = Literal["TRY", "USD"]
 
@@ -118,6 +118,8 @@ class RunOptions(BaseModel):
     only: Optional[List[str]] = Field(None, description="Yalnızca bu SKU'lar (deneme için)")
     rerun: bool = Field(False, description="Önceden hesaplanmış ürünleri de yeniden koş")
     allocation_objective: Literal["balanced", "profit", "blended"] = "balanced"
+    showcase: bool = Field(True, description="Vitrin turu: panel ürünleri gruplar halinde birlikte görüp seçer (panel motoru)")
+    block_size: int = Field(8, ge=3, le=15, description="Vitrinde bir grupta gösterilen en fazla ürün")
 
 
 class RunStatus(BaseModel):
@@ -166,6 +168,46 @@ class ItemRegion(BaseModel):
     confidence: str = ""
 
 
+class ShowcaseItem(BaseModel):
+    shown: int
+    best: int
+    worst: int
+    score: float = Field(..., description="(en iyi - en kötü) / gösterim, -1..1")
+    best_pct: float
+    worst_pct: float
+    rank: int
+    single_rank: Optional[int] = Field(None, description="Tek tek bakıştaki sıra")
+    together: int = Field(0, description="Kombin çiftlerinde seçilme sayısı")
+
+
+class PairCount(BaseModel):
+    a: str
+    b: str
+    count: int
+    pct: float = Field(..., description="İkisinin birlikte gösterildiği grupların yüzde kaçında seçildi")
+
+
+class PositionBias(BaseModel):
+    position: str
+    pick_pct: float
+    expected_pct: float
+
+
+class ShowcaseSummary(BaseModel):
+    n_answers: int
+    n_failed: int
+    n_persons: int
+    block_size: int
+    by_region: Dict[str, int] = Field(default_factory=dict)
+    together_pairs: List[PairCount] = Field(default_factory=list)
+    substitute_pairs: List[PairCount] = Field(default_factory=list)
+    position: List[PositionBias] = Field(default_factory=list)
+    position_warning: Optional[str] = None
+    mean_n_buy: Optional[float] = None
+    comments: List[str] = Field(default_factory=list)
+    agreement_pct: Optional[float] = Field(None, description="Tek tek ve vitrin sıralamasının uyumu (sıra korelasyonu x100)")
+
+
 class ItemResult(BaseModel):
     sku: str
     name: str
@@ -186,6 +228,7 @@ class ItemResult(BaseModel):
     planned_qty: Optional[int] = None
     flags: List[str] = Field(default_factory=list)
     failed_regions: List[str] = Field(default_factory=list)
+    showcase: Optional[ShowcaseItem] = None
 
 
 class ReachPoint(BaseModel):
@@ -216,7 +259,7 @@ class CategorySummary(BaseModel):
 
 
 class Action(BaseModel):
-    kind: Literal["çıkar", "fiyat", "kanibalizasyon", "derinlik", "eksik", "veri"]
+    kind: Literal["çıkar", "fiyat", "kanibalizasyon", "derinlik", "eksik", "veri", "kombin", "vitrin"]
     text: str
     skus: List[str] = Field(default_factory=list)
     basis: Basis
@@ -253,3 +296,4 @@ class CollectionResult(BaseModel):
     panel_shared: bool = Field(False, description="Bütün ürünlere aynı kişiler mi baktı (panel motoru)")
     brand_profile: Optional[BrandProfile] = None
     brand_effect: Optional[BrandEffect] = None
+    showcase: Optional[ShowcaseSummary] = None

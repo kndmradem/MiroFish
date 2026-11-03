@@ -22,9 +22,28 @@ OBJECTIONS = ("Fiyatı bütçeme göre yüksek", "Kumaşın bakımı zahmetli g�
               "Benzerini daha uygun fiyata bulabilirim", "Kesimi bana uymayabilir")
 
 
+def _h(text: str) -> int:
+    return int(hashlib.sha256(text.encode()).hexdigest()[:6], 16)
+
+
+def fake_showcase(system: str, user: str) -> dict:
+    """Koleksiyon vitrin turu cevabı: kişi x ürün ve ürün etkisinden deterministik seçim (anlamsız, akışı sınar)."""
+    items = re.findall(r"^([A-O])\) (.+?)\.", user, re.M)
+    score = {L: (_h(system + n) % 60) + (_h(n) % 40) for L, n in items}
+    order = sorted(score, key=lambda L: -score[L])
+    names = dict(items)
+    subs = [[a, b] for i, a in enumerate(order) for b in order[i + 1:]
+            if names[a].split()[0] == names[b].split()[0]][:1]
+    return {"best": order[:2], "worst": order[-1:], "together": [sorted([order[0], order[2]])] if len(order) > 2 else [],
+            "substitutes": [sorted(p) for p in subs], "n_buy": 1 + _h(system) % 2,
+            "comment": "deterministik test cevabı"}
+
+
 def fake_answer(messages: List[dict]) -> dict:
     system = next((m["content"] for m in messages if m["role"] == "system"), "")
     user = next((m["content"] for m in messages if m["role"] == "user"), "")
+    if "VİTRİN TURU" in user:
+        return fake_showcase(system, user)
     m = re.search(r"\((\d\.\d+)/1\)", system)
     sens = float(m.group(1)) if m else 0.5
     ladder = [float(x.replace(",", "")) for x in re.findall(r"^\d+\) \$([\d,\.]+)", user, re.M)]

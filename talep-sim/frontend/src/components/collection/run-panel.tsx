@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2, Play, Square } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { runStatus, startRun, stopRun, type Collection, type RunStatus } from "@/lib/collection-api";
 
@@ -13,6 +14,8 @@ const fmtDur = (s: number) => (s < 90 ? `${Math.round(s)} sn` : s < 5400 ? `${Ma
 export function RunPanel({ col, onFinished }: { col: Collection; onFinished: () => void }) {
   const [st, setSt] = useState<RunStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showcase, setShowcase] = useState(true);
+  const [blockSize, setBlockSize] = useState(8);
   const wasRunning = useRef(false);
   const lastDone = useRef(0);
 
@@ -40,7 +43,7 @@ export function RunPanel({ col, onFinished }: { col: Collection; onFinished: () 
   async function start(rerun = false) {
     setError(null);
     try {
-      const s = await startRun(col.id, { rerun });
+      const s = await startRun(col.id, { rerun, showcase, block_size: blockSize });
       wasRunning.current = true;
       setSt(s);
     } catch (e) {
@@ -52,6 +55,8 @@ export function RunPanel({ col, onFinished }: { col: Collection; onFinished: () 
   const pairs = col.items.length * regions;
   const elapsed = st?.started ? (st.finished ?? Date.now() / 1000) - st.started : 0;
   const eta = st?.running && st.done > 0 ? (elapsed / st.done) * (st.total - st.done) : null;
+  const n = col.items.length;
+  const groups = n <= blockSize ? 1 : Math.ceil(n / blockSize) * 2;
   const pct = st && st.total ? Math.round((100 * st.done) / st.total) : 0;
   return (
     <Card>
@@ -64,6 +69,19 @@ export function RunPanel({ col, onFinished }: { col: Collection; onFinished: () 
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3">
+        <label className="flex items-start gap-2 rounded-md border p-2 text-sm">
+          <Checkbox className="mt-0.5" checked={showcase} onCheckedChange={(v) => setShowcase(v === true)} disabled={st?.running} />
+          <span>
+            <b>Vitrin turu</b>: tek tek değerlendirmeden sonra her kişi ürünleri en fazla
+            <select className="mx-1 h-6 rounded border bg-background px-1 text-xs" value={blockSize} disabled={st?.running}
+              onChange={(e) => setBlockSize(Number(e.target.value))}>
+              {[4, 6, 8, 10, 12].map((k) => <option key={k} value={k}>{k}</option>)}
+            </select>
+            ürünlük gruplar halinde bir arada görür, kendisine özel karıştırılmış sırayla. En çok alacağı, almayacağı, birlikte alacağı
+            ve birinden birini seçeceği ürünleri işaretler. Kişi başı {groups} grup × {regions} bölge ek soru.
+            <span className="block text-xs text-muted-foreground">Yalnızca panel motorunda çalışır. Küçük yerel modelde (7B) 8&apos;den büyük grup önerilmez.</span>
+          </span>
+        </label>
         <div className="flex flex-wrap items-center gap-2">
           {!st?.running ? (
             <>

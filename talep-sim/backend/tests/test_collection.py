@@ -337,3 +337,81 @@ def test_brand_from_screen_drives_prices_and_triggers_rerun(client):
     p_lux = next(i for i in lux["items"] if i["sku"] == cheap["items"][0]["sku"])["regions"][0]["optimal_price"]
     assert p_lux > 2 * p_cheap
     assert lux["brand_effect"]["price_level_pct"] > 100 and not lux["brand_effect"]["warning"]
+
+
+# ---------- vitrin turu ----------
+
+from collections import Counter
+
+from app.collection import showcase as sc
+from app.collection.summary import summarize_showcase
+
+from .test_panel import FakeLLMServer
+
+
+def test_plan_blocks_small_collection_rotates_positions():
+    skus = [f"S{i}" for i in range(6)]
+    firsts = Counter()
+    for p in range(12):
+        blocks = sc.plan_blocks(skus, p, 12, 8, "seed")
+        assert len(blocks) == 1 and sorted(blocks[0]) == skus
+        firsts[blocks[0][0]] += 1
+    assert max(firsts.values()) <= 3 and len(firsts) >= 5     # her ürün başta yaklaşık eşit
+
+
+def test_plan_blocks_large_collection_each_item_twice():
+    skus = [f"S{i}" for i in range(20)]
+    blocks = sc.plan_blocks(skus, 3, 12, 8, "seed")
+    seen = Counter(x for b in blocks for x in b)
+    assert set(seen.values()) == {2} and all(len(set(b)) == len(b) <= 8 for b in blocks)
+    assert {len(b) for b in blocks} <= {6, 7}                   # 20 ürün -> 3 grup, eşit boy
+    assert blocks != sc.plan_blocks(skus, 4, 12, 8, "seed")    # kişiden kişiye farklı
+
+
+def test_parse_is_tolerant():
+    a = sc.parse('cevap: {"best": ["a", "Z", "B", "C", "D"], "worst": ["B", "E"], "together": [["A","C"],["C","A"],["A","A"]],'
+                 ' "substitutes": [["D","E"]], "n_buy": "2", "comment": "iyi"}', list("ABCDE"))
+    assert a["best"] == ["A", "C"] and a["worst"] == ["E"]     # Z geçersiz, B hem iyi hem kötü: çıkarıldı
+    assert a["together"] == [["A", "C"]] and a["substitutes"] == [["D", "E"]] and a["n_buy"] == 2
+    assert sc.parse("bilmiyorum", list("AB")) is None
+
+
+def test_position_bias_is_detected():
+    recs = []
+    for p in range(30):
+        order = [f"S{(p + i) % 5}" for i in range(5)]
+        recs.append({"region": "TR", "person": p, "order": order, "letters": dict(zip("ABCDE", order)),
+                     "answer": {"best": ["A"], "worst": ["E"], "together": [["A", "B"]], "substitutes": [], "n_buy": 1, "comment": ""}})
+    items, summ = summarize_showcase({"TR": recs}, [f"S{i}" for i in range(5)], {})
+    assert summ.position_warning and "ilk" in summ.position_warning
+    assert summ.position[0].pick_pct == 100.0 and summ.position[0].expected_pct == 20.0
+    assert all(v.shown == 30 for v in items.values())
+
+
+def test_showcase_end_to_end_with_panel_and_resume(client):
+    server = FakeLLMServer()
+    app.dependency_overrides[get_engine] = lambda: make_engine(server=server, panel_size=4, min_valid=2)
+    rows = [[f"SW27-1{i:02d}", f"{'Gömlek' if i < 5 else 'Etek'} model {i}", "Üst" if i < 5 else "Alt", "pamuk", 300 + i, 1200 + 50 * i,
+             None, None, None] for i in range(10)]
+    files = [("sheet", ("l.xlsx", xlsx(rows, {**META, "hedef_bolgeler": "TR"}), "application/octet-stream"))]
+    files += [("images", (f"{r[0]}.jpg", png(), "image/png")) for r in rows]
+    prev = client.post("/api/collections/import", files=files).json()
+    cid = prev["collection_id"]
+    client.post(f"/api/collections/{cid}/confirm", json={"meta": prev["meta"], "items": [p["item"] for p in prev["items"]]})
+    client.post(f"/api/collections/{cid}/run", json={"block_size": 4})
+    st = _wait(client, cid)
+    assert not st["failed"] and any("vitrin turu başlıyor" in line for line in st["log"]), st["log"]
+    showcase_prompts = [b for b in server.bodies if "VİTRİN TURU" in b["messages"][1]["content"]]
+    # 4 kişi x (10 ürün, 4'lük grup -> 3 grup x 2 tekrar = 6 grup)
+    assert len(showcase_prompts) == 4 * 6
+    assert not any("SW27-1" in b["messages"][1]["content"] for b in showcase_prompts)   # ürün kodu prompta yok
+    res = client.get(f"/api/collections/{cid}/result").json()
+    s = res["showcase"]
+    assert s["n_answers"] == 24 and s["n_persons"] == 4 and len(s["position"]) == 3
+    assert all(i["showcase"]["shown"] == 8 for i in res["items"])         # her ürün kişi başı 2 kez
+    assert s["together_pairs"]
+
+    n_before = len(server.bodies)
+    client.post(f"/api/collections/{cid}/run", json={"block_size": 4})
+    _wait(client, cid)
+    assert len(server.bodies) == n_before                                 # kaldığı yerden: hiçbir şey yeniden sorulmadı

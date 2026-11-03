@@ -15,7 +15,7 @@ from .. import brand as brandlib
 from ..allocation import DEMAND_SCENARIOS, STOP_P, p_sells
 from ..models import BrandProfile
 from .importer import norm
-from .models import (Action, BrandEffect, CannibalPair, CategorySummary, Collection, CollectionResult, CollectionSummary,
+from .models import (Action, BrandEffect, PairCount, PositionBias, ShowcaseItem, ShowcaseSummary, CannibalPair, CategorySummary, Collection, CollectionResult, CollectionSummary,
                      ItemRegion, ItemResult, Metric, ReachPoint, WhatIf)
 
 ENTHUSIAST = 70          # ilgi puanı bu ve üstü: "hevesli" (prompttaki ölçek: hevesli 70-95)
@@ -193,8 +193,100 @@ def brand_effect(used: Optional[dict], col: Collection, regions: List[str]) -> O
                        source=b.source, confidence=b.confidence, edited=b.edited, basis=basis, lines=lines, warning=warn)
 
 
+def summarize_showcase(records: Dict[str, list], skus: List[str], single_ranks: Dict[str, int]
+                       ) -> Tuple[Dict[str, ShowcaseItem], Optional[ShowcaseSummary]]:
+    """Vitrin turu cevaplarından ürün seçilme skoru, kombin ve ikame çiftleri, sıra etkisi kontrolü (ajan)."""
+    keep = set(skus)
+    recs = [r for rs in records.values() for r in rs]
+    ok = [r for r in recs if r.get("answer")]
+    if not ok:
+        return {}, None
+    shown = {s: 0 for s in skus}
+    best = {s: 0 for s in skus}
+    worst = {s: 0 for s in skus}
+    together: Dict[Tuple[str, str], int] = {}
+    subs: Dict[Tuple[str, str], int] = {}
+    co: Dict[Tuple[str, str], int] = {}
+    pos_pick = {"ilk": 0.0, "orta": 0.0, "son": 0.0}
+    pos_exp = {"ilk": 0.0, "orta": 0.0, "son": 0.0}
+    n_buy, comments, block = [], [], 0
+    for r in ok:
+        order, letters, a = r["order"], r["letters"], r["answer"]
+        block = max(block, len(order))
+        for x in order:
+            if x in keep:
+                shown[x] += 1
+        for i, x in enumerate(order):
+            for y in order[i + 1:]:
+                k = tuple(sorted((x, y)))
+                co[k] = co.get(k, 0) + 1
+        L = len(order)
+        picks = [letters[c] for c in a["best"] if c in letters]
+        for c in picks:
+            if c in keep:
+                best[c] += 1
+            i = order.index(c)
+            pos_pick["ilk" if i == 0 else "son" if i == L - 1 else "orta"] += 1
+        if picks:
+            pos_exp["ilk"] += len(picks) / L
+            pos_exp["son"] += len(picks) / L
+            pos_exp["orta"] += len(picks) * (L - 2) / L
+        for c in a["worst"]:
+            x = letters.get(c)
+            if x in keep:
+                worst[x] += 1
+        for dst, key in ((together, "together"), (subs, "substitutes")):
+            for p in a[key]:
+                x, y = letters.get(p[0]), letters.get(p[1])
+                if x in keep and y in keep:
+                    k = tuple(sorted((x, y)))
+                    dst[k] = dst.get(k, 0) + 1
+        n_buy.append(a["n_buy"])
+        if a.get("comment") and len(comments) < 6 and a["comment"] not in comments:
+            comments.append(a["comment"])
+    score = {s: ((best[s] - worst[s]) / shown[s]) if shown[s] else 0.0 for s in skus}
+    order_s = sorted([s for s in skus if shown[s]], key=lambda s: (-score[s], s))
+    rank = {s: i + 1 for i, s in enumerate(order_s)}
+    tog_count = {s: sum(v for k, v in together.items() if s in k) for s in skus}
+    items = {s: ShowcaseItem(shown=shown[s], best=best[s], worst=worst[s], score=round(score[s], 3),
+                             best_pct=_pct(best[s] / shown[s]), worst_pct=_pct(worst[s] / shown[s]), rank=rank[s],
+                             single_rank=single_ranks.get(s), together=tog_count[s])
+             for s in order_s}
+
+    def pairs(d):
+        out = [PairCount(a=k[0], b=k[1], count=v, pct=_pct(v / co[k]) if co.get(k) else 0.0) for k, v in d.items() if v >= 2]
+        return sorted(out, key=lambda p: (-p.count, -p.pct))[:10]
+
+    total = sum(pos_pick.values())
+    position = [PositionBias(position=k, pick_pct=_pct(pos_pick[k] / total) if total else 0.0,
+                             expected_pct=_pct(pos_exp[k] / total) if total else 0.0) for k in ("ilk", "orta", "son")]
+    warn = None
+    if total >= 20:
+        heavy = [p.position for p in position if p.position != "orta" and p.expected_pct and p.pick_pct > 1.5 * p.expected_pct]
+        if heavy:
+            warn = (f"Panel listenin {' ve '.join(heavy)} sırasındaki ürünleri beklenenden belirgin fazla seçti; vitrin "
+                    "sonuçlarında sıra etkisi olabilir. Sıralar kişiden kişiye karıştırıldığı için etki ürünlere dağılır "
+                    "ama küçük modelde güveni düşürür.")
+    elif total:
+        warn = "Sıra etkisini ölçmek için seçim sayısı az (20'nin altında); kontrol güvenilir değil."
+    agree = None
+    common = [s for s in order_s if s in single_ranks]
+    if len(common) >= 4:
+        a_r = {s: i for i, s in enumerate(sorted(common, key=lambda s: single_ranks[s]))}
+        b_r = {s: i for i, s in enumerate(sorted(common, key=lambda s: rank[s]))}
+        n = len(common)
+        d2 = sum((a_r[s] - b_r[s]) ** 2 for s in common)
+        agree = round(100 * (1 - 6 * d2 / (n * (n * n - 1))), 0)
+    summ = ShowcaseSummary(
+        n_answers=len(ok), n_failed=len(recs) - len(ok), n_persons=len({(r["region"], r["person"]) for r in ok}),
+        block_size=block, by_region={reg: sum(1 for r in rs if r.get("answer")) for reg, rs in records.items()},
+        together_pairs=pairs(together), substitute_pairs=pairs(subs), position=position, position_warning=warn,
+        mean_n_buy=round(statistics.fmean(n_buy), 2) if n_buy else None, comments=comments, agreement_pct=agree)
+    return items, summ
+
+
 def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif: Optional[WhatIf] = None,
-              objective: str = "balanced") -> CollectionResult:
+              objective: str = "balanced", showcase: Optional[Dict[str, list]] = None) -> CollectionResult:
     w = whatif or WhatIf()
     objective = w.allocation_objective or objective
     cur = col.meta.currency
@@ -242,6 +334,8 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
     ent_pct = {s: (len(ent[s]) / len(per_item_int[s]) if per_item_int.get(s) else None) for s in skus}
     disp = {s: (statistics.pstdev(per_item_int[s].values()) if len(per_item_int.get(s, {})) > 1 else None) for s in skus}
 
+    sc_items, sc_summary = summarize_showcase(showcase or {}, skus, ranks)
+
     # roller (kural varsayımı)
     n = len(skus)
     # eşit puanlı ürünler aynı yüzdelik dilimi alır (sıralama sırası rolü belirlemesin)
@@ -277,6 +371,14 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
             roles[s], why[s] = "çekirdek", "İlgi ortalamanın üstünde ve kişiler arasında görüş ayrılığı düşük: geniş kitleye güvenli"
         else:
             roles[s], why[s] = "destek", "İlgi orta seviyede; koleksiyonu tamamlayan ürün"
+
+    if sc_items:
+        tog = sorted((v.together for v in sc_items.values()), reverse=True)
+        cut = max(2, tog[max(0, len(tog) // 4 - 1)]) if tog else 2
+        for s_, v in sc_items.items():
+            if roles.get(s_) in ("destek", "riskli") and v.together >= cut:
+                roles[s_], why[s_] = "tamamlayıcı", (f"Tek başına ilgi orta/düşük ama vitrinde {v.together} kez kombin "
+                                                    "çiftinde seçildi: diğer ürünleri tamamlayan parça")
 
     # erişim (TURF): en az bir üründe hevesli olan kişi oranı
     reach_curve: List[ReachPoint] = []
@@ -325,6 +427,13 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
                     pairs.append(CannibalPair(a=a.sku, b=b.sku, category=a.category, overlap_pct=_pct(ov),
                                               why=f"İkisini de beğenen kişilerin örtüşmesi %{_pct(ov):g}, aynı kategori ve fiyatlar birbirine yakın"))
         pairs.sort(key=lambda p: -p.overlap_pct)
+    if sc_summary:
+        have = {tuple(sorted((p.a, p.b))) for p in pairs}
+        cat = {i.sku: i.category for i in evaluated}
+        for sp in sc_summary.substitute_pairs:
+            if (sp.a, sp.b) not in have and sp.pct >= 20:
+                pairs.append(CannibalPair(a=sp.a, b=sp.b, category=cat.get(sp.a, ""), overlap_pct=sp.pct,
+                                          why=f"Vitrinde {sp.count} kişi 'ikisinden birini alırım' dedi"))
 
     # bütçe dağıtımı (kural varsayımı)
     budget_total = w.total_budget if w.total_budget is not None else col.meta.total_budget
@@ -384,6 +493,12 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
             flags.append("hedef rol tutmadı")
         if failed:
             flags.append("bazı bölgeler hesaplanamadı")
+        sc = sc_items.get(s)
+        if sc and sc.single_rank and n >= 5:
+            if sc.single_rank - sc.rank >= max(3, n // 4):
+                flags.append("vitrinde daha güçlü")
+            elif sc.rank - sc.single_rank >= max(3, n // 4):
+                flags.append("vitrinde daha zayıf")
         lo_hi = intervals.get(s)
         out_items.append(ItemResult(
             sku=s, name=it.name, category=it.category, image=it.images[0] if it.images else None,
@@ -398,7 +513,8 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
             role=roles[s], role_why=why[s],
             recommended_qty=Metric(value=tq if it.unit_cost and budget_usd else None, basis="kural varsayımı",
                                    how="Koleksiyon bütçesinin satış hızına göre dağıtımı: talep panelden, kitle ve dönüşüm varsayımdan."),
-            qty_by_region=qty_item.get(s, {}), planned_qty=it.planned_qty, flags=flags, failed_regions=failed))
+            qty_by_region=qty_item.get(s, {}), planned_qty=it.planned_qty, flags=flags, failed_regions=failed,
+            showcase=sc_items.get(s)))
 
     # kategori özeti
     cats: Dict[str, List[ItemResult]] = {}
@@ -410,7 +526,7 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
         prices = [r.planned_price_usd for r in rs if r.planned_price_usd]
         fits = [x.price_fit for r in rs for x in r.regions if x.price_fit]
         categories.append(CategorySummary(
-            category=c, count=len(rs), roles={k: sum(r.role == k for r in rs) for k in ("hero", "çekirdek", "destek", "riskli")},
+            category=c, count=len(rs), roles={k: sum(r.role == k for r in rs) for k in ("hero", "çekirdek", "tamamlayıcı", "destek", "riskli")},
             price_min=min(prices) if prices else None, price_max=max(prices) if prices else None,
             mean_appeal=round(statistics.fmean(r.appeal.value or 0 for r in rs), 1),
             in_zone=sum(f == "içinde" for f in fits), out_zone=sum(f != "içinde" for f in fits)))
@@ -447,6 +563,23 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
         if r.role == "hero" and r.planned_qty and r.recommended_qty.value and r.planned_qty < 0.8 * r.recommended_qty.value:
             actions.append(Action(kind="derinlik", skus=[r.sku], basis="kural varsayımı",
                                   text=f"{r.name}: hero ürün; planlanan adet ({r.planned_qty}) önerilenin ({int(r.recommended_qty.value)}) belirgin altında, stok erken bitebilir."))
+    name_of = {r.sku: r.name for r in out_items}
+    if sc_summary:
+        for tp in sc_summary.together_pairs[:3]:
+            actions.append(Action(kind="kombin", skus=[tp.a, tp.b], basis="ajan",
+                                  text=f"{name_of.get(tp.a, tp.a)} ile {name_of.get(tp.b, tp.b)} vitrinde {tp.count} kez birlikte seçildi "
+                                       f"(yan yana gösterildikleri grupların %{tp.pct:g}'si). Birlikte sergileyin, kombin/set önerisi düşünün."))
+        for r in out_items:
+            if "vitrinde daha güçlü" in r.flags:
+                actions.append(Action(kind="vitrin", skus=[r.sku], basis="ajan",
+                                      text=f"{r.name}: tek başına sıra {r.showcase.single_rank}, koleksiyonun içinde sıra {r.showcase.rank}. "
+                                           "Diğer ürünlerin yanında daha çok seçiliyor; vitrinde ve kampanyada öne alın."))
+            elif "vitrinde daha zayıf" in r.flags:
+                actions.append(Action(kind="vitrin", skus=[r.sku], basis="ajan",
+                                      text=f"{r.name}: tek başına sıra {r.showcase.single_rank}, koleksiyonun içinde sıra {r.showcase.rank}. "
+                                           "Yanındaki ürünlere kaybediyor; benzer ürünle aynı yerde sergilemeyin."))
+        if sc_summary.position_warning and sc_summary.n_answers >= 20:
+            actions.append(Action(kind="veri", basis="ajan", text=sc_summary.position_warning))
     no_cost = [r.sku for r in out_items if "maliyet yok" in r.flags]
     if no_cost:
         actions.append(Action(kind="veri", skus=no_cost, basis="kullanıcı girdisi",
@@ -467,7 +600,7 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
     summary = CollectionSummary(
         n_items=len(items), n_evaluated=len(evaluated), n_failed=sum(1 for i in items if i.sku in results and not results[i.sku].get("response")),
         reach=reach, reach_by_region=reach_by_region, reach_curve=reach_curve,
-        roles={k: sum(r.role == k for r in out_items if r.regions) for k in ("hero", "çekirdek", "destek", "riskli", "belirsiz")},
+        roles={k: sum(r.role == k for r in out_items if r.regions) for k in ("hero", "çekirdek", "tamamlayıcı", "destek", "riskli", "belirsiz")},
         mean_appeal=Metric(value=round(statistics.fmean(appeal.values()), 1) if appeal else None, basis="ajan",
                            how="Ürünlerin talep skoru ortalaması."),
         categories=categories, cannibal_pairs=pairs, budget_total_usd=round(budget_usd, 2) if budget_usd else None,
@@ -478,4 +611,4 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
     regions = sorted({r.region for rs in per_item_regions.values() for r in rs}) or list(col.meta.target_regions)
     return CollectionResult(collection_id=col.id, name=col.meta.name, currency=cur, fx_rate=fx_rate, regions=regions,
                             items=out_items, summary=summary, notes=notes, data_basis=data_basis, panel_shared=shared,
-                            brand_profile=brand, brand_effect=brand_effect(brand, col, regions))
+                            brand_profile=brand, brand_effect=brand_effect(brand, col, regions), showcase=sc_summary)
