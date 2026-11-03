@@ -1,0 +1,466 @@
+"use client";
+
+import { Fragment, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
+import Link from "next/link";
+import type { EChartsOption } from "echarts";
+import { ChevronDown, ChevronRight, Download, ExternalLink, RotateCcw } from "lucide-react";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  exportUrl, imageUrl, money, ROLE_CLASS, ROLE_LABEL, whatIf,
+  type Basis, type CollectionResult, type ItemResult, type Metric, type WhatIf,
+} from "@/lib/collection-api";
+import { cn } from "@/lib/utils";
+
+const ReactECharts = dynamic(() => import("echarts-for-react"), { ssr: false });
+
+const BASIS_CLASS: Record<Basis, string> = {
+  ajan: "border-violet-300 bg-violet-50 text-violet-800",
+  "kural varsayımı": "border-amber-300 bg-amber-50 text-amber-800",
+  "LLM tahmini": "border-sky-300 bg-sky-50 text-sky-800",
+  ERP: "border-emerald-300 bg-emerald-50 text-emerald-800",
+  "kullanıcı girdisi": "border-slate-300 bg-slate-50 text-slate-700",
+};
+
+export function BasisChip({ basis, how }: { basis: Basis; how?: string }) {
+  return <span title={how} className={cn("rounded-full border px-1.5 py-px text-[10px] font-medium whitespace-nowrap", BASIS_CLASS[basis])}>{basis}</span>;
+}
+
+function Tile({ label, value, sub, m }: { label: string; value: string; sub?: string; m?: Metric }) {
+  return (
+    <div className="grid gap-1 rounded-lg border p-3">
+      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">{label}{m && <BasisChip basis={m.basis} how={m.how} />}</div>
+      <div className="text-2xl font-semibold">{value}</div>
+      {sub && <div className="text-xs text-muted-foreground">{sub}</div>}
+    </div>
+  );
+}
+
+const TABS = ["Özet", "Ürünler", "Bölgeler", "Fiyat", "Bütçe"] as const;
+type Tab = (typeof TABS)[number];
+const FIT_CLASS = { "altında": "text-sky-700", "içinde": "text-emerald-700", "üstünde": "text-rose-700" } as const;
+
+export function CollectionResults({ base }: { base: CollectionResult }) {
+  const [tab, setTab] = useState<Tab>("Özet");
+  const [scenario, setScenario] = useState<WhatIf>({});
+  const [res, setRes] = useState<CollectionResult>(base);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const active = !!(scenario.exclude?.length || Object.keys(scenario.planned_prices ?? {}).length || scenario.total_budget != null || scenario.allocation_objective);
+
+  useEffect(() => { setRes(base); setScenario({}); }, [base]);
+  useEffect(() => {
+    if (!active) { setRes(base); return; }
+    const t = setTimeout(() => {
+      setBusy(true);
+      whatIf(base.collection_id, scenario).then(setRes).catch((e) => setError(String(e.message ?? e))).finally(() => setBusy(false));
+    }, 400);
+    return () => clearTimeout(t);
+  }, [scenario, active, base]);
+
+  const cur = res.currency;
+  const fx = res.fx_rate;
+  const m = (v: number | null | undefined) => money(v, cur, fx);
+  const excluded = new Set(scenario.exclude ?? []);
+  const toggleExclude = (sku: string, on: boolean) =>
+    setScenario((s) => ({ ...s, exclude: on ? [...(s.exclude ?? []), sku] : (s.exclude ?? []).filter((x) => x !== sku) }));
+  const s = res.summary;
+  const allItems = useMemo(() => {
+    // çıkarılan ürünler de tabloda (soluk) kalsın ki geri alınabilsin
+    const map = new Map(res.items.map((i) => [i.sku, i]));
+    return [...res.items, ...base.items.filter((i) => !map.has(i.sku))].sort((a, b) => (a.rank.value ?? 999) - (b.rank.value ?? 999));
+  }, [res, base]);
+
+  return (
+    <Card>
+      <CardHeader className="gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <CardTitle className="text-base">4. Sonuç: {res.name}</CardTitle>
+            <CardDescription>
+              {s.n_evaluated}/{s.n_items} ürün değerlendirildi · bölgeler: {res.regions.join(", ")}
+              {res.panel_shared ? " · her bölgede bütün ürünlere aynı kişiler baktı" : ""}
+              {res.data_basis?.persona_version ? ` · persona ${String(res.data_basis.persona_version)}` : ""}
+              {res.data_basis?.context_as_of ? `, bağlam ${String(res.data_basis.context_as_of)}` : ""}
+            </CardDescription>
+          </div>
+          <a href={exportUrl(res.collection_id)} className="inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm hover:bg-muted">
+            <Download className="size-4" />Excel olarak indir
+          </a>
+        </div>
+        {active && (
+          <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Ne olur senaryosu açık{excluded.size ? `: ${excluded.size} ürün çıkarıldı` : ""}{Object.keys(scenario.planned_prices ?? {}).length ? `, ${Object.keys(scenario.planned_prices ?? {}).length} fiyat değişti` : ""}
+            {scenario.total_budget != null ? ", bütçe değişti" : ""}. Panel yeniden sorulmadı; sonuçlar kayıtlı cevaplardan yeniden hesaplandı.
+            <Button size="sm" variant="outline" onClick={() => setScenario({})}><RotateCcw className="size-3" />Geri al</Button>
+            {busy && <span className="text-xs">hesaplanıyor…</span>}
+          </div>
+        )}
+        {error && <div className="text-sm text-rose-600">{error}</div>}
+        <div className="flex flex-wrap gap-1 border-b">
+          {TABS.map((t) => (
+            <button key={t} onClick={() => setTab(t)}
+              className={cn("-mb-px border-b-2 px-3 py-1.5 text-sm", tab === t ? "border-primary font-medium" : "border-transparent text-muted-foreground")}>{t}</button>
+          ))}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {tab === "Özet" && <Summary res={res} m={m} />}
+        {tab === "Ürünler" && <Items res={res} items={allItems} excluded={excluded} onExclude={toggleExclude} m={m} />}
+        {tab === "Bölgeler" && <Heatmap res={res} />}
+        {tab === "Fiyat" && <Prices res={res} m={m} scenario={scenario} setScenario={setScenario} />}
+        {tab === "Bütçe" && <Budget res={res} m={m} scenario={scenario} setScenario={setScenario} />}
+      </CardContent>
+    </Card>
+  );
+}
+
+function Summary({ res, m }: { res: CollectionResult; m: (v: number | null | undefined) => string }) {
+  const s = res.summary;
+  const curve: EChartsOption = {
+    grid: { left: 40, right: 16, top: 16, bottom: 60 },
+    tooltip: { trigger: "axis", valueFormatter: (v) => `%${v}` },
+    xAxis: { type: "category", data: s.reach_curve.map((p) => p.name), axisLabel: { rotate: 30, fontSize: 10 } },
+    yAxis: { type: "value", max: 100, axisLabel: { formatter: "%{value}" } },
+    series: [
+      { type: "line", name: "Erişim", data: s.reach_curve.map((p) => p.reach_pct), smooth: true, areaStyle: { opacity: 0.15 } },
+      { type: "bar", name: "Bu ürünün eklediği", data: s.reach_curve.map((p) => p.added_pct), barWidth: 10, itemStyle: { opacity: 0.5 } },
+    ],
+  };
+  const sat = s.reach_curve.length;
+  return (
+    <div className="grid gap-5">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Tile label="Koleksiyon erişimi" m={s.reach} value={s.reach.value != null ? `%${s.reach.value}` : "–"}
+          sub={s.reach.value != null ? "panelin en az bir ürünü çok beğenen kısmı" : "kişi bazlı puan yok"} />
+        <Tile label="Ortalama talep skoru" m={s.mean_appeal} value={s.mean_appeal.value != null ? String(s.mean_appeal.value) : "–"} sub="0-100" />
+        <div className="grid gap-1 rounded-lg border p-3">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">Ürün rolleri<BasisChip basis="kural varsayımı" how="Koleksiyon içi sıra, hevesli kişi oranı ve görüş ayrılığından kurallarla" /></div>
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {(["hero", "çekirdek", "destek", "riskli"] as const).map((r) => (
+              <span key={r} className={cn("rounded-full border px-2 py-0.5 text-xs", ROLE_CLASS[r])}>{ROLE_LABEL[r]} {s.roles[r] ?? 0}</span>
+            ))}
+          </div>
+        </div>
+        <Tile label="Önerilen üretim" m={s.expected_units} value={`${s.total_qty.toLocaleString("tr-TR")} adet`}
+          sub={s.budget_total_usd ? `${m(s.budget_used_usd)} / ${m(s.budget_total_usd)} bütçe · 120 günde ~${(s.expected_units.value ?? 0).toLocaleString("tr-TR")} satış` : "bütçe girilmedi"} />
+      </div>
+
+      {s.actions.length > 0 && (
+        <div className="grid gap-2">
+          <h3 className="text-sm font-medium">Bu koleksiyon için öneriler</h3>
+          {s.actions.map((a, i) => (
+            <div key={i} className="flex items-start gap-2 rounded-md border p-2 text-sm">
+              <Badge variant="outline" className="shrink-0">{a.kind}</Badge>
+              <span className="flex-1">{a.text}</span>
+              <BasisChip basis={a.basis} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {sat > 0 && (
+        <div className="grid gap-1">
+          <h3 className="flex items-center gap-2 text-sm font-medium">Erişim eğrisi <BasisChip basis="ajan" how="En çok yeni kişi getiren ürün sırayla eklenir (TURF)." /></h3>
+          <p className="text-xs text-muted-foreground">
+            İlk {sat} ürün panelin %{s.reach_curve[sat - 1].reach_pct}&apos;ine ulaşıyor; listede olmayan ürünler panelde yeni bir kişiye ulaşmıyor (başka ürünü seven kişileri seviyor).
+          </p>
+          <ReactECharts option={curve} style={{ height: 280 }} notMerge />
+        </div>
+      )}
+
+      {s.cannibal_pairs.length > 0 && (
+        <div className="grid gap-2">
+          <h3 className="flex items-center gap-2 text-sm font-medium">Birbirinin müşterisini paylaşan ürünler <BasisChip basis="ajan" /><BasisChip basis="kural varsayımı" /></h3>
+          {s.cannibal_pairs.map((p) => {
+            const a = res.items.find((i) => i.sku === p.a), b = res.items.find((i) => i.sku === p.b);
+            return <div key={p.a + p.b} className="text-sm">{a?.name} ↔ {b?.name} <span className="text-muted-foreground">({p.category}, örtüşme %{p.overlap_pct})</span></div>;
+          })}
+        </div>
+      )}
+
+      <div className="grid gap-2">
+        <h3 className="text-sm font-medium">Kategoriler</h3>
+        <Table>
+          <TableHeader><TableRow>
+            <TableHead>Kategori</TableHead><TableHead className="text-right">Ürün</TableHead><TableHead>Roller</TableHead>
+            <TableHead className="text-right">Fiyat aralığı (planlanan)</TableHead><TableHead className="text-right">Ort. talep</TableHead>
+            <TableHead className="text-right">Kabul aralığında</TableHead>
+          </TableRow></TableHeader>
+          <TableBody>
+            {s.categories.map((c) => (
+              <TableRow key={c.category}>
+                <TableCell>{c.category}</TableCell>
+                <TableCell className="text-right">{c.count}</TableCell>
+                <TableCell className="text-xs">{Object.entries(c.roles).filter(([, v]) => v).map(([k, v]) => `${ROLE_LABEL[k as keyof typeof ROLE_LABEL]} ${v}`).join(" · ")}</TableCell>
+                <TableCell className="text-right">{c.price_min != null ? `${m(c.price_min)} – ${m(c.price_max)}` : "–"}</TableCell>
+                <TableCell className="text-right">{c.mean_appeal}</TableCell>
+                <TableCell className="text-right">{c.in_zone + c.out_zone ? `${c.in_zone}/${c.in_zone + c.out_zone}` : "–"}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      <ul className="list-disc space-y-1 pl-5 text-xs text-muted-foreground">
+        {res.notes.map((n, i) => <li key={i}>{n}</li>)}
+      </ul>
+    </div>
+  );
+}
+
+function Items({ res, items, excluded, onExclude, m }: {
+  res: CollectionResult; items: ItemResult[]; excluded: Set<string>; onExclude: (sku: string, on: boolean) => void;
+  m: (v: number | null | undefined) => string;
+}) {
+  const [open, setOpen] = useState<string | null>(null);
+  const n = res.summary.n_evaluated;
+  return (
+    <div className="overflow-x-auto">
+      <p className="mb-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+        Kaynaklar: sıra, talep ve hevesli oranı <BasisChip basis="ajan" />, rol ve adet <BasisChip basis="kural varsayımı" />, planlanan fiyat ve hedef rol <BasisChip basis="kullanıcı girdisi" />.
+        &quot;Çıkar&quot; kutusu ürünü ne olur senaryosunda koleksiyondan çıkarır.
+      </p>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-6" /><TableHead>Ürün</TableHead><TableHead>Sıra</TableHead><TableHead className="text-right">Talep</TableHead>
+            <TableHead>Koleksiyona göre</TableHead><TableHead className="text-right">Hevesli</TableHead><TableHead>Rol (hedef → panel)</TableHead>
+            <TableHead>Fiyat uyumu</TableHead><TableHead className="text-right">Önerilen adet</TableHead><TableHead>Bayraklar</TableHead><TableHead>Çıkar</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {items.map((it) => {
+            const ex = excluded.has(it.sku);
+            const fits = it.regions.map((r) => r.price_fit).filter(Boolean);
+            const rel = it.relative.value ?? 0;
+            return (
+              <Fragment key={it.sku}>
+                <TableRow className={cn(ex && "opacity-40")}>
+                  <TableCell>
+                    <button onClick={() => setOpen(open === it.sku ? null : it.sku)} disabled={!it.regions.length}>
+                      {open === it.sku ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                    </button>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      {it.image && <img src={imageUrl(res.collection_id, it.image)} alt="" className="size-11 rounded object-cover" />}
+                      <div className="min-w-40 whitespace-normal"><div className="font-medium">{it.name}</div><div className="font-mono text-[11px] text-muted-foreground">{it.sku} · {it.category || "kategorisiz"}</div></div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap" title={it.rank.how}>
+                    {it.rank.value != null ? <><b>{it.rank.value}</b><span className="text-muted-foreground">/{n}</span>{it.rank.low != null && <span className="text-xs text-muted-foreground"> ({it.rank.low}-{it.rank.high})</span>}</> : "–"}
+                  </TableCell>
+                  <TableCell className="text-right">{it.appeal.value ?? "–"}</TableCell>
+                  <TableCell title={it.relative.how}>
+                    {it.relative.value != null && (
+                      <div className="flex w-28 items-center">
+                        <div className="relative h-2 w-full rounded bg-muted">
+                          <div className="absolute top-0 left-1/2 h-2 w-px bg-foreground/40" />
+                          <div className={cn("absolute top-0 h-2 rounded", rel >= 0 ? "left-1/2 bg-emerald-500" : "right-1/2 bg-rose-400")}
+                            style={{ width: `${Math.min(50, Math.abs(rel) * 25)}%` }} />
+                        </div>
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">{it.enthusiast_pct.value != null ? `%${it.enthusiast_pct.value}` : "–"}</TableCell>
+                  <TableCell title={it.role_why}>
+                    <span className="text-xs text-muted-foreground">{it.declared_role ? `${it.declared_role} → ` : ""}</span>
+                    <span className={cn("rounded-full border px-2 py-0.5 text-xs", ROLE_CLASS[it.role])}>{ROLE_LABEL[it.role]}</span>
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    {fits.length ? it.regions.map((r) => r.price_fit && <div key={r.region} className={FIT_CLASS[r.price_fit]}>{r.region}: {r.price_fit}</div>) : <span className="text-muted-foreground">fiyat girilmedi</span>}
+                  </TableCell>
+                  <TableCell className="text-right">{it.recommended_qty.value != null ? it.recommended_qty.value.toLocaleString("tr-TR") : "–"}
+                    {it.planned_qty != null && <div className="text-[11px] text-muted-foreground">plan {it.planned_qty.toLocaleString("tr-TR")}</div>}</TableCell>
+                  <TableCell className="max-w-48 text-xs whitespace-normal">{it.flags.join(", ")}</TableCell>
+                  <TableCell><Checkbox checked={ex} onCheckedChange={(v) => onExclude(it.sku, v === true)} /></TableCell>
+                </TableRow>
+                {open === it.sku && (
+                  <TableRow className="bg-muted/30 hover:bg-muted/30">
+                    <TableCell colSpan={11}>
+                      <div className="grid gap-2 py-1">
+                        <div className="text-xs text-muted-foreground">{it.role_why}</div>
+                        <Table>
+                          <TableHeader><TableRow>
+                            <TableHead>Bölge</TableHead><TableHead className="text-right">Talep</TableHead><TableHead className="text-right">Hevesli</TableHead>
+                            <TableHead className="text-right">İdeal fiyat</TableHead><TableHead className="text-right">Kabul aralığı</TableHead>
+                            <TableHead className="text-right">Marj</TableHead><TableHead className="text-right">İade</TableHead><TableHead className="text-right">Adet</TableHead>
+                            <TableHead>En sık itirazlar</TableHead><TableHead>Güven</TableHead>
+                          </TableRow></TableHeader>
+                          <TableBody>
+                            {it.regions.map((r) => (
+                              <TableRow key={r.region}>
+                                <TableCell>{r.region}</TableCell><TableCell className="text-right">{r.demand}</TableCell>
+                                <TableCell className="text-right">{r.enthusiast_pct != null ? `%${r.enthusiast_pct}` : "–"}</TableCell>
+                                <TableCell className="text-right">{m(r.optimal_price)}</TableCell>
+                                <TableCell className="text-right whitespace-nowrap">{m(r.range_low)} – {m(r.range_high)}</TableCell>
+                                <TableCell className="text-right">%{r.margin_pct}</TableCell><TableCell className="text-right">%{r.return_pct}</TableCell>
+                                <TableCell className="text-right">{it.qty_by_region[r.region] ?? "–"}</TableCell>
+                                <TableCell className="text-xs">{r.objections.join(" · ")}</TableCell><TableCell className="text-xs">{r.confidence}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                        <Link className="inline-flex w-fit items-center gap-1 text-sm underline" target="_blank"
+                          href={`/?koleksiyon=${encodeURIComponent(res.collection_id)}&sku=${encodeURIComponent(it.sku)}`}>
+                          <ExternalLink className="size-3" />Tekli ürün ekranında ayrıntı (fiyat eğrisi, satış tahmini, senaryolar)
+                        </Link>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </Fragment>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+function Heatmap({ res }: { res: CollectionResult }) {
+  const items = res.items.filter((i) => i.regions.length).sort((a, b) => (a.rank.value ?? 0) - (b.rank.value ?? 0));
+  const data = items.flatMap((it, y) => it.regions.map((r) => [res.regions.indexOf(r.region), y, r.demand]));
+  const opt: EChartsOption = {
+    tooltip: { formatter: (p) => { const d = (p as { data: number[] }).data; return `${items[d[1]].name} · ${res.regions[d[0]]}: talep ${d[2]}`; } },
+    grid: { left: 160, right: 20, top: 10, bottom: 50 },
+    xAxis: { type: "category", data: res.regions, position: "top" },
+    yAxis: { type: "category", data: items.map((i) => i.name), inverse: true, axisLabel: { width: 150, overflow: "truncate" } },
+    visualMap: { min: 0, max: 100, orient: "horizontal", left: "center", bottom: 0, calculable: false, inRange: { color: ["#fee2e2", "#fef9c3", "#bbf7d0", "#15803d"] } },
+    series: [{ type: "heatmap", data, label: { show: true } }],
+  };
+  const byRegion = res.summary.reach_by_region;
+  return (
+    <div className="grid gap-3">
+      <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">Ürün × bölge talep skoru (0-100) <BasisChip basis="ajan" />. Bir ürün bir bölgede zayıfsa o bölgenin koleksiyonundan çıkarılabilir.</p>
+      {Object.keys(byRegion).length > 0 && (
+        <div className="flex flex-wrap gap-2 text-sm">
+          {Object.entries(byRegion).map(([r, v]) => <Badge key={r} variant="outline">{r}: erişim %{v}</Badge>)}
+        </div>
+      )}
+      <ReactECharts option={opt} style={{ height: Math.max(220, 34 * items.length + 80) }} notMerge />
+    </div>
+  );
+}
+
+function Prices({ res, m, scenario, setScenario }: {
+  res: CollectionResult; m: (v: number | null | undefined) => string; scenario: WhatIf; setScenario: (f: (s: WhatIf) => WhatIf) => void;
+}) {
+  const [region, setRegion] = useState(res.regions[0]);
+  const items = res.items.filter((i) => i.regions.length);
+  const cats = Array.from(new Set(items.map((i) => i.category || "kategorisiz")));
+  const toLocal = (usdV: number) => (res.currency === "TRY" ? usdV * res.fx_rate : usdV);
+  return (
+    <div className="grid gap-4">
+      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        Gri bant panelin kabul edilebilir fiyat aralığı <BasisChip basis="ajan" />, ince çizgi ideal fiyat, nokta planlanan fiyat <BasisChip basis="kullanıcı girdisi" />.
+        Fiyatı değiştirip sonucu görebilirsiniz (panel yeniden sorulmaz).
+        <select className="ml-auto h-8 rounded-md border bg-background px-2 text-sm text-foreground" value={region} onChange={(e) => setRegion(e.target.value)}>
+          {res.regions.map((r) => <option key={r}>{r}</option>)}
+        </select>
+      </div>
+      {cats.map((c) => {
+        const rows = items.filter((i) => (i.category || "kategorisiz") === c);
+        const max = Math.max(...rows.flatMap((i) => { const r = i.regions.find((x) => x.region === region); return [r?.range_high ?? 0, i.planned_price_usd ?? 0]; })) * 1.1 || 1;
+        return (
+          <div key={c} className="grid gap-2">
+            <h3 className="text-sm font-medium">{c}</h3>
+            {rows.map((i) => {
+              const r = i.regions.find((x) => x.region === region);
+              if (!r) return null;
+              const pos = (v: number) => `${Math.min(100, (100 * v) / max)}%`;
+              return (
+                <div key={i.sku} className="grid grid-cols-[minmax(120px,200px)_1fr_120px] items-center gap-3 text-sm">
+                  <span className="truncate" title={i.name}>{i.name}</span>
+                  <div className="relative h-6 rounded bg-muted/50">
+                    <div className="absolute top-1 h-4 rounded bg-slate-300" style={{ left: pos(r.range_low), width: `calc(${pos(r.range_high)} - ${pos(r.range_low)})` }}
+                      title={`Kabul aralığı ${m(r.range_low)} – ${m(r.range_high)}`} />
+                    <div className="absolute top-0 h-6 w-0.5 bg-slate-700" style={{ left: pos(r.optimal_price) }} title={`İdeal ${m(r.optimal_price)}`} />
+                    {i.planned_price_usd != null && (
+                      <div className={cn("absolute top-1.5 size-3 -translate-x-1/2 rounded-full border-2 border-white",
+                        r.price_fit === "içinde" ? "bg-emerald-600" : r.price_fit === "üstünde" ? "bg-rose-600" : "bg-sky-600")}
+                        style={{ left: pos(i.planned_price_usd) }} title={`Planlanan ${m(i.planned_price_usd)}`} />
+                    )}
+                  </div>
+                  <Input className="h-8 text-right" type="number" placeholder="planlanan"
+                    value={scenario.planned_prices?.[i.sku] ?? (i.planned_price_usd != null ? Math.round(toLocal(i.planned_price_usd)) : "")}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setScenario((s) => {
+                        const pp = { ...(s.planned_prices ?? {}) };
+                        if (v === "") delete pp[i.sku]; else pp[i.sku] = Number(v);
+                        return { ...s, planned_prices: pp };
+                      });
+                    }} />
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function Budget({ res, m, scenario, setScenario }: {
+  res: CollectionResult; m: (v: number | null | undefined) => string; scenario: WhatIf; setScenario: (f: (s: WhatIf) => WhatIf) => void;
+}) {
+  const s = res.summary;
+  const items = res.items.filter((i) => i.regions.length).sort((a, b) => (b.recommended_qty.value ?? 0) - (a.recommended_qty.value ?? 0));
+  const localBudget = s.budget_total_usd != null ? Math.round(res.currency === "TRY" ? s.budget_total_usd * res.fx_rate : s.budget_total_usd) : "";
+  return (
+    <div className="grid gap-4">
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="grid gap-1">
+          <span className="text-xs text-muted-foreground">Toplam bütçe ({res.currency})</span>
+          <Input className="h-9 w-44" type="number" value={scenario.total_budget ?? localBudget}
+            onChange={(e) => setScenario((x) => ({ ...x, total_budget: e.target.value === "" ? null : Number(e.target.value) }))} />
+        </div>
+        <div className="grid gap-1">
+          <span className="text-xs text-muted-foreground">Dağıtım hedefi</span>
+          <select className="h-9 rounded-md border bg-background px-2 text-sm" value={scenario.allocation_objective ?? "balanced"}
+            onChange={(e) => setScenario((x) => ({ ...x, allocation_objective: e.target.value as WhatIf["allocation_objective"] }))}>
+            <option value="balanced">Dengeli (satış hızı)</option><option value="profit">Kâr ağırlıklı</option><option value="blended">Karışık</option>
+          </select>
+        </div>
+        <div className="text-sm text-muted-foreground">
+          Kullanılan {m(s.budget_used_usd)} · {s.total_qty.toLocaleString("tr-TR")} adet <BasisChip basis="kural varsayımı" how={s.expected_units.how} />
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Bütçe, ürün × bölge hücrelerine bir sonraki birimin satılma olasılığına göre dağıtılır; son birimin satılma olasılığı %50&apos;nin altına inince o hücre durur.
+        Bütçe talebi aşıyorsa kalan bütçe harcanmaz. Talep panelden, kitle ve dönüşüm varsayımlardan gelir; ERP ile kalibre edilene kadar adetler varsayımdır.
+      </p>
+      <Table>
+        <TableHeader><TableRow>
+          <TableHead>Ürün</TableHead><TableHead>Rol</TableHead>
+          {res.regions.map((r) => <TableHead key={r} className="text-right">{r}</TableHead>)}
+          <TableHead className="text-right">Toplam</TableHead><TableHead className="text-right">Planlanan</TableHead><TableHead className="text-right">Tutar</TableHead>
+        </TableRow></TableHeader>
+        <TableBody>
+          {items.map((i) => {
+            const tot = i.recommended_qty.value ?? 0;
+            return (
+              <TableRow key={i.sku}>
+                <TableCell>{i.name}<div className="text-[11px] text-muted-foreground">{i.flags.filter((f) => f.startsWith("MOQ") || f === "maliyet yok").join(", ")}</div></TableCell>
+                <TableCell><span className={cn("rounded-full border px-2 py-0.5 text-xs", ROLE_CLASS[i.role])}>{ROLE_LABEL[i.role]}</span></TableCell>
+                {res.regions.map((r) => <TableCell key={r} className="text-right">{(i.qty_by_region[r] ?? 0).toLocaleString("tr-TR")}</TableCell>)}
+                <TableCell className="text-right font-medium">{i.recommended_qty.value != null ? tot.toLocaleString("tr-TR") : "–"}</TableCell>
+                <TableCell className="text-right text-muted-foreground">{i.planned_qty?.toLocaleString("tr-TR") ?? "–"}</TableCell>
+                <TableCell className="text-right">{i.unit_cost_usd != null ? m(tot * i.unit_cost_usd) : "–"}</TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}

@@ -4,3 +4,4 @@
 __pycache__/
 .pytest_cache/
 .mirofish_world.json.answers.jsonl
+collections_data/

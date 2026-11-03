@@ -36,7 +36,12 @@ def fake_answer(messages: List[dict]) -> dict:
     for i, p in enumerate(ladder, 1):
         r = p / center
         labels[str(i)] = "supheli" if r < 0.55 else "uygun" if r < 1.1 else "pahali" if r < 1.5 else "cok_pahali"
-    interest = int(max(5, min(95, 78 - 35 * sens + (h % 15) - 7 + (5 if "Diğer tüketicilerin" in user else 0))))
+    # ürün x kişi etkisi: koleksiyon modunda ürünler birbirinden ayrışsın (yine anlamsız, yalnızca deterministik)
+    prod = re.search(r"^Ürün: (.+)$", user, re.M)
+    hp = int(hashlib.sha256((system + (prod.group(1) if prod else "")).encode()).hexdigest()[:6], 16)
+    hq = int(hashlib.sha256((prod.group(1) if prod else "").encode()).hexdigest()[:6], 16)
+    tilt = ((hp % 21) - 10) + ((hq % 31) - 15) if prod else 0
+    interest = int(max(5, min(95, 78 - 35 * sens + (h % 15) - 7 + tilt + (5 if "Diğer tüketicilerin" in user else 0))))
     return {"interest": interest, "ladder": labels, "objection": OBJECTIONS[h % len(OBJECTIONS)],
             "reason": "deterministik test cevabı"}
 

@@ -117,7 +117,8 @@ class DirectPanelEngine:
         currency = economy.currency_of(region)
         rate = (fx_rates or {}).get(currency) if currency else None
         try_rate = rate if currency == "TRY" and rate else None
-        seed = f"{card.get('product_name')}|{brand.name if brand else ''}|{region}"
+        # Koleksiyon modunda kart `panel_seed` taşır: bölgedeki bütün ürünlere aynı kişiler bakar.
+        seed = f"{card.get('panel_seed') or card.get('product_name')}|{brand.name if brand else ''}|{region}"
         members = sample_panel(lib, self.panel_size, seed, cal.sensitivity_scale, cal.trend_scale)
         await note(f"{len(members)} kişilik panel ({lib.version}, {len(lib.segments)} segment) sorgulanıyor",
                    answered=0, agents=len(members), phase="interview")

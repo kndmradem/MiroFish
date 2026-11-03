@@ -24,6 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { itemPrediction } from "@/lib/collection-api";
 import { predictStream, REGIONS, resumeRun, savedRun, type StreamHandlers, TIER_LABEL, try_, usd, type BrandProfile, type PredictionResponse, type RegionCode } from "@/lib/api";
 
 function demandTone(score: number) {
@@ -93,6 +94,23 @@ export default function Dashboard() {
       })
       .catch((err) => setError(err instanceof Error ? err.message : String(err)))
       .finally(() => { setLoading(false); setProgress(null); });
+  }, []);
+
+  // Koleksiyon ekranından "Tekli ürün ekranında ayrıntı" ile gelindiyse kayıtlı sonucu göster
+  const [fromCollection, setFromCollection] = useState<string | null>(null);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const cid = q.get("koleksiyon"), sku = q.get("sku");
+    if (!cid || !sku) return;
+    itemPrediction(cid, sku)
+      .then((res) => {
+        setResult(res);
+        setProductName(String(res.product_card?.product_name ?? sku));
+        if (res.brand_profile) setProfile(res.brand_profile);
+        setChartRegion((res.regional_breakdown[0]?.region as RegionCode) ?? null);
+        setFromCollection(`${sku} (koleksiyon ${cid})`);
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
   }, []);
 
   async function onSubmit(e: React.FormEvent) {
@@ -333,6 +351,12 @@ export default function Dashboard() {
           )
         ) : (
           <>
+            {fromCollection && (
+              <div className="rounded-md border border-sky-300 bg-sky-50 p-3 text-sm text-sky-900">
+                Koleksiyon sonucundan açıldı: {fromCollection}. Bu kayıtlı bir sonuçtur; soldaki formla yeni simülasyon çalıştırırsanız yerine geçer.{" "}
+                <Link className="underline" href="/koleksiyon">Koleksiyona dön</Link>
+              </div>
+            )}
             <SummaryCard result={result} productName={productName} />
 
             {result.failed_regions.length > 0 && (

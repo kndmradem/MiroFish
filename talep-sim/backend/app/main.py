@@ -450,3 +450,9 @@ async def run_events(run_id: str, start: int = 0) -> StreamingResponse:
     if run is None:
         raise HTTPException(status_code=404, detail="Koşu bulunamadı (sunucu yeniden başlatılmış ya da süresi dolmuş olabilir)")
     return StreamingResponse(_follow(run, max(0, start)), media_type="application/x-ndjson", headers=_STREAM_HEADERS)
+
+
+# Koleksiyon modu (toplu ürün değerlendirme). Döngüsel içe aktarmayı önlemek için en sonda.
+from .collection.routes import router as collection_router  # noqa: E402
+
+app.include_router(collection_router)

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { ModeTabs } from "@/components/mode-tabs";
 
 export const metadata: Metadata = {
   title: "Talep Simülasyonu",
@@ -13,7 +14,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="tr">
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        <ModeTabs />
+        {children}
+      </body>
     </html>
   );
 }
