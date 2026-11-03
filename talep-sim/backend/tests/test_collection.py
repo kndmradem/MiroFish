@@ -1,4 +1,5 @@
 import io
+import json
 import time
 
 import pytest
@@ -301,3 +302,38 @@ def test_ties_do_not_create_fake_roles():
     assert {i.role for i in res.items} == {"belirsiz"}
     assert any("ayırt etmedi" in n for n in res.notes)
     assert not any(a.kind == "çıkar" for a in res.summary.actions)
+
+
+def _profile(name, mult, tier, pull=50):
+    from app.brand import generic_profile
+    return json.loads(generic_profile(name, "").model_copy(update={
+        "price_multiple": mult, "price_tier": tier, "brand_pull": pull, "edited": True}).model_dump_json())
+
+
+def test_brand_from_screen_drives_prices_and_triggers_rerun(client):
+    app.dependency_overrides[get_engine] = lambda: make_engine(panel_size=6, min_valid=2)
+    rows = [r for r in ROWS if r[0] in ("SW27-001", "SW27-003")]
+    prev = _upload(client, rows=rows, meta={**META, "hedef_bolgeler": "TR", "marka": "Excel Markası"}).json()
+    cid = prev["collection_id"]
+    meta = {**prev["meta"], "brand": "Ekran Markası", "brand_profile": _profile("Ekran Markası", 1.8, "budget")}
+    client.post(f"/api/collections/{cid}/confirm", json={"meta": meta, "items": [p["item"] for p in prev["items"]]})
+    client.post(f"/api/collections/{cid}/run", json={})
+    assert not _wait(client, cid)["failed"]
+    cheap = client.get(f"/api/collections/{cid}/result").json()
+    be = cheap["brand_effect"]
+    assert be["name"] == "Ekran Markası" and be["basis"] == "kullanıcı girdisi" and be["price_level_pct"] < 0
+    pred = client.get(f"/api/collections/{cid}/items/SW27-001/prediction").json()
+    assert pred["brand_profile"]["name"] == "Ekran Markası"          # ekrandaki giriş Excel'e baskın
+
+    meta2 = {**meta, "brand": "Lüks Marka", "brand_profile": _profile("Lüks Marka", 6.0, "luxury", 85)}
+    assert client.put(f"/api/collections/{cid}/meta", json={"meta": meta2}).status_code == 200
+    stale = client.get(f"/api/collections/{cid}/result").json()["brand_effect"]
+    assert "yeniden çalıştırın" in (stale["warning"] or "")
+    client.post(f"/api/collections/{cid}/run", json={})
+    st = _wait(client, cid)
+    assert not any("önceki sonuç" in line for line in st["log"])         # marka değişti, yeniden soruldu
+    lux = client.get(f"/api/collections/{cid}/result").json()
+    p_cheap = cheap["items"][0]["regions"][0]["optimal_price"]
+    p_lux = next(i for i in lux["items"] if i["sku"] == cheap["items"][0]["sku"])["regions"][0]["optimal_price"]
+    assert p_lux > 2 * p_cheap
+    assert lux["brand_effect"]["price_level_pct"] > 100 and not lux["brand_effect"]["warning"]

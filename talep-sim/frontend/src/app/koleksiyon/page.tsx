@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { BrandCard } from "@/components/collection/brand-card";
 import { ImportStep } from "@/components/collection/import-step";
 import { CollectionResults } from "@/components/collection/results";
 import { RunPanel } from "@/components/collection/run-panel";
@@ -86,9 +87,13 @@ export default function CollectionPage() {
         <>
           <div className="rounded-lg border p-3 text-sm">
             <b>{col.meta.name}</b> {col.meta.season && `· ${col.meta.season}`} · {col.items.length} ürün · {col.meta.target_regions.join(", ")}
+            {col.meta.brand ? ` · marka ${col.meta.brand}` : " · marka girilmedi (nötr)"}
             {col.meta.total_budget ? ` · bütçe ${col.meta.total_budget.toLocaleString("tr-TR")} ${col.meta.currency}` : " · bütçe girilmedi"}
           </div>
-          <RunPanel col={col} onFinished={refresh} />
+          <div className="grid gap-4 lg:grid-cols-[420px_1fr]">
+            <BrandCard key={col.id} col={col} onSaved={(c) => { setCol(c); refresh(); }} />
+            <RunPanel col={col} onFinished={refresh} />
+          </div>
           {result && <CollectionResults base={result} />}
         </>
       )}

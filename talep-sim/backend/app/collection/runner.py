@@ -96,6 +96,23 @@ class CollectionRunner:
         self.tasks[col.id] = asyncio.create_task(self._run(col, opts, store, engine, profiler, predict, fx_rate, st))
         return st
 
+    @staticmethod
+    async def _brand(col, store, profiler, say) -> Optional[BrandProfile]:
+        """Ekrandaki profil önceliklidir; yoksa marka adı + notlarla bir kez çıkarılır ve saklanır."""
+        if col.meta.brand_profile is not None:
+            store.save_brand(col.id, {"profile": json.loads(col.meta.brand_profile.model_dump_json()), "notes": col.meta.brand_notes})
+            return col.meta.brand_profile
+        if not col.meta.brand:
+            return None
+        saved = store.load_brand(col.id) or {}
+        prof = saved.get("profile")
+        if prof and prof.get("name") == col.meta.brand and saved.get("notes", "") == col.meta.brand_notes:
+            return BrandProfile(**prof)
+        say(f"{col.meta.brand} marka profili çıkarılıyor")
+        brand = await profiler.profile(col.meta.brand, col.meta.brand_notes or None)
+        store.save_brand(col.id, {"profile": json.loads(brand.model_dump_json()), "notes": col.meta.brand_notes})
+        return brand
+
     async def _run(self, col, opts, store, engine, profiler, predict, fx_rate, st: RunStatus):
         def say(msg: str):
             st.detail = msg
@@ -107,15 +124,7 @@ class CollectionRunner:
             regions = opts.regions or col.meta.target_regions
             items = [it for it in col.items if not opts.only or it.sku in opts.only]
             st.total = len(items)
-            brand = None
-            if col.meta.brand:
-                saved = store.load_brand(col.id)
-                if saved and saved.get("name") == col.meta.brand:
-                    brand = BrandProfile(**saved)
-                else:
-                    say(f"{col.meta.brand} marka profili çıkarılıyor")
-                    brand = await profiler.profile(col.meta.brand, col.meta.notes or None)
-                    store.save_brand(col.id, json.loads(brand.model_dump_json()))
+            brand = await self._brand(col, store, profiler, say)
             seeded = SeededEngine(engine, f"koleksiyon:{col.id}", store.dir(col.id) / "cards")
             to_usd = (lambda v: v / fx_rate) if col.meta.currency == "TRY" else (lambda v: v)
             budget_usd = to_usd(col.meta.total_budget) if col.meta.total_budget else 100000.0
@@ -131,7 +140,7 @@ class CollectionRunner:
                     continue
                 img = store.image_path(col.id, it.images[0]).read_bytes()
                 digest = hashlib.sha1(img).hexdigest()[:16]
-                h = input_hash(it, regions, col.meta.brand, digest)
+                h = input_hash(it, regions, brand.model_dump_json() if brand else "", digest)
                 old = store.load_result(col.id, it.sku)
                 if old and old.get("response") and old.get("input_hash") == h and not opts.rerun:
                     say(f"{i}/{len(items)} {it.name}: önceki sonuç kullanıldı")
@@ -147,7 +156,7 @@ class CollectionRunner:
                 req = PredictionRequest(
                     product_name=it.name, image_base64=base64.b64encode(img).decode(),
                     technical_specs=item_specs(it), unit_cost=Decimal(str(round(to_usd(cost), 2))),
-                    total_production_budget=per_item_budget, target_regions=regions, brand=col.meta.brand,
+                    total_production_budget=per_item_budget, target_regions=regions, brand=brand.name if brand else None,
                     brand_profile=brand,
                     assumptions=Assumptions(channel=col.meta.channel, launch_month=it.launch_month or col.meta.launch_month),
                     usd_try_rate=fx_rate, allocation_objective=opts.allocation_objective)

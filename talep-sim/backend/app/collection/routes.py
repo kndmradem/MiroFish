@@ -10,7 +10,8 @@ from fastapi.responses import FileResponse, Response
 
 from ..config import settings
 from .importer import IMAGE_EXT, UNSUPPORTED_IMAGE_EXT, ImageInfo, build_preview, ext, read_workbook, template_bytes
-from .models import (Collection, CollectionResult, ConfirmRequest, ImportPreview, Issue, RunOptions, RunStatus, WhatIf)
+from .models import (Collection, CollectionResult, ConfirmRequest, ImportPreview, Issue, MetaUpdate, RunOptions, RunStatus,
+                     WhatIf)
 from .runner import CollectionRunner
 from .store import CollectionStore, safe_rel
 from .summary import summarize
@@ -169,6 +170,18 @@ async def confirm(cid: str, body: ConfirmRequest, store: CollectionStore = Depen
 @router.get("/{cid}", response_model=Collection)
 async def get_collection(cid: str, store: CollectionStore = Depends(get_store)) -> Collection:
     return _load(store, cid)
+
+
+@router.put("/{cid}/meta", response_model=Collection)
+async def update_meta(cid: str, body: MetaUpdate, store: CollectionStore = Depends(get_store)) -> Collection:
+    """Koleksiyon bilgisini (marka, bütçe, bölgeler...) günceller. Ürün listesi değişmez. Marka değişirse sonraki
+    çalıştırmada ürünler yeniden sorulur."""
+    if runner.running(cid):
+        raise HTTPException(409, "Koleksiyon şu an koşuyor; önce durdurun")
+    col = _load(store, cid)
+    col.meta = body.meta
+    store.save(col)
+    return col
 
 
 @router.get("/{cid}/images/{path:path}")

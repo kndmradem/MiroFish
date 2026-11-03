@@ -11,9 +11,11 @@ import random
 import statistics
 from typing import Dict, List, Optional, Set, Tuple
 
+from .. import brand as brandlib
 from ..allocation import DEMAND_SCENARIOS, STOP_P, p_sells
+from ..models import BrandProfile
 from .importer import norm
-from .models import (Action, CannibalPair, CategorySummary, Collection, CollectionResult, CollectionSummary,
+from .models import (Action, BrandEffect, CannibalPair, CategorySummary, Collection, CollectionResult, CollectionSummary,
                      ItemRegion, ItemResult, Metric, ReachPoint, WhatIf)
 
 ENTHUSIAST = 70          # ilgi puanı bu ve üstü: "hevesli" (prompttaki ölçek: hevesli 70-95)
@@ -158,6 +160,37 @@ def allocate_items(signals: List[dict], budget: float, objective: str) -> Dict[T
         q[(best["sku"], best["region"])] += n
         left -= n * best["cost"]
     return q
+
+
+def brand_effect(used: Optional[dict], col: Collection, regions: List[str]) -> Optional[BrandEffect]:
+    """Kullanılan marka profilinin hesaplara nasıl girdiği. Profil yoksa nötr varsayım olduğu söylenir."""
+    if not used:
+        return None
+    b = BrandProfile(**used)
+    neutral = brandlib.NEUTRAL_MULTIPLE
+    level = round(100 * (b.price_multiple / neutral - 1), 1)
+    dp = {r: round(sum(brandlib.demand_points(b, r)), 1) for r in regions}
+    basis = "kullanıcı girdisi" if b.edited else "LLM tahmini" if b.source == "llm_knowledge" else \
+        "kullanıcı girdisi" if b.source == "user_notes" else "kural varsayımı"
+    lines = [
+        f"Fiyat merdiveni ve panele söylenen 'bu marka genelde şu fiyata satar' bilgisi maliyet × {b.price_multiple:g} "
+        f"üzerinden kuruldu. Marka yokken kullanılan × {neutral:g}'e göre fiyat seviyesi %{level:+g}.",
+        f"Panel her üründe markayı '{brandlib.TIER_LABEL[b.price_tier]}' segment ve bölgedeki bilinirliğiyle "
+        f"({', '.join(f'{r} {brandlib.region_strength(b, r)}/100' for r in regions)}) görerek cevap verdi; marka değeri "
+        "kişilerin kabul ettiği fiyat aralığını doğrudan etkiler.",
+        f"Fiyat duyarlılığı {b.price_sensitivity:.2f} ve çekim gücü {b.brand_pull}/100: fiyat aralığının genişliği ve "
+        "panel yeterli fiyat cevabı vermezse kullanılan yedek eşikler bunlardan hesaplanır (kural varsayımı).",
+    ]
+    warn = b.warning
+    cur = col.meta.brand_profile
+    if (cur is not None and cur.model_dump() != b.model_dump()) or (cur is None and col.meta.brand and col.meta.brand != b.name):
+        warn = ("Ekrandaki marka bilgisi bu sonuçlar üretildikten sonra değişti. Yeni marka profilinin etkisini görmek için "
+                "paneli yeniden çalıştırın (değişen ürünler yeniden sorulur).")
+    return BrandEffect(name=b.name, tier=brandlib.TIER_LABEL[b.price_tier], price_multiple=b.price_multiple,
+                       neutral_multiple=neutral, price_level_pct=level, brand_pull=b.brand_pull,
+                       price_sensitivity=b.price_sensitivity,
+                       regional_strength={r: brandlib.region_strength(b, r) for r in regions}, demand_points=dp,
+                       source=b.source, confidence=b.confidence, edited=b.edited, basis=basis, lines=lines, warning=warn)
 
 
 def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif: Optional[WhatIf] = None,
@@ -445,4 +478,4 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
     regions = sorted({r.region for rs in per_item_regions.values() for r in rs}) or list(col.meta.target_regions)
     return CollectionResult(collection_id=col.id, name=col.meta.name, currency=cur, fx_rate=fx_rate, regions=regions,
                             items=out_items, summary=summary, notes=notes, data_basis=data_basis, panel_shared=shared,
-                            brand_profile=brand)
+                            brand_profile=brand, brand_effect=brand_effect(brand, col, regions))

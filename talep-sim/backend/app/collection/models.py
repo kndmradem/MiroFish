@@ -33,6 +33,8 @@ class CollectionItem(BaseModel):
 class CollectionMeta(BaseModel):
     name: str = "Adsız koleksiyon"
     brand: Optional[str] = None
+    brand_notes: str = Field("", description="Marka profili çıkarılırken kullanılan notlar")
+    brand_profile: Optional[BrandProfile] = Field(None, description="Ekranda çıkarılan/düzenlenen profil; verilirse yeniden üretilmez")
     season: str = ""
     total_budget: Optional[float] = Field(None, description="Koleksiyon para biriminde toplam üretim bütçesi")
     currency: Currency = "TRY"
@@ -86,6 +88,29 @@ class Collection(BaseModel):
 class ConfirmRequest(BaseModel):
     meta: CollectionMeta
     items: List[CollectionItem]
+
+
+class BrandEffect(BaseModel):
+    """Marka profilinin sonuca etkisi: hangi profil kullanıldı ve hangi hesaba nasıl girdi."""
+    name: Optional[str]
+    tier: str
+    price_multiple: float
+    neutral_multiple: float
+    price_level_pct: float = Field(..., description="Marka çarpanının nötr çarpana göre fiyat merdivenini kaydırdığı oran (%)")
+    brand_pull: int
+    price_sensitivity: float
+    regional_strength: Dict[str, int]
+    demand_points: Dict[str, float] = Field(default_factory=dict, description="Bölge: marka gücünün talep endeksine kural etkisi (puan)")
+    source: str
+    confidence: str
+    edited: bool
+    basis: Basis
+    lines: List[str] = Field(default_factory=list)
+    warning: Optional[str] = None
+
+
+class MetaUpdate(BaseModel):
+    meta: CollectionMeta
 
 
 class RunOptions(BaseModel):
@@ -227,3 +252,4 @@ class CollectionResult(BaseModel):
     data_basis: Optional[dict] = None
     panel_shared: bool = Field(False, description="Bütün ürünlere aynı kişiler mi baktı (panel motoru)")
     brand_profile: Optional[BrandProfile] = None
+    brand_effect: Optional[BrandEffect] = None

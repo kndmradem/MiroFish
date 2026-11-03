@@ -152,6 +152,13 @@ function Summary({ res, m }: { res: CollectionResult; m: (v: number | null | und
           sub={s.budget_total_usd ? `${m(s.budget_used_usd)} / ${m(s.budget_total_usd)} bütçe · 120 günde ~${(s.expected_units.value ?? 0).toLocaleString("tr-TR")} satış` : "bütçe girilmedi"} />
       </div>
 
+      {res.brand_effect && <BrandEffectCard b={res.brand_effect} regions={res.regions} />}
+      {!res.brand_effect && (
+        <div className="rounded-md border p-3 text-sm text-muted-foreground">
+          Marka girilmedi: fiyatlar nötr çarpanla (maliyet × 2,7) kuruldu <BasisChip basis="kural varsayımı" />. Marka değeri fiyatı ciddi etkiler; marka girip yeniden çalıştırın.
+        </div>
+      )}
+
       {s.actions.length > 0 && (
         <div className="grid gap-2">
           <h3 className="text-sm font-medium">Bu koleksiyon için öneriler</h3>
@@ -211,6 +218,28 @@ function Summary({ res, m }: { res: CollectionResult; m: (v: number | null | und
       <ul className="list-disc space-y-1 pl-5 text-xs text-muted-foreground">
         {res.notes.map((n, i) => <li key={i}>{n}</li>)}
       </ul>
+    </div>
+  );
+}
+
+function BrandEffectCard({ b, regions }: { b: NonNullable<CollectionResult["brand_effect"]>; regions: string[] }) {
+  return (
+    <div className="grid gap-2 rounded-lg border p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-sm font-medium">Marka etkisi: {b.name ?? "isimsiz"}</h3>
+        <span className="text-xs text-muted-foreground">profil kaynağı</span><BasisChip basis={b.basis} />
+        <span className="text-xs text-muted-foreground">fiyata etkisi</span><BasisChip basis="kural varsayımı" />
+        <span className="text-xs text-muted-foreground">panel cevabı</span><BasisChip basis="ajan" />
+      </div>
+      {b.warning && <div className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-900">{b.warning}</div>}
+      <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+        <div><div className="text-xs text-muted-foreground">Segment</div>{b.tier}</div>
+        <div><div className="text-xs text-muted-foreground">Fiyat çarpanı (satış ÷ maliyet)</div>× {b.price_multiple} <span className="text-xs text-muted-foreground">(nötr × {b.neutral_multiple})</span></div>
+        <div><div className="text-xs text-muted-foreground">Fiyat seviyesine etkisi</div>
+          <span className={b.price_level_pct >= 0 ? "text-emerald-700" : "text-rose-700"}>%{b.price_level_pct > 0 ? "+" : ""}{b.price_level_pct}</span></div>
+        <div><div className="text-xs text-muted-foreground">Bölge bilinirliği</div>{regions.map((r) => `${r} ${b.regional_strength[r] ?? 50}`).join(" · ")}</div>
+      </div>
+      <ul className="list-disc space-y-0.5 pl-5 text-xs text-muted-foreground">{b.lines.map((l, i) => <li key={i}>{l}</li>)}</ul>
     </div>
   );
 }

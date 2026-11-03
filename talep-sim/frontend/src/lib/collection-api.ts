@@ -1,5 +1,5 @@
 // Koleksiyon modu API istemcisi (/api/collections). Tekli ürün API'si (api.ts) değişmez.
-import { normalizePrediction, try_, usd, type PredictionResponse, type RegionCode } from "@/lib/api";
+import { normalizePrediction, try_, usd, type BrandProfile, type PredictionResponse, type RegionCode } from "@/lib/api";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -29,6 +29,8 @@ export interface CollectionItem {
 export interface CollectionMeta {
   name: string;
   brand: string | null;
+  brand_notes: string;
+  brand_profile: BrandProfile | null;
   season: string;
   total_budget: number | null;
   currency: "TRY" | "USD";
@@ -132,6 +134,24 @@ export interface CollectionSummary {
   actions: Action[];
 }
 
+export interface BrandEffect {
+  name: string | null;
+  tier: string;
+  price_multiple: number;
+  neutral_multiple: number;
+  price_level_pct: number;
+  brand_pull: number;
+  price_sensitivity: number;
+  regional_strength: Record<string, number>;
+  demand_points: Record<string, number>;
+  source: string;
+  confidence: string;
+  edited: boolean;
+  basis: Basis;
+  lines: string[];
+  warning: string | null;
+}
+
 export interface CollectionResult {
   collection_id: string;
   name: string;
@@ -143,6 +163,7 @@ export interface CollectionResult {
   notes: string[];
   data_basis: Record<string, unknown> | null;
   panel_shared: boolean;
+  brand_effect: BrandEffect | null;
 }
 
 export interface WhatIf {
@@ -187,6 +208,12 @@ export const getPreview = async (cid: string): Promise<ImportPreview> => json(aw
 export async function confirmCollection(cid: string, meta: CollectionMeta, items: CollectionItem[]): Promise<Collection> {
   return json(await fetch(`${API_URL}/api/collections/${cid}/confirm`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ meta, items }),
+  }));
+}
+
+export async function updateMeta(cid: string, meta: CollectionMeta): Promise<Collection> {
+  return json(await fetch(`${API_URL}/api/collections/${cid}/meta`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ meta }),
   }));
 }
 

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, CircleHelp, Download, FileSpreadsheet, FolderOpen, Images, Loader2, XCircle } from "lucide-react";
 
+import { BrandPanel } from "@/components/brand-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -161,9 +162,7 @@ function PreviewStep({ preview, onSaved }: { preview: ImportPreview; onSaved: (c
         <div className="grid gap-3 rounded-lg border p-3 md:grid-cols-4">
           <div className="grid gap-1 md:col-span-2"><Label>Koleksiyon adı</Label>
             <Input value={meta.name} onChange={(e) => setMeta({ ...meta, name: e.target.value })} /></div>
-          <div className="grid gap-1"><Label>Marka</Label>
-            <Input value={meta.brand ?? ""} onChange={(e) => setMeta({ ...meta, brand: e.target.value || null })} /></div>
-          <div className="grid gap-1"><Label>Sezon</Label>
+          <div className="grid gap-1 md:col-span-2"><Label>Sezon</Label>
             <Input value={meta.season} onChange={(e) => setMeta({ ...meta, season: e.target.value })} /></div>
           <div className="grid gap-1"><Label>Toplam üretim bütçesi</Label>
             <Input type="number" value={meta.total_budget ?? ""} onChange={(e) => setMeta({ ...meta, total_budget: e.target.value ? Number(e.target.value) : null })} /></div>
@@ -179,6 +178,12 @@ function PreviewStep({ preview, onSaved }: { preview: ImportPreview; onSaved: (c
               onChange={(e) => setMeta({ ...meta, channel: e.target.value as "online" | "store" })}>
               <option value="online">Online</option><option value="store">Mağaza</option>
             </select></div>
+          <div className="md:col-span-4">
+            <BrandPanel brand={meta.brand ?? ""} notes={meta.brand_notes ?? ""} profile={meta.brand_profile ?? null}
+              onBrand={(v) => setMeta((m) => ({ ...m, brand: v || null }))}
+              onNotes={(v) => setMeta((m) => ({ ...m, brand_notes: v }))}
+              onProfile={(p) => setMeta((m) => ({ ...m, brand_profile: p }))} />
+          </div>
           <div className="grid gap-2 md:col-span-4"><Label>Hedef bölgeler</Label>
             <div className="flex flex-wrap gap-4">
               {REGIONS.map((r) => (

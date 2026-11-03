@@ -63,6 +63,7 @@ ITEM_ALIASES: Dict[str, List[str]] = {
 META_ALIASES: Dict[str, List[str]] = {
     "name": ["koleksiyon adi", "koleksiyon adı", "koleksiyon_adi", "koleksiyon", "collection"],
     "brand": ["marka", "brand"],
+    "brand_notes": ["marka notlari", "marka notları", "marka_notlari", "brand notes"],
     "season": ["sezon", "season"],
     "total_budget": ["toplam butce", "toplam bütçe", "toplam_butce", "butce", "bütçe", "budget"],
     "currency": ["para birimi", "para_birimi", "doviz", "döviz", "currency"],
@@ -181,7 +182,7 @@ def parse_meta(sheet: Optional[Sheet], issues: List[Issue]) -> CollectionMeta:
     d: dict = {}
     if _str(vals.get("name")):
         d["name"] = _str(vals["name"])
-    for f in ("brand", "season", "notes"):
+    for f in ("brand", "brand_notes", "season", "notes"):
         if _str(vals.get(f)):
             d[f] = _str(vals[f])
     for f in ("total_budget", "usd_try_rate"):
