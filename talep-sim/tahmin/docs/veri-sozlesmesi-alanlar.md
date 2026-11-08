@@ -363,6 +363,43 @@ Stok eritme önerileri için hedefler: marj tabanı, stok bitirme tarihi, sezon 
 | `kalan_deger_orani` | ondalık | hayır | Hedef tarihte kalan stoğun maliyete göre geri kazanımı, 0-1 (outlet, stok satışı). | 0.50 |
 | `indirim_basamaklari` | metin | hayır | Markanın kullandığı indirim oranları, virgülle. | 0.2,0.3,0.4,0.5 |
 
+## `rakip_kampanyalari.csv` (opsiyonel)
+
+Rakip kampanya gözlemleri (Boss Analyze ya da elle). Kampanya etki raporunda 'maruz kalan' grubu belirler.
+
+- Taneciklik: olay x ülke (x kanal x kategori)
+- Benzersiz anahtar: yok (tekrar eden satırlar kontrol edilir)
+
+| Alan | Tip | Zorunlu | Açıklama | Örnek |
+|---|---|---|---|---|
+| `olay_kodu` | metin | evet | Olay kodu (aynı kampanyanın satırları aynı kodu taşır). | RK-2025-014 |
+| `rakip_adi` | metin | hayır | Rakip. | Rakip A |
+| `gozlem_tarihi` | tarih | hayır | İlk görüldüğü gün. | 2025-11-14 |
+| `baslangic_tarihi` | tarih | evet | Başlangıç. | 2025-11-14 |
+| `bitis_tarihi` | tarih | evet | Bitiş (dahil). | 2025-11-20 |
+| `ulke` | metin | hayır | Ülke (boşsa bizim bulunduğumuz tüm ülkeler). | TR |
+| `kanal` | metin | hayır | Yalnızca bir kanaldaysa. İzinli: `magaza`, `online`, `outlet`, `franchise`, `toptan`. | online |
+| `kategori` | metin | hayır | Kategori (boşsa tümü). | mont |
+| `indirim_orani` | ondalık | hayır | Gözlenen indirim 0-1. | 0.30 |
+| `kaynak` | metin | hayır | Gözlem kaynağı. | Boss Analyze |
+
+## `kampanya_kararlari.csv` (opsiyonel)
+
+Karar defteri: bir olaya (rakip kampanyası ya da stok eritme önerisi) karşı ne yapıldı. Kontrol grubu, kampanyaya bilerek alınmayan benzer ürün/mağazalardır; etkinin güvenilir ölçümü için önerilir.
+
+- Taneciklik: karar
+- Benzersiz anahtar: `karar_kodu`
+
+| Alan | Tip | Zorunlu | Açıklama | Örnek |
+|---|---|---|---|---|
+| `karar_kodu` | metin | evet | Karar kodu. | KR-0007 |
+| `olay_kodu` | metin | hayır | İlgili rakip olayı (rakip_kampanyalari.olay_kodu) ya da öneri kodu. | RK-2025-014 |
+| `karar` | metin | evet | Yapıldı mı. İzinli: `yapildi`, `yapilmadi`, `kismen`. | yapildi |
+| `kampanya_kodu` | metin | hayır | Yapıldıysa bizim kampanyamız (kampanyalar.kampanya_kodu); kapsamı kampanya_kapsami'nda. | K-2025-AW-07 |
+| `kontrol_grubu` | metin | hayır | Kapsamdan bilerek dışarıda bırakılan benzer grup var mı. İzinli: `evet`, `hayir`. | evet |
+| `isaret_tarihi` | tarih | hayır | Kararın işaretlendiği gün. | 2025-11-15 |
+| `gerekce` | metin | hayır | Serbest açıklama. | stok fazla, eşledik |
+
 ## `doviz_kurlari.csv` (opsiyonel)
 
 Ciro raporlaması için günlük ya da aylık kur. Tahmin modeli kur kullanmaz (göreli fiyatla çalışır).

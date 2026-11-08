@@ -13,7 +13,7 @@
    bütün zincirde aynı haftada olan kampanyaları ve özel günleri emer. Bu yüzden e yalnızca aynı haftada
    indirime giren ile girmeyen ürün/mağaza farkından öğrenilir (fark-içinde-fark mantığı). Zincir geneli
    kampanyalar (sezon sonu, Black Friday) bu tahmine katkı vermez; bu bir sınırdır ve raporda yazılır.
-   Yalnızca stokta olunan haftalar (A >= 0,9) kullanılır. Aralık: ürün bazında küme bootstrap.
+   Stokta bulunma oranı A >= 0,5 olan haftalar satış / A ile kullanılır. Aralık: ürün bazında küme bootstrap.
 
 3. ``eritme_onerisi``: verilen tarihte (yalnızca o tarihe kadarki veriyle) her model-renk için eldeki stok,
    güncel satış hızı, hedef bitiş tarihine göre gereken hız ve indirim seçenekleri (satış, kalan stok,
@@ -44,6 +44,7 @@ class EritmeAyar:
     tohum: int = 0
     min_indirimli_gozlem: int = 200    # bir grup için ayrı esneklik ancak bu kadar indirimli gözlem varsa
     grup: str = "bolge"                # esneklik grubu: "bolge" ya da "kategori" ya da "tumu"
+    min_A: float = 0.5                 # esneklik: stokta bulunma oranı en az bu kadar olan haftalar (satış / A ile düzeltilir)
     esneklik_tau: float = 0.25         # kural varsayımı: gruplar arası gerçek esneklik farkının tipik büyüklüğü (büzülme)
 
 
@@ -113,12 +114,29 @@ def _kampanya_orani(vs, g: pd.DataFrame) -> pd.Series:
     return out
 
 
+def _rakip_maruz(vs, g: pd.DataFrame) -> pd.Series:
+    """Haftanın herhangi bir gününde rakip kampanyasına (rakip_kampanyalari: ülke x kanal x kategori) maruz kalan satırlar."""
+    rk = vs.get("rakip_kampanyalari")
+    out = pd.Series(False, index=g.index)
+    if rk is None or rk.empty:
+        return out
+    hb = g["hafta_bas"]
+    for r in rk.itertuples(index=False):
+        m = (hb <= pd.Timestamp(r.bitis_tarihi)) & (hb + pd.Timedelta(days=6) >= pd.Timestamp(r.baslangic_tarihi))
+        for c, v in (("ulke", r.ulke), ("kanal", r.kanal), ("kategori", r.kategori)):
+            if isinstance(v, str) and v:
+                m &= g[c] == v
+        out |= m
+    return out
+
+
 def fiyat_oranlari(vs, panel: Panel) -> pd.DataFrame:
-    """sezon_kodu, ur_id, magaza_kodu, hafta_no (+ satis, A, kategori, bolge, ...) ve raf_orani, kampanya_orani, oran."""
+    """sezon_kodu, ur_id, magaza_kodu, hafta_no (+ satis, A, kategori, bolge, ...) ve raf_orani, kampanya_orani, oran, rakip_maruz."""
     g = _izgara(panel)
     g["raf_orani"] = _raf_orani(vs, g)
     g["kampanya_orani"] = _kampanya_orani(vs, g)
     g["oran"] = (g["raf_orani"] * (1 - g["kampanya_orani"])).clip(0.05, 1.0)
+    g["rakip_maruz"] = _rakip_maruz(vs, g)
     return g
 
 
@@ -164,14 +182,19 @@ def _poisson_fe(y: np.ndarray, x: np.ndarray, a_id: np.ndarray, w_id: np.ndarray
 def esneklik_ogren(g: pd.DataFrame, sezonlar: list[str], ayar: EritmeAyar | None = None) -> pd.DataFrame:
     """g: fiyat_oranlari çıktısı. Sonuç: grup, e (satış ~ oran^-e), e_alt, e_ust (%80), indirimli_gozlem, gozlem, kaynak."""
     ayar = ayar or EritmeAyar()
-    d = g[g["sezon_kodu"].isin(sezonlar) & (g["A"] >= 0.9)].copy()
+    d = g[g["sezon_kodu"].isin(sezonlar) & (g["A"] >= ayar.min_A)].copy()
+    if "rakip_maruz" in d:
+        # rakip kampanyası haftalarında bizim indirimimiz çoğu zaman rakibe yanıttır; aynı anda rakip talebi düşürür.
+        # Bu haftalar alınırsa esneklik olduğundan düşük çıkar.
+        d = d[~d["rakip_maruz"]]
     d["x"] = np.log(d["oran"])
-    # sezon-hafta-bölge-kategori içinde hiç fiyat farkı olmayan hücreler e'ye bilgi taşımaz; ürün-mağazada da aynı
     # hafta etkisi ülke düzeyinde: ülkeye özel bayram/özel gün talep artışları kampanyayla aynı haftaya düşerse esnekliği şişirmesin
     d["_w"] = d["sezon_kodu"] + "|" + d["hafta_no"].astype(str) + "|" + d["ulke"] + "|" + d["kategori"]
     d["_a"] = d["sezon_kodu"] + "|" + d["ur_id"] + "|" + d["magaza_kodu"]
-    d = d[d.groupby("_w")["x"].transform("std").fillna(0) > 1e-6]
-    d = d[d.groupby("_a")["x"].transform("std").fillna(0) > 1e-6]
+    # Not: fiyatı hiç değişmeyen ürün-mağazalar ve hücreler atılmaz; onlar hafta etkisini ve indirim öncesi düzeyi
+    # belirleyen kontrol gözlemleridir. Yalnızca hiç satışı olmayan birimler (bilgi taşımaz) çıkarılır.
+    d = d[d.groupby("_a")["satis"].transform("sum") > 0]
+    d = d[d.groupby("_w")["satis"].transform("sum") > 0]
     if ayar.grup == "tumu" or d.empty:
         d["_g"] = "tümü"
     else:
@@ -185,7 +208,7 @@ def esneklik_ogren(g: pd.DataFrame, sezonlar: list[str], ayar: EritmeAyar | None
     b_id = d["_g"].map({k: i for i, k in enumerate(gruplar)}).to_numpy()
     a_id = pd.factorize(d["_a"])[0]
     w_id = pd.factorize(d["_w"])[0]
-    y, x = d["satis"].to_numpy(float), d["x"].to_numpy(float)
+    y, x = (d["satis"] / d["A"]).to_numpy(float), d["x"].to_numpy(float)
     rng = np.random.default_rng(ayar.tohum)
     urunler = d["ur_id"].to_numpy()
     tekil = np.unique(urunler)

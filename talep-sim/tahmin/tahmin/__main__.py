@@ -6,6 +6,7 @@ python -m tahmin dogrula veri/            # veri kalitesi raporu
 python -m tahmin geriye-test veri/        # geriye dönük test + rapor
 python -m tahmin benzer veri/ --kategori gomlek --renk BEJ --gorsel tasarim.jpg
 python -m tahmin eritme veri/ --tarih 2025-11-09   # stok eritme önerisi (gölge mod)
+python -m tahmin kampanya-etki veri/              # rakip kampanyası ve yanıt etkisi (1/2/4 hafta)
 """
 from __future__ import annotations
 
@@ -112,6 +113,27 @@ def _eritme(a) -> int:
     return 0
 
 
+def _kampanya_etki(a) -> int:
+    import pandas as pd
+
+    from .hazirlik import panel_kur
+    from .kampanya_etki import EtkiAyar, kampanya_etkisi
+    from .kampanya_etki_rapor import etki_raporu
+    from .yukleme import yukle
+
+    vs = yukle(a.klasor)
+    panel = panel_kur(vs)
+    r = kampanya_etkisi(vs, panel, EtkiAyar(), tarih=a.tarih, defter=a.defter)
+    gercek, e_gercek = None, None
+    p = Path(a.klasor) / "_sentetik_rakip_etkisi.csv"
+    if p.exists():
+        from .sentetik import BOLGE_KAMPANYA_ESNEKLIK as e_gercek
+        gercek = pd.read_csv(p)
+    yol = etki_raporu(r, a.cikti, veri_adi=str(a.klasor), sentetik_gercek=gercek, e_gercek=e_gercek)
+    print(f"Rapor: {yol}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="python -m tahmin", description="ERP verisiyle talep tahmini ve geriye dönük test")
     alt = p.add_subparsers(dest="komut", required=True)
@@ -165,6 +187,13 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--oncelik", default="kar", choices=["kar", "tarih"])
     s.add_argument("--cikti", default="rapor_eritme")
     s.set_defaults(f=_eritme)
+
+    s = alt.add_parser("kampanya-etki", help="rakip kampanyası ve bizim yanıtımızın etkisi (gölge mod)")
+    s.add_argument("klasor")
+    s.add_argument("--tarih", help="rapor günü (varsayılan: son satış günü)")
+    s.add_argument("--defter", default="karar_defteri", help="dondurulmuş temel tahminlerin tutulduğu klasör")
+    s.add_argument("--cikti", default="rapor_kampanya")
+    s.set_defaults(f=_kampanya_etki)
 
     a = p.parse_args(argv)
     return a.f(a)

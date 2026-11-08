@@ -17,7 +17,8 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m tahmin geriye-test veri-sentetik/ --cikti rapor/ --test-sezonu 2025-SS --test-sezonu 2025-AW
 .venv/bin/python -m tahmin benzer veri-sentetik/ --kategori gomlek --renk YSL --kalip oversize --sezon-tipi SS --gorsel tasarim.png
 .venv/bin/python -m tahmin eritme veri-sentetik/ --tarih 2025-11-09 --cikti rapor_eritme/   # stok eritme önerisi (gölge mod)
-.venv/bin/python -m pytest -q                                # testler (~45 sn)
+.venv/bin/python -m tahmin kampanya-etki veri-sentetik/ --cikti rapor_kampanya/   # rakip kampanyası + yanıt etkisi (1/2/4 hafta)
+.venv/bin/python -m pytest -q                                # testler (~1,5 dk)
 ```
 
 Gerçek müşteri verisi için klasöre şablondaki adlarla CSV'leri (ve `gorseller/`) koyup aynı komutları çalıştır.
@@ -41,7 +42,7 @@ Gerçek müşteri verisi için klasöre şablondaki adlarla CSV'leri (ve `gorsel
 |---|---|
 | `sozlesme.py` | Tek doğruluk kaynağı: tablolar, alanlar, tipler, anahtarlar. Pydantic satır modelleri, doküman ve şablon üretimi |
 | `yukleme.py`, `dogrulama.py` | CSV klasörünü tiplerle yükleme; HATA/UYARI/BİLGİ seviyeli kalite raporu |
-| `sentetik.py` | Sentetik zincir: 21 mağaza, 5 bölge, mevsimsellik, bayram/Black Friday, kampanyalar, alıcı hatası, ikmal, tekrar sipariş, kalıcı indirim, iade, TRY enflasyonu, ürün görselleri. Gerçek talep `_sentetik_gercek_talep.csv`'de (yalnızca ölçüm için) |
+| `sentetik.py` | Sentetik zincir: 21 mağaza, 5 bölge, mevsimsellik, bayram/Black Friday, kampanyalar, rakip kampanyaları ve bizim yanıt kararlarımız (gerçek etki `_sentetik_rakip_etkisi.csv`), alıcı hatası, ikmal, tekrar sipariş, kalıcı indirim, iade, TRY enflasyonu, ürün görselleri. Gerçek talep `_sentetik_gercek_talep.csv`'de (yalnızca ölçüm için) |
 | `hazirlik.py` | Sezon pencereleri, satış/stoğun sezon haftasına eşlenmesi, stokta bulunma oranı, stok bitişi düzeltmesi, mağaza kümeleri |
 | `gorsel.py` | Değiştirilebilir görsel gömücü: `renk_doku` (model indirmez), `clip` (open_clip kuruluysa), `yok` |
 | `benzerlik.py` | Özellik + göreli fiyat + görsel ile en benzer geçmiş ürünler (kNN) |
@@ -50,6 +51,7 @@ Gerçek müşteri verisi için klasöre şablondaki adlarla CSV'leri (ve `gorsel
 | `geriye_test.py`, `metrikler.py`, `rapor.py` | Test akışı, WAPE / sapma / kapsama, beden eğrisi, gazeteci (newsvendor) üretim adedi kıyası, Türkçe rapor |
 | `dagitim_test.py` | Mağaza dağıtımı ve ikmal geriye dönük testi: aynı arz ve talep karşısında gerçekleşen sevkiyat, iki basit kural ve model (ilk sevk + depoda rezerv + ürün/mağaza/beden düzeyinde ilk satış okumasıyla haftalık ikmal) mağaza x beden x hafta stok simülasyonuyla kıyaslanır |
 | `eritme.py`, `eritme_rapor.py` | Stok eritme önerisi (gölge mod): müşterinin kampanya geçmişinden bölge bazında indirim esnekliği (aynı hafta indirime giren/girmeyen ürün farkı, Poisson sabit etkiler, ürün bazında bootstrap, ortak değere büzülme), eldeki + yoldaki stok, iade dönüşü, indirimden arındırılmış güncel hız, hedef tarihe göre gereken hız, marj tabanı ve kalan değerle ek indirim seçenekleri; geçen sezon aynı haftayla kalibre edilen %80 aralık, bölge dengesizliği (önce transfer), geriye dönük ve sentetik karşı-olgu kontrolü. Çıktı `eritme_raporu.md` + `eritme_*.csv` |
+| `kampanya_etki.py`, `kampanya_etki_rapor.py` | Kampanya kaydı ve rakip etkisi (gölge mod): `rakip_kampanyalari` + `kampanya_kararlari` (yapıldı/yapılmadı, kontrol grubu) ile olaydan 1/2/4 hafta sonra rakip etkisi (maruz kalan vs aynı kategori maruz kalmayan pazar, fark-içinde-fark), kontrol grubu varsa yanıtın etkisi, dondurulmuş temel tahmine göre sapma, kaptırılan tahmini satış ve brüt kâr. Aralık ve "ölçülebilir en küçük etki" olaysız geçmiş haftalardaki aynı hesaptan (plasebo); olaylar arası ortalama (kampanya kütüphanesi). Pazar payı ölçülmez |
 | `yeni_tasarim.py` | Henüz satılmamış tasarım için benzer ürünler ve bölge başına mağaza başı talep |
 
 ## Önemli tasarım kararları

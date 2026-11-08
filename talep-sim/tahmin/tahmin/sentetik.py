@@ -162,6 +162,7 @@ class SentetikAyar:
     devamli_oran: float = 0.15
     gorsel: bool = True
     gorsel_boyut: int = 48
+    rakip: bool = True  # rakip kampanyaları ve bizim yanıt kararlarımız
 
 
 @dataclass
@@ -361,6 +362,73 @@ def _kampanyalar(sz: Sezon, mag: pd.DataFrame) -> tuple[list[dict], list[dict], 
     return kayit, kapsam, indirim, kod_idx
 
 
+RAKIP_ETKI_GAMMA = 0.7  # rakip indirimi d iken bizim talebimiz (1-d)^gamma ile çarpılır (sentetik varsayım)
+
+
+def _rakip_olaylari(sz: Sezon, mag: pd.DataFrame, ur: list, kayit: list, kapsam: list, rng: np.random.Generator):
+    """Rakip kampanyaları, bizim yanıtımız (yapıldı/yapılmadı, bazen kontrol gruplu) ve gerçek etkiler.
+
+    Döner: rakip satırları, karar satırları, gerçek etki satırları, rakip talep çarpanı (U,S,K),
+    bizim yanıt indirimi (U,S,K) ve yanıt kampanyasının kayit içindeki indeksi (U,S,K, yoksa -1)."""
+    U, S = len(ur), len(mag)
+    carpan = np.ones((U, S, HAFTA))
+    ek_ind = np.zeros((U, S, HAFTA))
+    ek_idx = np.full((U, S, HAFTA), -1)
+    m_ulke = mag["ulke"].to_numpy()
+    online = (mag["kanal"] == "online").to_numpy()
+    kat_u = np.array([m["kategori"] for m, _ in ur])
+    model_u = np.array([m["urun_kodu"] for m, _ in ur])
+    ulkeler = sorted(set(m_ulke))
+    rakip, karar, gercek = [], [], []
+    for j in range(3):
+        kat = str(rng.choice(sorted(set(kat_u))))
+        if rng.random() < 0.4:
+            kanal, ul = "online", list(rng.choice(ulkeler, int(rng.integers(1, 3)), replace=False))
+            maruz_s = online & np.isin(m_ulke, ul)
+            if not maruz_s.any():
+                ul = sorted(set(m_ulke[online]))[:1]
+                maruz_s = online & np.isin(m_ulke, ul)
+        else:
+            kanal, ul = "", ["TR"] if rng.random() < 0.6 else list(rng.choice(ulkeler, 1))
+            maruz_s = np.isin(m_ulke, ul)
+        k0 = int(rng.integers(4, 18))
+        k1 = k0 + int(rng.integers(0, 2))
+        d = float(rng.choice([0.2, 0.3, 0.4]))
+        maruz_u = kat_u == kat
+        etki = (1 - d) ** RAKIP_ETKI_GAMMA
+        carpan[np.ix_(maruz_u, maruz_s, np.arange(k0, k1 + 1))] *= etki
+        kod = f"RK-{sz.kod}-{j + 1:02d}"
+        for u in ul:
+            rakip.append(dict(olay_kodu=kod, rakip_adi=str(rng.choice(["Rakip A", "Rakip B", "Rakip C"])), gozlem_tarihi=sz.hafta_basi(k0).date(),
+                              baslangic_tarihi=sz.hafta_basi(k0).date(), bitis_tarihi=(sz.hafta_basi(k1) + pd.Timedelta(days=6)).date(),
+                              ulke=u, kanal=kanal, kategori=kat, indirim_orani=d, kaynak="Boss Analyze (SENTETİK)"))
+        yapildi = rng.random() < 0.6
+        kontrol = yapildi and rng.random() < 0.7
+        yanit, kamp_kod = 0.0, ""
+        if yapildi:
+            modeller = sorted(set(model_u[maruz_u]))
+            dahil = set(modeller)
+            if kontrol and len(modeller) >= 3:
+                dahil = set(rng.choice(modeller, max(1, int(round(0.7 * len(modeller)))), replace=False))
+            else:
+                kontrol = False
+            yanit = float(rng.choice([0.15, 0.2, 0.25]))
+            kamp_kod = f"K-{sz.kod}-Y{j + 1}"
+            kayit.append(dict(kampanya_kodu=kamp_kod, kampanya_adi=f"Rakip yanıtı {kod}", mekanik="yuzde_indirim", indirim_orani=yanit,
+                              baslangic_tarihi=sz.hafta_basi(k0).date(), bitis_tarihi=(sz.hafta_basi(k1) + pd.Timedelta(days=6)).date(), kanal=kanal))
+            kapsam.extend(dict(kampanya_kodu=kamp_kod, ulke=u, urun_kodu=m) for u in ul for m in sorted(dahil))
+            uu = np.isin(model_u, sorted(dahil))
+            for k in range(k0, k1 + 1):
+                blok = np.ix_(uu, maruz_s)
+                ek_ind[:, :, k][blok] = yanit
+                ek_idx[:, :, k][blok] = len(kayit) - 1
+        karar.append(dict(karar_kodu=f"KR-{sz.kod}-{j + 1:02d}", olay_kodu=kod, karar="yapildi" if yapildi else "yapilmadi",
+                          kampanya_kodu=kamp_kod, kontrol_grubu="evet" if kontrol else "hayir",
+                          isaret_tarihi=(sz.hafta_basi(k0) + pd.Timedelta(days=1)).date(), gerekce="SENTETİK karar"))
+        gercek.append(dict(olay_kodu=kod, sezon_kodu=sz.kod, rakip_talep_carpani=etki, yanit_indirimi=yanit))
+    return rakip, karar, gercek, carpan, ek_ind, ek_idx
+
+
 def uret(klasor: str | Path, ayar: SentetikAyar | None = None) -> Path:
     ayar = ayar or SentetikAyar()
     klasor = Path(klasor)
@@ -368,6 +436,7 @@ def uret(klasor: str | Path, ayar: SentetikAyar | None = None) -> Path:
     if ayar.gorsel:
         (klasor / "gorseller").mkdir(exist_ok=True)
     rng = np.random.default_rng(ayar.tohum)
+    rng_r = np.random.default_rng(ayar.tohum + 7919)  # rakip olayları ayrı akış: diğer tablolar eski tohumla aynı kalır
 
     mag = _magaza_df(rng)
     S = len(mag)
@@ -380,7 +449,8 @@ def uret(klasor: str | Path, ayar: SentetikAyar | None = None) -> Path:
 
     out: dict[str, list] = {k: [] for k in (
         "urunler", "skular", "urun_gorselleri", "fiyat_gecmisi", "kampanyalar", "kampanya_kapsami",
-        "satin_alma_siparisleri", "iadeler", "stok", "satislar", "gercek", "sevkiyatlar", "gercek_beden")}
+        "satin_alma_siparisleri", "iadeler", "stok", "satislar", "gercek", "sevkiyatlar", "gercek_beden",
+        "rakip_kampanyalari", "kampanya_kararlari", "gercek_rakip")}
     sku_goruldu: set[str] = set()
     gecmis_modeller: dict[str, list[dict]] = {"SS": [], "AW": []}
     sayac = 0
@@ -462,6 +532,15 @@ def uret(klasor: str | Path, ayar: SentetikAyar | None = None) -> Path:
         beklenen_np = taban[:, :, None] * (prof * 1.0)[None, None, :] * ozel[None] * (acik * olgunluk)[None]  # kampanyasız (U,S,K)
 
         kayit, kapsam, kamp_ind, kamp_idx = _kampanyalar(sz, mag)
+        if ayar.rakip:
+            rk, kr, gr, rakip_carpan, ek_ind, ek_idx = _rakip_olaylari(sz, mag, ur, kayit, kapsam, rng_r)
+            out["rakip_kampanyalari"].extend(rk)
+            out["kampanya_kararlari"].extend(kr)
+            out["gercek_rakip"].extend(gr)
+        else:
+            rakip_carpan, ek_ind, ek_idx = np.ones((U, S, HAFTA)), np.zeros((U, S, HAFTA)), np.full((U, S, HAFTA), -1)
+        etkin_ind = np.maximum(kamp_ind[None], ek_ind)  # (U,S,K): mağaza kampanyası ya da ürüne özel yanıt, büyüğü
+        etkin_idx = np.where(ek_ind > kamp_ind[None], ek_idx, kamp_idx[None])
         out["kampanyalar"].extend(kayit)
         out["kampanya_kapsami"].extend(kapsam)
         kamp_esn = np.array([BOLGE_KAMPANYA_ESNEKLIK[b] for b in m_bolge])
@@ -540,8 +619,8 @@ def uret(klasor: str | Path, ayar: SentetikAyar | None = None) -> Path:
             stok += yolda + iade_bekleyen[:, :, :, k]
             yolda[:] = 0
             depo += depo_bekleyen[:, :, k]
-            fiyat_carpan = (1 - kalici_ind)[:, None] * (1 - kamp_ind[None, :, k])
-            lam = beklenen_np[:, :, k] * fiyat_carpan ** (-kamp_esn[None, :]) * dagit
+            fiyat_carpan = (1 - kalici_ind)[:, None] * (1 - etkin_ind[:, :, k])
+            lam = beklenen_np[:, :, k] * fiyat_carpan ** (-kamp_esn[None, :]) * dagit * rakip_carpan[:, :, k]
             lam *= rng.gamma(4.0, 0.25, (U, S))
             d = rng.poisson(lam[:, :, None] * beden)
             s_ = np.minimum(d, stok)
@@ -635,8 +714,8 @@ def uret(klasor: str | Path, ayar: SentetikAyar | None = None) -> Path:
             i, s, z, k, n = i_[nz], s_[nz], z_[nz], k_[nz], gunluk[nz, j]
             out["satislar"].append(pd.DataFrame(dict(
                 tarih=gun0 + (7 * k + j).astype("timedelta64[D]"), magaza_kodu=magaza_kod[s], sku_kodu=sku[i, z], adet=n,
-                brut_tutar=np.round(liste_arr[i, s, k] * n, 2), net_tutar=np.round(raf_arr[i, s, k] * (1 - kamp_ind[s, k]) * n, 2),
-                kampanya_kodu=kamp_kod[kamp_idx[s, k]])))
+                brut_tutar=np.round(liste_arr[i, s, k] * n, 2), net_tutar=np.round(raf_arr[i, s, k] * (1 - etkin_ind[i, s, k]) * n, 2),
+                kampanya_kodu=kamp_kod[etkin_idx[i, s, k]])))
         # iadeler (haftanın salı günü)
         i_, s_, z_, k_ = np.nonzero(iade_kayit)
         out["iadeler"].append(pd.DataFrame(dict(
@@ -689,9 +768,12 @@ def _yaz(klasor: Path, out: dict, mag: pd.DataFrame, ayar: SentetikAyar) -> None
 
     csv("magazalar", mag.drop(columns=["bolge", "_carpan"]))
     csv("depolar", pd.DataFrame([dict(depo_kodu="D-MERKEZ", depo_adi="Merkez depo", ulke="TR", depo_tipi="merkez")]))
-    for ad in ("urunler", "skular", "urun_gorselleri", "fiyat_gecmisi", "kampanyalar", "kampanya_kapsami", "satin_alma_siparisleri"):
-        if out[ad] or ad != "urun_gorselleri":
+    for ad in ("urunler", "skular", "urun_gorselleri", "fiyat_gecmisi", "kampanyalar", "kampanya_kapsami", "satin_alma_siparisleri",
+               "rakip_kampanyalari", "kampanya_kararlari"):
+        if out[ad] or ad not in ("urun_gorselleri", "rakip_kampanyalari", "kampanya_kararlari"):
             csv(ad, pd.DataFrame(out[ad]))
+    if out["gercek_rakip"]:
+        pd.DataFrame(out["gercek_rakip"]).to_csv(klasor / "_sentetik_rakip_etkisi.csv", index=False)
     satis = pd.concat(out["satislar"], ignore_index=True).sort_values(["tarih", "magaza_kodu", "sku_kodu"])
     csv("satislar", satis)
     csv("iadeler", pd.concat(out["iadeler"]).groupby(["tarih", "magaza_kodu", "sku_kodu", "iade_nedeni"], as_index=False)["adet"].sum())
