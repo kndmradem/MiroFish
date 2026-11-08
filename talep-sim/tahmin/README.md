@@ -16,7 +16,8 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m tahmin dogrula veri-sentetik/            # veri kalitesi raporu
 .venv/bin/python -m tahmin geriye-test veri-sentetik/ --cikti rapor/ --test-sezonu 2025-SS --test-sezonu 2025-AW
 .venv/bin/python -m tahmin benzer veri-sentetik/ --kategori gomlek --renk YSL --kalip oversize --sezon-tipi SS --gorsel tasarim.png
-.venv/bin/python -m pytest -q                                # testler (~30 sn)
+.venv/bin/python -m tahmin eritme veri-sentetik/ --tarih 2025-11-09 --cikti rapor_eritme/   # stok eritme önerisi (gölge mod)
+.venv/bin/python -m pytest -q                                # testler (~45 sn)
 ```
 
 Gerçek müşteri verisi için klasöre şablondaki adlarla CSV'leri (ve `gorseller/`) koyup aynı komutları çalıştır.
@@ -48,6 +49,7 @@ Gerçek müşteri verisi için klasöre şablondaki adlarla CSV'leri (ve `gorsel
 | `belirsizlik.py` | Doğrulama sezonundan öğrenilen konformal aralıklar (q05-q95) |
 | `geriye_test.py`, `metrikler.py`, `rapor.py` | Test akışı, WAPE / sapma / kapsama, beden eğrisi, gazeteci (newsvendor) üretim adedi kıyası, Türkçe rapor |
 | `dagitim_test.py` | Mağaza dağıtımı ve ikmal geriye dönük testi: aynı arz ve talep karşısında gerçekleşen sevkiyat, iki basit kural ve model (ilk sevk + depoda rezerv + ürün/mağaza/beden düzeyinde ilk satış okumasıyla haftalık ikmal) mağaza x beden x hafta stok simülasyonuyla kıyaslanır |
+| `eritme.py`, `eritme_rapor.py` | Stok eritme önerisi (gölge mod): müşterinin kampanya geçmişinden bölge bazında indirim esnekliği (aynı hafta indirime giren/girmeyen ürün farkı, Poisson sabit etkiler, ürün bazında bootstrap, ortak değere büzülme), eldeki + yoldaki stok, iade dönüşü, indirimden arındırılmış güncel hız, hedef tarihe göre gereken hız, marj tabanı ve kalan değerle ek indirim seçenekleri; geçen sezon aynı haftayla kalibre edilen %80 aralık, bölge dengesizliği (önce transfer), geriye dönük ve sentetik karşı-olgu kontrolü. Çıktı `eritme_raporu.md` + `eritme_*.csv` |
 | `yeni_tasarim.py` | Henüz satılmamış tasarım için benzer ürünler ve bölge başına mağaza başı talep |
 
 ## Önemli tasarım kararları

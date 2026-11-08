@@ -5,6 +5,7 @@ python -m tahmin sentetik veri/           # sentetik veri üret
 python -m tahmin dogrula veri/            # veri kalitesi raporu
 python -m tahmin geriye-test veri/        # geriye dönük test + rapor
 python -m tahmin benzer veri/ --kategori gomlek --renk BEJ --gorsel tasarim.jpg
+python -m tahmin eritme veri/ --tarih 2025-11-09   # stok eritme önerisi (gölge mod)
 """
 from __future__ import annotations
 
@@ -90,6 +91,27 @@ def _benzer(a) -> int:
     return 0
 
 
+def _eritme(a) -> int:
+    from .eritme import EritmeAyar, eritme_onerisi, fiyat_oranlari
+    from .eritme_rapor import eritme_raporu
+    from .hazirlik import panel_kur
+    from .yukleme import yukle
+
+    vs = yukle(a.klasor)
+    panel = panel_kur(vs)
+    ayar = EritmeAyar(hedef_brut_marj=a.hedef_marj, kalan_deger_orani=a.kalan_deger, kdv_orani=a.kdv, oncelik=a.oncelik)
+    g = fiyat_oranlari(vs, panel)
+    r = eritme_onerisi(vs, panel, a.tarih, ayar, hedef_bitis=a.hedef_bitis, g=g)
+    e_gercek = None
+    if panel.gercek is not None:
+        from .sentetik import BOLGE_KAMPANYA_ESNEKLIK as e_gercek
+    yol = eritme_raporu(r, panel, g, vs, a.cikti, veri_adi=str(a.klasor), e_gercek=e_gercek)
+    print(f"Rapor: {yol}")
+    u = r.urunler
+    print(f"{len(u)} model-renk, şişmiş {int(u['sisman'].sum()) if len(u) else 0}, ek indirim önerilen {int((u['onerilen_ek_indirim'] > 0).sum()) if len(u) else 0}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="python -m tahmin", description="ERP verisiyle talep tahmini ve geriye dönük test")
     alt = p.add_subparsers(dest="komut", required=True)
@@ -132,6 +154,17 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--k", type=int, default=5)
     s.add_argument("--gorsel-modeli", default="renk_doku", choices=["renk_doku", "clip", "yok"])
     s.set_defaults(f=_benzer)
+
+    s = alt.add_parser("eritme", help="stok eritme (indirim) önerisi, gölge mod")
+    s.add_argument("klasor")
+    s.add_argument("--tarih", required=True, help="öneri tarihi; yalnızca bu güne kadarki veri kullanılır")
+    s.add_argument("--hedef-bitis", help="stoğun bitmesi hedeflenen tarih (varsayılan: ticari_hedefler, yoksa sezon sonu)")
+    s.add_argument("--hedef-marj", type=float, default=0.35, help="korunacak en düşük brüt marj (ticari_hedefler yoksa)")
+    s.add_argument("--kalan-deger", type=float, default=0.5, help="hedef tarihte kalan stoğun maliyete göre geri kazanımı")
+    s.add_argument("--kdv", type=float, default=0.10)
+    s.add_argument("--oncelik", default="kar", choices=["kar", "tarih"])
+    s.add_argument("--cikti", default="rapor_eritme")
+    s.set_defaults(f=_eritme)
 
     a = p.parse_args(argv)
     return a.f(a)
