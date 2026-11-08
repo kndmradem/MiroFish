@@ -429,6 +429,31 @@ def test_showcase_end_to_end_with_panel_and_resume(client):
     assert len(server.bodies) == n_before                                 # kaldığı yerden: hiçbir şey yeniden sorulmadı
 
 
+def test_showcase_runs_on_panel_side_of_hybrid_engine(client):
+    """Karma motor: tek tek tur MiroFish'te, vitrin turu (MiroFish'te yok) panelde; ekranda farkı açıklanır."""
+    from app.services.hybrid_engine import HybridEngine
+    from .test_hybrid_engine import FakeMiroFish
+
+    server = FakeLLMServer()
+    mf = FakeMiroFish()
+    app.dependency_overrides[get_engine] = lambda: HybridEngine(mf, make_engine(server=server, panel_size=4, min_valid=2))
+    rows = [[f"SW27-1{i:02d}", f"Gömlek model {i}", "Üst", "pamuk", 300 + i, 1200 + 50 * i, None, None, None] for i in range(5)]
+    files = [("sheet", ("l.xlsx", xlsx(rows, {**META, "hedef_bolgeler": "TR"}), "application/octet-stream"))]
+    files += [("images", (f"{r[0]}.jpg", png(), "image/png")) for r in rows]
+    prev = client.post("/api/collections/import", files=files).json()
+    cid = prev["collection_id"]
+    client.post(f"/api/collections/{cid}/confirm", json={"meta": prev["meta"], "items": [p["item"] for p in prev["items"]]})
+    client.post(f"/api/collections/{cid}/run", json={"block_size": 4})
+    st = _wait(client, cid)
+    assert not st["failed"], st["log"]
+    assert any("persona paneliyle yapılıyor" in line for line in st["log"]), st["log"]
+    assert len(mf.calls) == 5                                             # tek tek tur: MiroFish
+    assert any("VİTRİN TURU" in b["messages"][1]["content"] for b in server.bodies)   # vitrin: panel
+    assert not any("VİTRİN TURU" not in b["messages"][1]["content"] for b in server.bodies)
+    s = client.get(f"/api/collections/{cid}/result").json()["showcase"]
+    assert s["n_answers"] > 0 and "MiroFish" in s["basis_note"]
+
+
 # ---------- üretim kararı (üret / azalt / üretme) ----------
 
 def test_production_decision_drops_low_demand_and_low_margin_items():

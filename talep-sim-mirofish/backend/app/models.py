@@ -323,6 +323,8 @@ class RegionPredictionResult(BaseModel):
     size_curve: List[SizeShare] = []
     seasonality: Optional[Seasonality] = None
     raw_answers: List[RawAnswer] = Field([], description="Ajanların ham cevapları ve nasıl çözümlendikleri (MiroFish motoru)")
+    engine: Optional[str] = Field(None, description="Bu bölgeyi hesaplayan motor: mirofish | panel | mock")
+    engine_note: Optional[str] = Field(None, description="Karma motorda MiroFish yerine panelin kullanılma nedeni")
     data_basis: Optional[dict] = Field(None, description="Panel motoru: persona/bağlam sürümü, 'as of' tarihleri, eskime uyarıları, kalibrasyon")
     local_currency: Optional[str] = Field(None, description="Bölgenin yerel para birimi (yalnızca TL gösterilen bölgelerde)")
     local_price: Optional[Decimal] = Field(None, description="Önerilen fiyatın yerel para karşılığı")

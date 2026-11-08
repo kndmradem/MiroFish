@@ -139,6 +139,7 @@ export interface ShowcaseSummary {
   substitute_pairs: PairCount[];
   position: { position: string; pick_pct: number; expected_pct: number }[];
   position_warning: string | null;
+  basis_note?: string | null;
   mean_n_buy: number | null;
   comments: string[];
   agreement_pct: number | null;

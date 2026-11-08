@@ -21,8 +21,11 @@ def _env(name: str, default: Optional[str] = None) -> Optional[str]:
 
 @dataclass(frozen=True)
 class Settings:
-    # "mock" | "panel" (MiroFish'siz, önerilen) | "mirofish"
-    sim_engine: str = field(default_factory=lambda: _env("SIM_ENGINE", "mirofish"))
+    # "hybrid" (varsayılan: MiroFish + yapamadığı yerde persona paneli) | "mirofish" (yalnız MiroFish)
+    # | "panel" (MiroFish'siz) | "mock"
+    sim_engine: str = field(default_factory=lambda: _env("SIM_ENGINE", "hybrid"))
+    # hybrid: MiroFish bir bölgeyi hesaplayamazsa o bölge persona paneliyle hesaplanır (etiketli)
+    hybrid_fallback: bool = field(default_factory=lambda: _env("HYBRID_FALLBACK", "true").lower() in ("1", "true", "yes", "on"))
 
     # --- SIM_ENGINE=panel: doğrudan persona paneli (Zep/MiroFish yok) ---
     # Persona kütüphanesi, bağlam paketleri, active.json ve calibration.json bu klasörde (boşsa backend/panel_data)

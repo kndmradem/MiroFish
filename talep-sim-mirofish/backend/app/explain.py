@@ -166,7 +166,9 @@ def methodology_notes(engine: str, brand: Optional[BrandProfile]) -> List[str]:
     notes = ["Sonuçlar sentetik ajan simülasyonundan gelir; gerçek satış verisiyle doğrulanmadı. Karar için tek başına kullanılmamalı."]
     notes.append({"mock": "Bu çalıştırma MOCK simülasyon kullandı (gerçek LLM ajanları yok).",
                   "panel": "Bu çalıştırma doğrudan persona paneli kullandı (MiroFish/Zep yok): segment verisinden "
-                           "örneklenen kişiler, tarihli bağlam paketiyle yerel dil modeline soruldu."}
+                           "örneklenen kişiler, tarihli bağlam paketiyle yerel dil modeline soruldu.",
+                  "hybrid": "Bu çalıştırma karma motor kullandı: bölgelerin bir kısmı MiroFish ajan sürüsüyle, kalanı "
+                            "persona paneliyle hesaplandı (hangi bölgenin hangisiyle hesaplandığı aşağıda)."}
                  .get(engine, "Bu çalıştırma MiroFish ajan sürüsü kullandı."))
     if brand is None:
         notes.append("Marka girilmedi: fiyatlama nötr kitlesel varsayımla yapıldı.")

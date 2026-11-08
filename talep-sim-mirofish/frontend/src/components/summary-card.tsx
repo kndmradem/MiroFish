@@ -9,6 +9,7 @@ const ENGINE_LABEL: Record<string, string> = {
   mock: "mock (örnek)",
   panel: "persona paneli (yerel model)",
   mirofish: "MiroFish ajan simülasyonu",
+  hybrid: "karma (MiroFish + persona paneli)",
 };
 
 /** Panel motorunda verinin tarihi ve eskime uyarıları: sonuç, ancak bu verinin güncelliği kadar doğrudur. */
@@ -83,6 +84,13 @@ export function SummaryCard({ result, productName }: { result: PredictionRespons
         </table>
       </div>
       <DataBasisNote result={result} />
+      {result.regional_breakdown.some((r) => r.engine_note) && (
+        <p className="text-xs text-amber-700">
+          Bölge bazında motor:{" "}
+          {result.regional_breakdown.map((r) => `${r.region}: ${ENGINE_LABEL[r.engine ?? ""] ?? r.engine ?? "?"}`).join(" · ")}.
+          MiroFish&apos;in hesaplayamadığı bölgeler persona paneliyle hesaplandı; nedenleri yöntem notlarında.
+        </p>
+      )}
       {result.failed_regions.length > 0 && (
         <p className="text-xs text-amber-700">Hesaplanamayan bölgeler: {result.failed_regions.map((f) => f.region).join(", ")}.</p>
       )}

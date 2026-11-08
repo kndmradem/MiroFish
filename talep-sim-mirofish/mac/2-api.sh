@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Pencere 2: Talep simülasyonu API'si (SIM_ENGINE=mirofish), port 8100
+# Pencere 2: Talep simülasyonu API'si (SIM_ENGINE=hybrid: MiroFish + persona paneli), port 8100
 set -euo pipefail
 source "$(dirname "$0")/ortak.sh"
 curl -fs "http://localhost:$MIROFISH_PORT/health" >/dev/null 2>&1 \

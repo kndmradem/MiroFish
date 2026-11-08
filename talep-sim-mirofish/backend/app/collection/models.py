@@ -214,6 +214,7 @@ class ShowcaseSummary(BaseModel):
     mean_n_buy: Optional[float] = None
     comments: List[str] = Field(default_factory=list)
     agreement_pct: Optional[float] = Field(None, description="Tek tek ve vitrin sıralamasının uyumu (sıra korelasyonu x100)")
+    basis_note: Optional[str] = Field(None, description="Vitrin turu ile tek tek tur farklı motorlardan geldiyse açıklama")
 
 
 class Reason(BaseModel):

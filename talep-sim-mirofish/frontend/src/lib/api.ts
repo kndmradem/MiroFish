@@ -296,6 +296,9 @@ export interface RegionPredictionResult {
   raw_answers?: RawAnswer[];
   /** Panel motoru: hangi persona/bağlam sürümüyle, hangi tarih itibarıyla hesaplandı. */
   data_basis?: DataBasis | null;
+  /** Bu bölgeyi hesaplayan motor (karma motorda bölgeden bölgeye değişebilir). */
+  engine?: string | null;
+  engine_note?: string | null;
   local_currency?: string | null;
   local_price?: string | null;
   fx_rate?: number | null;

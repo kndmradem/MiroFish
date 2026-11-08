@@ -2,7 +2,7 @@
 # Hangi servis ayakta? (yeni kurulum + eski kurulumun portları yalnızca bilgi için)
 source "$(dirname "$0")/ortak.sh"
 kontrol() { if curl -fs -m 3 "$2" >/dev/null 2>&1; then echo "  ✓ $1"; else echo "  ✗ $1  (kapalı)"; fi; }
-echo "Yeni kurulum (MiroFish motoru):"
+echo "Yeni kurulum (karma motor: MiroFish + persona paneli):"
 kontrol "Ollama            $OLLAMA_URL" "$OLLAMA_URL/api/version"
 kontrol "MiroFish          :$MIROFISH_PORT" "http://localhost:$MIROFISH_PORT/health"
 kontrol "Talep API         :$API_PORT" "http://localhost:$API_PORT/health"

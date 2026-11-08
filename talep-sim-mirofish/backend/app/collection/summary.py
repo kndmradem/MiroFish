@@ -46,6 +46,9 @@ def _net_margin(price: float, return_pct: float, cost: Optional[float]) -> Optio
     return round(100 * (net - cost) / price, 1)
 
 
+PANEL_FALLBACK_OFFSET = 100_000
+
+
 def _item_regions(resp: dict, planned_usd: Optional[float], cost_usd: Optional[float] = None
                   ) -> Tuple[List[ItemRegion], Dict[Person, float], dict]:
     regions, interests, basis = [], {}, None
@@ -57,9 +60,12 @@ def _item_regions(resp: dict, planned_usd: Optional[float], cost_usd: Optional[f
         if planned_usd:
             fit = "altında" if planned_usd < lo else "üstünde" if planned_usd > hi else "içinde"
         own = {}
+        # Karma motorda MiroFish'in hesaplayamayıp panelin hesapladığı bölgede kişiler MiroFish ajanları değildir:
+        # aynı numaralı ajanla karışmasın diye ayrı kişi sayılır (kişi içi normalizasyon yalnızca aynı kişiyle yapılır).
+        offset = PANEL_FALLBACK_OFFSET if rb.get("engine_note") else 0
         for a in rb.get("raw_answers") or []:
             if a.get("interest") is not None:
-                own[(r, int(a["agent"]))] = float(a["interest"])
+                own[(r, offset + int(a["agent"]))] = float(a["interest"])
         interests.update(own)
         alloc = rb.get("allocation") or {}
         ret = rb.get("returns") or {}
@@ -367,6 +373,11 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
     disp = {s: (statistics.pstdev(per_item_int[s].values()) if len(per_item_int.get(s, {})) > 1 else None) for s in skus}
 
     sc_items, sc_summary = summarize_showcase({} if indep else (showcase or {}), skus, ranks)
+    single_engines = {results[s]["response"].get("engine") for s in skus}
+    if sc_summary and single_engines & {"mirofish", "hybrid"}:
+        sc_summary.basis_note = ("Tek tek tur MiroFish ajanlarıyla, vitrin turu persona paneliyle yapıldı (MiroFish'te vitrin turu "
+                                 "yok). İki turda soruya cevap veren kişiler farklı; sıralama uyumu iki ayrı panelin "
+                                 "karşılaştırmasıdır, aynı kişilerin fikir değişimi olarak okunmamalı.")
 
     # roller (kural varsayımı)
     n = len(skus)

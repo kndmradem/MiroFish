@@ -67,12 +67,21 @@ def build_panel_engine(cfg: Settings, mock: MockSimulationEngine):
 
 
 def build_engine(cfg: Settings) -> SimulationEngine:
-    """SIM_ENGINE=panel: doğrudan persona paneli, mirofish: MiroFish ajan sürüsü, aksi halde mock."""
+    """SIM_ENGINE=hybrid: MiroFish + yapamadığı yerde persona paneli, panel: yalnız persona paneli,
+    mirofish: yalnız MiroFish ajan sürüsü, aksi halde mock."""
     mock = MockSimulationEngine()
     if cfg.sim_engine == "panel":
         return build_panel_engine(cfg, mock)
+    if cfg.sim_engine == "hybrid":
+        from .services.hybrid_engine import HybridEngine
+        return HybridEngine(build_mirofish_engine(cfg, mock), build_panel_engine(cfg, mock),
+                            fallback_on_error=cfg.hybrid_fallback)
     if cfg.sim_engine != "mirofish":
         return mock
+    return build_mirofish_engine(cfg, mock)
+
+
+def build_mirofish_engine(cfg: Settings, mock: MockSimulationEngine):
 
     from .services.mirofish_client import MiroFishClient
     from .services.mirofish_engine import MiroFishSimulationEngine
@@ -328,6 +337,9 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
             size_curve=size_curve(region, card), seasonality=season,
             raw_answers=sim.meta.get("raw_answers", []),
             data_basis=_data_basis(sim.meta),
+            engine=sim.meta.get("engine"),
+            engine_note=(f"MiroFish bu bölgeyi hesaplayamadı, persona paneli kullanıldı: {sim.meta['fallback_reason']}"
+                         if sim.meta.get("fallback_from") else None),
             explanations=[e if e.key != "quantity" else Explanation(
                 key="quantity", label=e.label, value=f"{alloc.quantity:,}", how=view.why,
                 assumptions=["Talep 120 günlük ajan talebi + kural varsayımlarından (kitle, dönüşüm) gelir; stok sınırsız varsayıldığında beklenen satıştır.",
@@ -340,8 +352,14 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
 
     spent = sum((a.quantity * req.unit_cost for a in allocations.values()), Decimal(0))
     unallocated = Decimal(req.total_production_budget) - spent
-    engine_name = sims[0].meta.get("engine", "mock")
+    used = {s.meta.get("engine", "mock") for s in sims}
+    engine_name = used.pop() if len(used) == 1 else "hybrid"
     notes = methodology_notes(engine_name, brand)
+    fell_back = [s for s in sims if s.meta.get("fallback_from")]
+    if fell_back:
+        notes.append("MiroFish şu bölgeleri hesaplayamadı, bu bölgeler persona paneliyle (yerel model) hesaplandı: " +
+                     "; ".join(f"{s.region} ({s.meta.get('fallback_reason', '')[:120]})" for s in fell_back) +
+                     ". Bu bölgelerin sonuçları MiroFish ajanlarından değil, panel kişilerinden gelir.")
     if failed:
         notes.append("Hesaplanamayan bölgeler (" + ", ".join(f.region for f in failed) +
                      ") dağıtıma katılmadı; bütçe yalnızca hesaplanan bölgeler arasında paylaştırıldı.")

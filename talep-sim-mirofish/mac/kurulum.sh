@@ -29,13 +29,14 @@ if [ -z "$ZEP" ] || [ "$ZEP" = "your_zep_api_key_here" ]; then
   echo "! ZEP_API_KEY boş. $KOK_ENV dosyasını aç, ZEP_API_KEY= satırına Zep anahtarını yaz."
 fi
 
-# --- 2) Talep API .env, motor = mirofish, port 8100 -> MiroFish 5101 ---
+# --- 2) Talep API .env, motor = hybrid (MiroFish + panel), port 8100 -> MiroFish 5101 ---
 API_ENV="$SIM_KOK/backend/.env"
 if [ ! -f "$API_ENV" ]; then
   if [ -f "$ESKI_KOK/talep-sim/backend/.env" ]; then cp "$ESKI_KOK/talep-sim/backend/.env" "$API_ENV"; echo "✓ API .env eski klasörden kopyalandı"
   else cp "$SIM_KOK/backend/.env.example" "$API_ENV"; echo "! Eski API .env bulunamadı, örnekten oluşturuldu"; fi
 fi
-env_yaz "$API_ENV" SIM_ENGINE mirofish
+env_yaz "$API_ENV" SIM_ENGINE hybrid
+env_yaz "$API_ENV" HYBRID_FALLBACK true
 env_yaz "$API_ENV" MIROFISH_URL "http://localhost:$MIROFISH_PORT"
 env_yaz "$API_ENV" CORS_ORIGINS "http://localhost:$PANEL_PORT,http://127.0.0.1:$PANEL_PORT"
 if [ -z "$(env_oku "$API_ENV" VISION_API_KEY)" ]; then

@@ -121,9 +121,13 @@ class CollectionRunner:
 
     @staticmethod
     async def _showcase(col, opts, store, engine, brand, regions, fx_rate, say, st):
-        """Tek tek turdan sonra vitrin turu. Yalnızca panel motorunda (kişi ve LLM erişimi gerekir)."""
+        """Tek tek turdan sonra vitrin turu. Panel motoru gerekir (kişi ve LLM erişimi); karma motorda panel tarafı kullanılır."""
+        mixed = hasattr(engine, "panel") and hasattr(engine, "mirofish")
+        if mixed:
+            engine = engine.panel
+            say("Vitrin turu MiroFish'te yok: bu tur persona paneliyle yapılıyor (tek tek tur MiroFish ajanlarıyla)")
         if not (hasattr(engine, "llm") and hasattr(engine, "store") and hasattr(engine.llm, "ask_json")):
-            say("Vitrin turu atlandı: yalnızca panel motorunda (SIM_ENGINE=panel) çalışır")
+            say("Vitrin turu atlandı: panel motoru gerekir (SIM_ENGINE=panel veya hybrid)")
             return
         res = store.results(col.id, [i.sku for i in col.items])
         ok = {s: r for s, r in res.items() if r.get("response")}

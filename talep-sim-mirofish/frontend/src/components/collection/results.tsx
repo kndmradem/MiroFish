@@ -444,7 +444,7 @@ function Showcase({ res }: { res: CollectionResult }) {
   if (!v) {
     return (
       <p className="text-sm text-muted-foreground">
-        Bu koşuda vitrin turu yok. Panel motoruyla (SIM_ENGINE=panel) &quot;Vitrin turu&quot; kutusu işaretli çalıştırın; tek tek sonuçlar
+        Bu koşuda vitrin turu yok. Panel veya karma motorla (SIM_ENGINE=panel / hybrid) &quot;Vitrin turu&quot; kutusu işaretli çalıştırın; tek tek sonuçlar
         yeniden sorulmaz, yalnızca vitrin soruları eklenir.
       </p>
     );
@@ -462,6 +462,7 @@ function Showcase({ res }: { res: CollectionResult }) {
           v.agreement_pct >= 60 ? "büyük ölçüde aynı" : v.agreement_pct >= 30 ? "kısmen benzer" : v.agreement_pct > -30 ? "birbirinden bağımsız" : "çoğunlukla ters"
         } (sıra korelasyonu ${(v.agreement_pct / 100).toFixed(2)}; 1 tam aynı, 0 ilişkisiz, -1 tam ters). Fark büyükse ürünler yan yana görülünce farklı algılanıyor demektir.`}
       </p>
+      {v.basis_note && <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs">{v.basis_note}</p>}
       <div className={cn("rounded-md border p-3 text-sm", v.position_warning ? "border-amber-300 bg-amber-50" : "")}>
         <div className="mb-2 flex items-center gap-2 font-medium">Sıra etkisi kontrolü <BasisChip basis="ajan" how="Seçilen ürünlerin listedeki konumu" /></div>
         <div className="grid gap-1 sm:grid-cols-3">
