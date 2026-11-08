@@ -22,7 +22,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 Gerçek müşteri verisi için klasöre şablondaki adlarla CSV'leri (ve `gorseller/`) koyup aynı komutları çalıştır.
 `rapor/geriye_donuk_test_raporu.md` pilot müşteriye verilecek ilk çıktının taslağıdır; yanında tüm tahminler
 (`tahminler_*.csv`, q05-q95 kantilleriyle), `metrikler.csv`, `benzer_urunler.csv`, `beden_egrisi.csv`,
-`uretim_adedi_kiyasi.csv`, `dagitim_ozet.csv` / `dagitim_bolge.csv` / `dagitim_urun.csv` (mağaza dağıtımı kıyası) ve `veri_kalitesi.md` yazılır.
+`uretim_adedi_kiyasi.csv`, `dagitim_ozet.csv` / `dagitim_bolge.csv` / `dagitim_beden.csv` / `dagitim_urun.csv` (mağaza dağıtımı kıyası) ve `veri_kalitesi.md` yazılır.
 
 ## Dokümanlar
 
@@ -47,7 +47,7 @@ Gerçek müşteri verisi için klasöre şablondaki adlarla CSV'leri (ve `gorsel
 | `modeller.py` | Kıyas yöntemleri (kategori ortalaması, geçen yıl kategori, mevsimsel naif), benzer ürün kNN, özellik modeli (gradyan artırmalı ağaç, Poisson); haftalara dağıtım |
 | `belirsizlik.py` | Doğrulama sezonundan öğrenilen konformal aralıklar (q05-q95) |
 | `geriye_test.py`, `metrikler.py`, `rapor.py` | Test akışı, WAPE / sapma / kapsama, beden eğrisi, gazeteci (newsvendor) üretim adedi kıyası, Türkçe rapor |
-| `dagitim_test.py` | Mağaza dağıtımı ve ikmal geriye dönük testi: aynı arz ve talep karşısında gerçekleşen sevkiyat, iki basit kural ve model (ilk sevk + depoda rezerv + ilk satış okumasıyla haftalık ikmal) mağaza x hafta stok simülasyonuyla kıyaslanır |
+| `dagitim_test.py` | Mağaza dağıtımı ve ikmal geriye dönük testi: aynı arz ve talep karşısında gerçekleşen sevkiyat, iki basit kural ve model (ilk sevk + depoda rezerv + ürün/mağaza/beden düzeyinde ilk satış okumasıyla haftalık ikmal) mağaza x beden x hafta stok simülasyonuyla kıyaslanır |
 | `yeni_tasarim.py` | Henüz satılmamış tasarım için benzer ürünler ve bölge başına mağaza başı talep |
 
 ## Önemli tasarım kararları
@@ -68,6 +68,7 @@ Gerçek müşteri verisi için klasöre şablondaki adlarla CSV'leri (ve `gorsel
 - Sezon geneli seviye kaymaları geçmişten öğrenilemez; sentetik testte tüm yöntemler toplamı %15-22 düşük tahmin etti.
   Gerçek veride, karar anında devam eden sezonun geçen yıla göre trendi (like-for-like) bir sonraki iyileştirme adayıdır.
 - Kampanya takvimi karar anında bilinmiyor kabul edildi; promosyon planı girdisi sonraki adımdır.
-- Mağaza dağıtımı testi model-renk x mağaza düzeyindedir: beden kırılımı, mağazalar arası transfer, iadelerin rafa dönüşü, koli katları ve kapasite henüz yok.
+- Mağaza dağıtımı testi mağaza x beden x hafta düzeyindedir (gerçek veride beden talebi, mağaza talebinin bölge beden payıyla bölünmesiyle tahmin edilir);
+  mağazalar arası transfer, iadelerin rafa dönüşü, koli katları ve kapasite henüz yok.
   İkmal kapsaması (varsayılan 2 hafta) sabit; doğru ayar müşterinin kaçan satış ve kalan stok maliyetine göre doğrulama sezonunda seçilmeli.
 - ERP bağlantısı (connector) yok; veri CSV olarak gelir.

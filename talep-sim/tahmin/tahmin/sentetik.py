@@ -380,7 +380,7 @@ def uret(klasor: str | Path, ayar: SentetikAyar | None = None) -> Path:
 
     out: dict[str, list] = {k: [] for k in (
         "urunler", "skular", "urun_gorselleri", "fiyat_gecmisi", "kampanyalar", "kampanya_kapsami",
-        "satin_alma_siparisleri", "iadeler", "stok", "satislar", "gercek", "sevkiyatlar")}
+        "satin_alma_siparisleri", "iadeler", "stok", "satislar", "gercek", "sevkiyatlar", "gercek_beden")}
     sku_goruldu: set[str] = set()
     gecmis_modeller: dict[str, list[dict]] = {"SS": [], "AW": []}
     sayac = 0
@@ -525,6 +525,7 @@ def uret(klasor: str | Path, ayar: SentetikAyar | None = None) -> Path:
         depo_bekleyen = np.zeros((U, 5, HAFTA + 12))
         satis = np.zeros((U, S, 5, HAFTA))
         talep = np.zeros((U, S, HAFTA))
+        talep_beden = np.zeros((U, S, 5, HAFTA))
         stok_kayit = np.zeros((U, S, 5, HAFTA))
         depo_kayit = np.zeros((U, 5, HAFTA))
         sevk_kayit = np.zeros((U, S, 5, HAFTA))  # hafta k sonunda gönderilen, k+1 başında rafta
@@ -547,6 +548,7 @@ def uret(klasor: str | Path, ayar: SentetikAyar | None = None) -> Path:
             stok -= s_
             satis[:, :, :, k] = s_
             talep[:, :, k] = d.sum(2)
+            talep_beden[:, :, :, k] = d
             # iadeler 1-3 hafta sonra aynı lokasyona döner, %85'i tekrar satılabilir
             ia = rng.binomial(s_.astype(int), np.broadcast_to(iade_oran[:, :, None], s_.shape))
             gecikme = rng.integers(1, 4)
@@ -671,6 +673,11 @@ def uret(klasor: str | Path, ayar: SentetikAyar | None = None) -> Path:
         out["gercek"].append(pd.DataFrame(dict(
             sezon_kodu=sz.kod, urun_kodu=np.array([m["urun_kodu"] for m, _ in ur])[I], renk_kodu=np.array([r for _, r in ur])[I],
             magaza_kodu=magaza_kod[Sg], hafta_baslangic=gun0 + (7 * K).astype("timedelta64[D]"), gercek_talep=talep[I, Sg, K].astype(int))))
+        # beden düzeyinde gerçek talep (yalnızca sıfırdan büyükler; dağıtım testinde kullanılır)
+        bi, bs, bz, bk = np.nonzero(talep_beden * (dagit[:, :, None, None] & acik[None, :, None, :]))
+        out["gercek_beden"].append(pd.DataFrame(dict(
+            sezon_kodu=sz.kod, sku_kodu=sku[bi, bz], magaza_kodu=magaza_kod[bs],
+            hafta_baslangic=gun0 + (7 * bk).astype("timedelta64[D]"), gercek_talep=talep_beden[bi, bs, bz, bk].astype(int))))
 
     _yaz(klasor, out, mag, ayar)
     return klasor
@@ -693,11 +700,13 @@ def _yaz(klasor: Path, out: dict, mag: pd.DataFrame, ayar: SentetikAyar) -> None
     csv("takvim", _takvim(range(ayar.ilk_yil, ayar.ilk_yil + ayar.yil_sayisi + 1)))
     pd.concat(out["gercek"], ignore_index=True).to_csv(
         klasor / "_sentetik_gercek_talep.csv", index=False)
+    pd.concat(out["gercek_beden"], ignore_index=True).to_csv(
+        klasor / "_sentetik_gercek_talep_beden.csv", index=False)
     (klasor / "SENTETIK_VERI_BENIOKU.md").write_text(
         "# SENTETİK VERİ\n\n"
         "Bu klasördeki veriler `python -m tahmin sentetik` ile üretilmiştir. Gerçek bir markanın verisi değildir;\n"
         "satış, stok ve fiyatlar bir formülden üretilmiştir. Müşteriye gösterilirken mutlaka 'sentetik' olarak belirtilmelidir.\n\n"
         f"Tohum: {ayar.tohum}, yıl: {ayar.ilk_yil}-{ayar.ilk_yil + ayar.yil_sayisi - 1}, sezon başına model: {ayar.model_sayisi}.\n\n"
-        "`_sentetik_gercek_talep.csv` stok bitişinden etkilenmemiş gerçek talebi içerir. Gerçek veride böyle bir dosya yoktur;\n"
+        "`_sentetik_gercek_talep.csv` (ve beden düzeyinde `_sentetik_gercek_talep_beden.csv`) stok bitişinden etkilenmemiş gerçek talebi içerir. Gerçek veride böyle bir dosya yoktur;\n"
         "yalnızca stok bitişi düzeltmesinin ve modellerin ne kadar isabetli olduğunu ölçmek için kullanılır, modellere verilmez.\n",
         encoding="utf-8")

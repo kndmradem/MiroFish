@@ -239,27 +239,35 @@ def _dagitim_bolumu(s: TestSonucu, T: str) -> list[str]:
     n = s.dagitim["notlar"].set_index("test_sezonu").loc[T]
     hedef = d["hedef"].iat[0]
     o = ["## Mağaza dağıtımı ve ikmal\n"]
-    o.append(f"Soru: aynı toplam adet (depoya giren alım) ve aynı talep ({HEDEF_AD[hedef]}) karşısında ürünü mağazalara farklı "
-             "kurallarla dağıtsaydık ne kadar satış kaçardı, sezon sonunda stok nerede kalırdı? Her model-renk için mağaza x hafta "
-             "stok simülasyonu: hafta içi satış = min(talep, raf stoğu), hafta sonu verilen sevk ertesi hafta rafta. "
-             f"Mağaza payları ve haftalık profil karar anındaki tahminden ({s.dagitim_yontemi}) ve geçmiş sezonlardan gelir; test sezonunun satışı "
-             "yalnızca model politikasının haftalık ikmalinde, o haftaya kadar gerçekleşen kadarıyla görülür.\n")
-    sira = [p for p in ("gerceklesen", "model", *sorted(x for x in d.index if x.startswith("model_kapsama_")), "tek_sefer_pay", "tek_sefer_esit") if p in d.index]
+    o.append(f"Soru: aynı toplam adet (depoya giren alım, beden bazında) ve aynı talep ({HEDEF_AD[hedef]}) karşısında ürünü mağazalara farklı "
+             "kurallarla dağıtsaydık ne kadar satış kaçardı, sezon sonunda stok nerede kalırdı? Her model-renk için mağaza x beden x hafta "
+             "stok simülasyonu: hafta içi satış = min(talep, raf stoğu), hafta sonu verilen sevk ertesi hafta rafta, depo stoğu beden başına ayrı. "
+             f"Mağaza payları, haftalık profil ve beden eğrisi karar anındaki tahminden ({s.dagitim_yontemi}) ve geçmiş sezonlardan gelir; test sezonunun satışı "
+             "yalnızca model politikasının haftalık ikmalinde, o haftaya kadar gerçekleşen kadarıyla görülür (ürün, mağaza ve beden düzeyinde ilk satış okuması).\n")
+    sira = [p for p in ("gerceklesen", "model", "model_esit_beden", *sorted(x for x in d.index if x.startswith("model_kapsama_")), "tek_sefer_pay", "tek_sefer_esit") if p in d.index]
     o.append(_tablo(pd.DataFrame({
         "Politika": [politika_adi(p) for p in sira],
         "Karşılanan talep": [yuzde(d.at[p, "karsilanan_talep"]) for p in sira],
         "Kaçan satış": [sayi(d.at[p, "kacan_satis"]) for p in sira],
+        "Bunun mağazada ürün varken (beden yok) kaçan kısmı": [sayi(d.at[p, "stok_varken_kacan"]) for p in sira],
         "Sezon sonu mağazada": [sayi(d.at[p, "magazada_kalan"]) for p in sira],
         "Sezon sonu depoda": [sayi(d.at[p, "depoda_kalan"]) for p in sira],
-        "Sevk satırı": [sayi(d.at[p, "sevk_satiri"]) for p in sira]})))
+        "Mağazaya sevk": [sayi(d.at[p, "sevk_satiri"]) for p in sira]})))
     o.append("")
     o.append(f"Karşılaştırılan ürün: {int(n['urun_karsilastirilan'])} / {int(n['urun_toplam'])} model-renk; toplam arz {sayi(d['arz'].iat[0])}, "
-             f"toplam talep {sayi(d['talep'].iat[0])} adet. Mağaza x bölge kırılımı: `dagitim_bolge.csv`, ürün bazında: `dagitim_urun.csv`.\n")
+             f"toplam talep {sayi(d['talep'].iat[0])} adet. Bölge kırılımı: `dagitim_bolge.csv`, beden: `dagitim_beden.csv`, ürün bazında: `dagitim_urun.csv`.\n")
     if "gerceklesen" in d.index and "model" in d.index:
         g, m = d.loc["gerceklesen"], d.loc["model"]
         o.append(f"- Model politikası gerçekleşen sevkiyata göre kaçan satışı {yuzde(m['kacan_satis'] / g['kacan_satis'] - 1, True)}, "
                  f"sezon sonunda mağazalarda kalan stoğu {yuzde(m['magazada_kalan'] / max(g['magazada_kalan'], 1) - 1, True)} değiştirdi; "
-                 f"sevk satırı sayısı {yuzde(m['sevk_satiri'] / max(g['sevk_satiri'], 1) - 1, True)}.")
+                 f"mağazaya sevk sayısı {yuzde(m['sevk_satiri'] / max(g['sevk_satiri'], 1) - 1, True)}.")
+        o.append(f"- Gerçekleşen sevkiyatta kaçan satışın {yuzde(g['stok_varken_kacan'] / max(g['kacan_satis'], 1))}'i mağazada üründen stok varken, "
+                 "istenen beden olmadığı için kaçtı. Kayıpların çoğu 'ürün yok'tan değil 'beden yok'tan geliyor; beden bazında ikmal bu yüzden önemli.")
+        if "model_esit_beden" in d.index:
+            e = d.loc["model_esit_beden"]
+            o.append(f"- Geçmiş beden eğrisinin katkısı: aynı model eşit beden payıyla başlasaydı kaçan satış {sayi(e['kacan_satis'])} olurdu "
+                     f"(eğriyle {sayi(m['kacan_satis'])}). Fark küçükse nedeni haftalık ikmalin ilk satışlardan beden payını hızla öğrenmesidir; "
+                     "ikmal imkânı az olan üründe (tek sevkiyat, uzak mağaza) eğrinin payı büyür.")
     o.append("- 'Hepsi baştan' politikaları depoda hiç stok bırakmaz: kaçan satış düşük görünebilir ama sezon sonunda stok mağazalara dağılmış kalır "
              "ve oradan toplamak transfer maliyeti demektir. Depoda kalan stok online'a, outlet'e ya da sonraki sezona daha kolay gider. "
              "Bu yüzden tek bir sayıya değil, kaçan satış ile mağazada kalan stoğu birlikte okumak gerekir.")
@@ -271,7 +279,20 @@ def _dagitim_bolumu(s: TestSonucu, T: str) -> list[str]:
     else:
         o.append("- **Gerçek veri sınırı:** talep, stok bitişi düzeltilmiş bir tahmindir; model kendi düzelttiği talebe göre değerlendirildiği için kazanç biraz abartılı çıkabilir. "
                  "Asıl kanıt, mağaza kümelerinin bir kısmında modelle, kalanında eski yöntemle yapılan canlı pilottur.")
-    o.append("- Bu sürümde yok: beden kırılımı (beden eğrisi yukarıda ayrıca test edildi), mağazalar arası transfer, iadelerin rafa dönüşü, "
-             "koli katları ve mağaza kapasitesi. Hepsi bütün politikalara aynı şekilde uygulandığı için kıyası bozmaz ama mutlak sayıları değiştirir.")
+    if not s.sentetik:
+        o.append("- Gerçek veride beden talebi, mağaza talebinin ürünün o bölgedeki sezon beden payıyla bölünmesiyle tahmin edildi; stoğu erken biten bedenin payı düşük görünebilir.")
+    o.append("- Bu sürümde yok: mağazalar arası transfer, iadelerin rafa dönüşü, koli katları ve mağaza kapasitesi. "
+             "Hepsi bütün politikalara aynı şekilde uygulandığı için kıyası bozmaz ama mutlak sayıları değiştirir.")
     o.append("")
+    bd = s.dagitim.get("beden")
+    if bd is not None and not bd.empty:
+        bd = bd[(bd["test_sezonu"] == T) & bd["politika"].isin(["gerceklesen", "model"])]
+        if bd["politika"].nunique() == 2:
+            g_, m_ = (bd[bd["politika"] == p].set_index("beden_sirasi") for p in ("gerceklesen", "model"))
+            o.append("Beden bazında (bütün ürünler, beden sırasına göre):\n")
+            o.append(_tablo(pd.DataFrame({
+                "Beden": g_["beden"], "Talep": [sayi(v) for v in g_["talep"]],
+                "Kaçan, gerçekleşen": [sayi(v) for v in g_["kacan_satis"]], "Kaçan, model": [sayi(v) for v in m_["kacan_satis"]],
+                "Mağazada kalan, gerçekleşen": [sayi(v) for v in g_["magazada_kalan"]], "Mağazada kalan, model": [sayi(v) for v in m_["magazada_kalan"]]})))
+            o.append("")
     return o
