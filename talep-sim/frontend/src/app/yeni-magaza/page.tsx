@@ -102,6 +102,12 @@ export default function NewStorePage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 text-sm">
+            {result.synthetic_data && (
+              <p className="rounded-md border-2 border-red-600 bg-red-500/10 p-2 font-semibold text-red-700">
+                SENTETİK ÖRNEK VERİ: Bu sonuç uydurma deneme mağazalarından (ORNEK-*) hesaplandı, gerçek ERP satışı değildir.
+                Yalnızca ekranı denemek içindir; müşteriye gerçek sonuç olarak gösterilmemeli.
+              </p>
+            )}
             <div className="flex flex-wrap gap-2">
               <Badge variant={result.confidence === "düşük" ? "destructive" : "secondary"}>Güven: {result.confidence}</Badge>
               <Badge variant={noOwn ? "destructive" : "outline"}>{OWN_LABEL[result.own_data]}</Badge>
