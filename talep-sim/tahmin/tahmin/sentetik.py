@@ -380,7 +380,7 @@ def uret(klasor: str | Path, ayar: SentetikAyar | None = None) -> Path:
 
     out: dict[str, list] = {k: [] for k in (
         "urunler", "skular", "urun_gorselleri", "fiyat_gecmisi", "kampanyalar", "kampanya_kapsami",
-        "satin_alma_siparisleri", "iadeler", "stok", "satislar", "gercek")}
+        "satin_alma_siparisleri", "iadeler", "stok", "satislar", "gercek", "sevkiyatlar")}
     sku_goruldu: set[str] = set()
     gecmis_modeller: dict[str, list[dict]] = {"SS": [], "AW": []}
     sayac = 0
@@ -527,6 +527,7 @@ def uret(klasor: str | Path, ayar: SentetikAyar | None = None) -> Path:
         talep = np.zeros((U, S, HAFTA))
         stok_kayit = np.zeros((U, S, 5, HAFTA))
         depo_kayit = np.zeros((U, 5, HAFTA))
+        sevk_kayit = np.zeros((U, S, 5, HAFTA))  # hafta k sonunda gönderilen, k+1 başında rafta
         iade_kayit = np.zeros((U, S, 5, HAFTA + 4))
         kalici_ind = np.zeros(U)
         ind_hafta = np.full(U, -1)
@@ -592,6 +593,7 @@ def uret(klasor: str | Path, ayar: SentetikAyar | None = None) -> Path:
                 gonder = np.floor(ihtiyac * oran[:, None, :])
                 depo -= gonder.sum(1)
                 yolda = gonder
+                sevk_kayit[:, :, :, k] = gonder
             depo_kayit[:, :, k] = depo
 
         # ---- kayıtlar
@@ -652,6 +654,15 @@ def uret(klasor: str | Path, ayar: SentetikAyar | None = None) -> Path:
         out["stok"].append(pd.DataFrame(dict(
             tarih=gun0 + (7 * K.ravel() + 6).astype("timedelta64[D]"), lokasyon_kodu="D-MERKEZ", sku_kodu=sku[I.ravel(), Z.ravel()],
             eldeki_adet=depo_kayit[I.ravel(), Z.ravel(), K.ravel()].astype(int))))
+        # sevkiyatlar: ilk dağıtım (sezon başından 3 gün önce) + haftalık ikmal (cumartesi, ertesi hafta rafta)
+        si, ss, sz_ = np.nonzero(ilk_stok)
+        out["sevkiyatlar"].append(pd.DataFrame(dict(
+            tarih=np.full(len(si), gun0 - np.timedelta64(3, "D")), kaynak_lokasyon="D-MERKEZ", hedef_lokasyon=magaza_kod[ss],
+            sku_kodu=sku[si, sz_], adet=ilk_stok[si, ss, sz_].astype(int))))
+        si, ss, sz_, sk = np.nonzero(sevk_kayit)
+        out["sevkiyatlar"].append(pd.DataFrame(dict(
+            tarih=gun0 + (7 * sk + 5).astype("timedelta64[D]"), kaynak_lokasyon="D-MERKEZ", hedef_lokasyon=magaza_kod[ss],
+            sku_kodu=sku[si, sz_], adet=sevk_kayit[si, ss, sz_, sk].astype(int))))
         # gerçek talep (yalnızca sentetik)
         I, K = np.meshgrid(i_, np.arange(HAFTA), indexing="ij")
         Sg = np.broadcast_to(s_[:, None], I.shape)
@@ -678,6 +689,7 @@ def _yaz(klasor: Path, out: dict, mag: pd.DataFrame, ayar: SentetikAyar) -> None
     csv("satislar", satis)
     csv("iadeler", pd.concat(out["iadeler"]).groupby(["tarih", "magaza_kodu", "sku_kodu", "iade_nedeni"], as_index=False)["adet"].sum())
     csv("stok", pd.concat(out["stok"], ignore_index=True))
+    csv("sevkiyatlar", pd.concat(out["sevkiyatlar"], ignore_index=True).sort_values(["tarih", "hedef_lokasyon", "sku_kodu"]))
     csv("takvim", _takvim(range(ayar.ilk_yil, ayar.ilk_yil + ayar.yil_sayisi + 1)))
     pd.concat(out["gercek"], ignore_index=True).to_csv(
         klasor / "_sentetik_gercek_talep.csv", index=False)

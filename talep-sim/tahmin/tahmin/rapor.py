@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from .dagitim_test import politika_adi
 from .geriye_test import SEVIYE_AD, TestSonucu
 from .modeller import KIYAS_YONTEMLERI, YONTEMLER
 
@@ -52,6 +53,9 @@ def rapor_yaz(sonuc: TestSonucu, cikti: str | Path, veri_adi: str = "") -> Path:
     sonuc.benzer.to_csv(cikti / "benzer_urunler.csv", index=False)
     sonuc.beden.to_csv(cikti / "beden_egrisi.csv", index=False)
     sonuc.deger.to_csv(cikti / "uretim_adedi_kiyasi.csv", index=False)
+    for ad, df in sonuc.dagitim.items():
+        if ad != "notlar":
+            df.to_csv(cikti / f"dagitim_{ad}.csv", index=False)
 
     md = _rapor_md(sonuc, veri_adi)
     yol = cikti / "geriye_donuk_test_raporu.md"
@@ -158,6 +162,9 @@ def _rapor_md(s: TestSonucu, veri_adi: str) -> str:
                                       "Eşit dağılım (kıyas)": [yuzde(v) for v in b["esit_dagilim_hata"]]})))
         o.append("")
 
+    # --- Mağaza dağıtımı
+    o += _dagitim_bolumu(s, T)
+
     # --- Değer
     if not s.deger.empty:
         d = s.deger[(s.deger["test_sezonu"] == T) & (s.deger["yontem"] == biz)]
@@ -220,4 +227,51 @@ def _rapor_md(s: TestSonucu, veri_adi: str) -> str:
     o.append("2. `python -m tahmin dogrula <klasör>` ile veri kalitesi raporu, eksiklerin müşteriyle kapatılması.")
     o.append("3. `python -m tahmin geriye-test <klasör>` ile bu raporun gerçek veriyle üretilmesi; son 2 sezon ayrı ayrı test.")
     o.append("4. Müşterinin kendi alım kararlarıyla model önerisinin aynı talep karşısında kıyası (değer analizi).")
+    o.append("5. Müşterinin gerçek sevkiyat geçmişiyle (`sevkiyatlar`) mağaza dağıtımı kıyası; ikmal kapsamasının doğrulama sezonunda seçilmesi.")
     return "\n".join(o) + "\n"
+
+
+def _dagitim_bolumu(s: TestSonucu, T: str) -> list[str]:
+    d = s.dagitim.get("ozet")
+    if d is None or d.empty or T not in set(d["test_sezonu"]):
+        return []
+    d = d[d["test_sezonu"] == T].set_index("politika")
+    n = s.dagitim["notlar"].set_index("test_sezonu").loc[T]
+    hedef = d["hedef"].iat[0]
+    o = ["## Mağaza dağıtımı ve ikmal\n"]
+    o.append(f"Soru: aynı toplam adet (depoya giren alım) ve aynı talep ({HEDEF_AD[hedef]}) karşısında ürünü mağazalara farklı "
+             "kurallarla dağıtsaydık ne kadar satış kaçardı, sezon sonunda stok nerede kalırdı? Her model-renk için mağaza x hafta "
+             "stok simülasyonu: hafta içi satış = min(talep, raf stoğu), hafta sonu verilen sevk ertesi hafta rafta. "
+             f"Mağaza payları ve haftalık profil karar anındaki tahminden ({s.dagitim_yontemi}) ve geçmiş sezonlardan gelir; test sezonunun satışı "
+             "yalnızca model politikasının haftalık ikmalinde, o haftaya kadar gerçekleşen kadarıyla görülür.\n")
+    sira = [p for p in ("gerceklesen", "model", *sorted(x for x in d.index if x.startswith("model_kapsama_")), "tek_sefer_pay", "tek_sefer_esit") if p in d.index]
+    o.append(_tablo(pd.DataFrame({
+        "Politika": [politika_adi(p) for p in sira],
+        "Karşılanan talep": [yuzde(d.at[p, "karsilanan_talep"]) for p in sira],
+        "Kaçan satış": [sayi(d.at[p, "kacan_satis"]) for p in sira],
+        "Sezon sonu mağazada": [sayi(d.at[p, "magazada_kalan"]) for p in sira],
+        "Sezon sonu depoda": [sayi(d.at[p, "depoda_kalan"]) for p in sira],
+        "Sevk satırı": [sayi(d.at[p, "sevk_satiri"]) for p in sira]})))
+    o.append("")
+    o.append(f"Karşılaştırılan ürün: {int(n['urun_karsilastirilan'])} / {int(n['urun_toplam'])} model-renk; toplam arz {sayi(d['arz'].iat[0])}, "
+             f"toplam talep {sayi(d['talep'].iat[0])} adet. Mağaza x bölge kırılımı: `dagitim_bolge.csv`, ürün bazında: `dagitim_urun.csv`.\n")
+    if "gerceklesen" in d.index and "model" in d.index:
+        g, m = d.loc["gerceklesen"], d.loc["model"]
+        o.append(f"- Model politikası gerçekleşen sevkiyata göre kaçan satışı {yuzde(m['kacan_satis'] / g['kacan_satis'] - 1, True)}, "
+                 f"sezon sonunda mağazalarda kalan stoğu {yuzde(m['magazada_kalan'] / max(g['magazada_kalan'], 1) - 1, True)} değiştirdi; "
+                 f"sevk satırı sayısı {yuzde(m['sevk_satiri'] / max(g['sevk_satiri'], 1) - 1, True)}.")
+    o.append("- 'Hepsi baştan' politikaları depoda hiç stok bırakmaz: kaçan satış düşük görünebilir ama sezon sonunda stok mağazalara dağılmış kalır "
+             "ve oradan toplamak transfer maliyeti demektir. Depoda kalan stok online'a, outlet'e ya da sonraki sezona daha kolay gider. "
+             "Bu yüzden tek bir sayıya değil, kaçan satış ile mağazada kalan stoğu birlikte okumak gerekir.")
+    o.append("- İkmal kapsaması bir hizmet düzeyi ayarıdır: daha uzun kapsama daha az kaçan satış ama mağazada daha çok kalan stok ve sevk demektir. "
+             "Doğru ayar müşterinin kaçan satış ile kalan stok maliyetine göre, doğrulama sezonunda seçilmelidir; bu sürüm sabit varsayılanla koşar.")
+    if s.sentetik:
+        o.append("- **Sentetik veri sınırı:** sentetik 'gerçekleşen' sevkiyat, gerçek beklenen talebe yakın bir planla yapılmış ve haftalık ikmalli bir dağıtımdır. "
+                 "Gerçek bir dağıtım ekibinin kuralı farklıdır; asıl kıyas müşterinin kendi sevkiyat geçmişiyle yapılır.")
+    else:
+        o.append("- **Gerçek veri sınırı:** talep, stok bitişi düzeltilmiş bir tahmindir; model kendi düzelttiği talebe göre değerlendirildiği için kazanç biraz abartılı çıkabilir. "
+                 "Asıl kanıt, mağaza kümelerinin bir kısmında modelle, kalanında eski yöntemle yapılan canlı pilottur.")
+    o.append("- Bu sürümde yok: beden kırılımı (beden eğrisi yukarıda ayrıca test edildi), mağazalar arası transfer, iadelerin rafa dönüşü, "
+             "koli katları ve mağaza kapasitesi. Hepsi bütün politikalara aynı şekilde uygulandığı için kıyası bozmaz ama mutlak sayıları değiştirir.")
+    o.append("")
+    return o

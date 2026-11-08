@@ -93,6 +93,11 @@ Satış noktaları. Online kanal da (ülke başına) bir 'mağaza' satırı olar
 | `kapanis_tarihi` | tarih | hayır | Kapanış tarihi (açıksa boş). | - |
 | `para_birimi` | metin | evet | Mağazanın satış para birimi. | TRY |
 | `musteri_bolgesi` | metin | hayır | Müşterinin kendi bölge gruplaması. | Marmara |
+| `magaza_sinifi` | metin | hayır | Müşterinin kendi mağaza sınıfı (dağıtım kuralları genellikle buna dayanır). | A |
+| `kapasite_adet` | tamsayı | hayır | Satış alanı + mağaza deposunun yaklaşık ürün kapasitesi (adet). | 6000 |
+| `iklim_bolgesi` | metin | hayır | Müşterinin iklim / sezon gruplaması (boşsa geçmiş satıştan ve koordinattan türetilir). | soguk |
+| `depo_teslim_suresi_gun` | tamsayı | hayır | Merkez depodan sevkin rafa ulaşma süresi (gün). | 3 |
+| `sevk_gunleri` | metin | hayır | Sevk alınan günler, virgülle (pzt,sal,car,per,cum,cmt,paz). | pzt,per |
 
 > Yenileme / tadilat / geçici kapanma dönemleri varsa ayrıca liste olarak istenir (satışta boşluk = talep yok sanılmasın).
 
@@ -245,9 +250,9 @@ Tedarikçiye verilen siparişler ve teslimatlar (ilk sipariş ve tekrar sipariş
 
 > Tedarik süresi = teslim_tarihi - siparis_tarihi. 'Ne zaman üretmeli' sorusu bu tarihler olmadan cevaplanamaz.
 
-## `sevkiyatlar.csv` (opsiyonel)
+## `sevkiyatlar.csv` (önerilen)
 
-Depodan mağazaya ve mağazalar arası transferler.
+Depodan mağazaya ve mağazalar arası transferler. Mağaza dağıtımı geriye dönük testi için gerekli.
 
 - Taneciklik: gün x kaynak x hedef x SKU
 - Benzersiz anahtar: yok (tekrar eden satırlar kontrol edilir)
@@ -288,6 +293,75 @@ Hangi ürün hangi mağazada hangi tarihler arasında satılacaktı. Bilerek kal
 | `ulke` | metin | evet | ISO2 ülke kodu. | TR |
 | `gun_tipi` | metin | evet | resmi_tatil / dini_bayram / ozel_gun / okul_tatili. | dini_bayram |
 | `aciklama` | metin | hayır | Açıklama. | Ramazan Bayramı 1. gün |
+
+## `eticaret_siparisleri.csv` (opsiyonel)
+
+Online talebin coğrafyası: online satışların teslimat iline ve siparişi karşılayan lokasyona göre toplamı.
+
+- Taneciklik: gün x teslimat ili x karşılayan lokasyon x SKU
+- Benzersiz anahtar: `tarih`, `ulke`, `teslimat_ili`, `karsilayan_lokasyon`, `sku_kodu`, `teslim_tipi`
+
+| Alan | Tip | Zorunlu | Açıklama | Örnek |
+|---|---|---|---|---|
+| `tarih` | tarih | evet | Sipariş günü. | 2025-08-09 |
+| `ulke` | metin | evet | Teslimat ülkesi (ISO2). | TR |
+| `teslimat_ili` | metin | evet | Teslimat ili / bölgesi. Adres, posta kodu ya da kişi bilgisi istenmez. | Izmir |
+| `karsilayan_lokasyon` | metin | evet | Siparişi gönderen depo ya da mağaza kodu. | D-ETICARET |
+| `sku_kodu` | metin | evet | SKU kodu. Bağlantı: `skular.sku_kodu`. | KD25A-0412-BEJ-M |
+| `teslim_tipi` | metin | hayır | Adrese teslim ya da mağazadan teslim. İzinli: `adrese`, `magazadan`. | adrese |
+| `adet` | tamsayı | evet | Sipariş adedi. | 2 |
+| `iade_adet` | tamsayı | hayır | Bu siparişlerden sonradan iade edilen adet (biliniyorsa). | 0 |
+
+> KVKK: yalnızca il düzeyinde toplam. Müşteri, adres, telefon ya da sipariş numarası istenmez.
+> Mağazadan gönderim ya da mağazadan teslim yapan müşteride mağaza talebi = mağaza satışı + çevresindeki online sipariş.
+
+## `paket_tanimlari.csv` (opsiyonel)
+
+Asorti / seri koliler: depodan mağazaya hangi beden karışımıyla kolilenerek gidiyor.
+
+- Taneciklik: paket x beden
+- Benzersiz anahtar: `paket_kodu`, `beden`
+
+| Alan | Tip | Zorunlu | Açıklama | Örnek |
+|---|---|---|---|---|
+| `paket_kodu` | metin | evet | Paket / seri kodu. | SERI-1221 |
+| `urun_kodu` | metin | hayır | Yalnızca bir model için geçerliyse model kodu (boşsa kategoride geçerli). Bağlantı: `urunler.urun_kodu`. | - |
+| `kategori` | metin | hayır | Kategoride geçerliyse kategori. | gomlek |
+| `beden` | metin | evet | Beden etiketi. | M |
+| `adet` | tamsayı | evet | Pakette bu bedenden kaç adet. | 2 |
+
+## `dagitim_kurallari.csv` (opsiyonel)
+
+Müşterinin dağıtım kuralları. Boş bırakılırsa varsayılanlar kullanılır ve raporda 'kural varsayımı' olarak etiketlenir.
+
+- Taneciklik: kural x kapsam
+- Benzersiz anahtar: `kural`, `kapsam_tipi`, `kapsam_kodu`
+
+| Alan | Tip | Zorunlu | Açıklama | Örnek |
+|---|---|---|---|---|
+| `kural` | metin | evet | Kural tipi. İzinli: `sunum_minimumu`, `ilk_dagitim_orani`, `ilk_dagitim_hafta`, `maks_kapsama_hafta`, `ikmal_kapsama_hafta`, `transfer_yok`, `dagitim_disi`. | sunum_minimumu |
+| `kapsam_tipi` | metin | evet | Kuralın geçerli olduğu düzey. İzinli: `genel`, `magaza`, `magaza_sinifi`, `kategori`, `urun`. | magaza_sinifi |
+| `kapsam_kodu` | metin | hayır | Mağaza kodu, sınıf, kategori ya da model kodu (genel ise boş). | C |
+| `deger` | ondalık | hayır | Kuralın sayısal değeri (adet, oran ya da hafta). | 1 |
+| `aciklama` | metin | hayır | Serbest açıklama. | C sınıfı mağazalara her bedenden en az 1 |
+
+## `ticari_hedefler.csv` (opsiyonel)
+
+Stok eritme önerileri için hedefler: marj tabanı, stok bitirme tarihi, sezon sonu kalan değer.
+
+- Taneciklik: sezon x kapsam (kategori ya da model)
+- Benzersiz anahtar: `sezon_kodu`, `kapsam_tipi`, `kapsam_kodu`
+
+| Alan | Tip | Zorunlu | Açıklama | Örnek |
+|---|---|---|---|---|
+| `sezon_kodu` | metin | evet | Sezon. | 2025-AW |
+| `kapsam_tipi` | metin | evet | Hedefin düzeyi. İzinli: `genel`, `kategori`, `urun`. | kategori |
+| `kapsam_kodu` | metin | hayır | Kategori ya da model kodu (genel ise boş). | mont |
+| `hedef_brut_marj` | ondalık | hayır | İndirimli satışta korunacak en düşük brüt marj, 0-1 (KDV hariç net fiyata göre). | 0.35 |
+| `hedef_bitis_tarihi` | tarih | hayır | Stoğun bitirilmesi hedeflenen tarih. | 2026-01-31 |
+| `taban_fiyat` | ondalık | hayır | Altına inilmeyecek satış fiyatı (KDV dahil). | 1499.90 |
+| `kalan_deger_orani` | ondalık | hayır | Hedef tarihte kalan stoğun maliyete göre geri kazanımı, 0-1 (outlet, stok satışı). | 0.50 |
+| `indirim_basamaklari` | metin | hayır | Markanın kullandığı indirim oranları, virgülle. | 0.2,0.3,0.4,0.5 |
 
 ## `doviz_kurlari.csv` (opsiyonel)
 

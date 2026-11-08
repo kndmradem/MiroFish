@@ -30,9 +30,15 @@ ERP'nizin çıktısını olduğu gibi gönderirseniz eşlemeyi biz yaparız.
 9. **Kampanya takvimi:** kampanya adı, mekaniği (yüzde indirim, x al y öde, sepette indirim...), oranı, tarihleri, hangi mağaza ve ürünlerde geçerli olduğu.
 10. **İadeler:** gün x mağaza x SKU bazında iade adedi; online ve mağaza ayrı. Varsa iade nedeni.
 
+11. **Depodan mağazaya sevkiyatlar:** gün x kaynak (depo) x hedef (mağaza) x SKU adet; mağazalar arası transferler dahil.
+    Bununla aynı ürünü sizin dağıtımınızla ve modelin dağıtımıyla aynı talep karşısında kıyaslarız (kaçan satış, mağazada kalan stok).
+12. **Mağaza bilgileri:** mağaza sınıfı (A/B/C ya da kendi sınıflamanız), yaklaşık kapasite, depodan rafa teslim süresi.
+
 ## Varsa
 
-11. Depodan mağazaya sevkiyatlar, asortiman planı (hangi ürün hangi mağazada satılacaktı), mağaza tadilat / geçici kapanma dönemleri, ülkeye özel kampanya ve tatil takvimi.
+13. Online siparişlerin teslimat iline ve gönderen depo/mağazaya göre toplamı (adres ve müşteri bilgisi olmadan), asorti/seri koli tanımları,
+    dağıtım kurallarınız (sunum minimumu, ilk dağıtım oranı), indirim kurallarınız (marj tabanı, stok bitirme hedefi, sezon sonu stoğun nereye gittiği).
+14. Asortiman planı (hangi ürün hangi mağazada satılacaktı), mağaza tadilat / geçici kapanma dönemleri, ülkeye özel kampanya ve tatil takvimi.
 
 ## Gizlilik
 

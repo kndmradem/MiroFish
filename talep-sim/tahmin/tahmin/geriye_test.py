@@ -15,6 +15,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from .dagitim_test import DagitimAyar, dagitim_testi
 from .belirsizlik import SEVIYELER, KonformalAralik, kantil_degeri, q_kolon
 from .benzerlik import BenzerlikIndeksi
 from .gorsel import gomucu_sec, urun_gomuleri
@@ -49,6 +50,7 @@ class TestAyar:
     # gazeteci (newsvendor) değer analizi varsayımları
     ortalama_indirim: float = 0.20     # etiket fiyatına göre ortalama tahsil edilen indirim
     hurda_orani: float = 0.30          # satılmayan stoğun maliyete göre geri kazanımı (outlet vb.)
+    dagitim: DagitimAyar | None = field(default_factory=DagitimAyar)  # None: mağaza dağıtımı testi yapılmaz
 
 
 @dataclass
@@ -65,6 +67,8 @@ class TestSonucu:
     egitim: dict[str, list[str]]
     dogrulama: dict[str, str]
     gorsel_var: bool
+    dagitim: dict[str, pd.DataFrame] = field(default_factory=dict)
+    dagitim_yontemi: str = ""
 
 
 def _gercekler(panel: Panel, hedef: str) -> dict[str, pd.DataFrame]:
@@ -106,6 +110,8 @@ def calistir(veri: str | Path, ayar: TestAyar | None = None) -> TestSonucu:
     testler = ayar.test_sezonlari or [panel.sezonlar["sezon_kodu"].iloc[-1]]
     metrik_satir, tahmin_parca, benzer_parca, beden_parca, deger_parca = [], {s: [] for s in SEVIYE_ANAHTAR}, [], [], []
     egitim, dogrulama = {}, {}
+    dagitim_parca: dict[str, list[pd.DataFrame]] = {}
+    dagitim_yontemi = "ozellik_modeli" if "ozellik_modeli" in ayar.yontemler else ayar.yontemler[-1]
     for T in testler:
         gecmis = b.gecmis_sezonlar(T)
         if not gecmis:
@@ -136,13 +142,18 @@ def calistir(veri: str | Path, ayar: TestAyar | None = None) -> TestSonucu:
         beden_parca.append(_beden_degerlendir(panel, T, gecmis))
         urun_t = [x for x in tahmin_parca["urun"] if x["test_sezonu"].iat[0] == T]
         deger_parca.append(_deger_analizi(panel, T, pd.concat(urun_t), ayar))
+        if ayar.dagitim is not None:
+            kh = [x for x in tahmin_parca["urun_kume_hafta"] if x["test_sezonu"].iat[0] == T and x["yontem"].iat[0] == dagitim_yontemi]
+            for ad, df in dagitim_testi(vs, panel, T, gecmis, pd.concat(kh), ayar.dagitim).items():
+                dagitim_parca.setdefault(ad, []).append(df)
 
     return TestSonucu(
         ayar=ayar, panel=panel, metrikler=pd.DataFrame(metrik_satir),
         tahminler={s: pd.concat(p, ignore_index=True) for s, p in tahmin_parca.items()},
         benzer=pd.concat(benzer_parca, ignore_index=True), beden=pd.concat(beden_parca, ignore_index=True),
         deger=pd.concat(deger_parca, ignore_index=True), sentetik=panel.gercek is not None,
-        egitim=egitim, dogrulama=dogrulama, gorsel_var=indeks.gorsel_var)
+        egitim=egitim, dogrulama=dogrulama, gorsel_var=indeks.gorsel_var,
+        dagitim={ad: pd.concat(p, ignore_index=True) for ad, p in dagitim_parca.items()}, dagitim_yontemi=dagitim_yontemi)
 
 
 def _benzer_aciklama(b: Baglam, hedef: str, gecmis: list[str], k: int = 5) -> pd.DataFrame:

@@ -31,10 +31,14 @@ kanıtlamaktır. Bunun için üç şey gerekir:
 | `kampanyalar`, `kampanya_kapsami` | önerilen | kampanya | Kampanya etkisini ayırmak |
 | `iadeler` | önerilen | gün x mağaza x SKU | İade oranı (kanal ayrı) |
 | `depolar` | önerilen | depo | Merkez depo stoğu |
-| `sevkiyatlar` | opsiyonel | transfer | Mağaza ikmali analizi |
+| `sevkiyatlar` | önerilen | gün x kaynak x hedef x SKU | Mağaza dağıtımı geriye dönük testi (gerçek sevkiyat ile model kıyası) |
 | `asortiman_plani` | opsiyonel | model x renk x mağaza | Bilerek kaldırılan ürünü stok bitişinden ayırmak |
 | `takvim` | opsiyonel | gün x ülke | Ülkeye özel tatil/özel gün |
 | `doviz_kurlari` | opsiyonel | gün x para birimi | Ciro raporlaması |
+| `eticaret_siparisleri` | opsiyonel | gün x teslimat ili x karşılayan lokasyon x SKU | Online talebin coğrafyası, mağazadan gönderim |
+| `paket_tanimlari` | opsiyonel | paket x beden | Asorti/seri koli katları |
+| `dagitim_kurallari` | opsiyonel | kural x kapsam | Sunum minimumu, ilk dağıtım oranı, kapsama |
+| `ticari_hedefler` | opsiyonel | sezon x kategori/model | Stok eritme: marj tabanı, bitiş tarihi, kalan değer |
 
 İlişkiler: `skular.urun_kodu → urunler`, `satislar/stok/iadeler.sku_kodu → skular`,
 `satislar/iadeler.magaza_kodu → magazalar`, `stok.lokasyon_kodu → magazalar ya da depolar`,
