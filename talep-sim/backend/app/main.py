@@ -456,3 +456,7 @@ async def run_events(run_id: str, start: int = 0) -> StreamingResponse:
 from .collection.routes import router as collection_router  # noqa: E402
 
 app.include_router(collection_router)
+
+from .mallprofile.routes import router as mall_router  # noqa: E402
+
+app.include_router(mall_router)

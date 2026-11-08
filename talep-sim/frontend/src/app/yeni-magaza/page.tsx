@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { MallCard } from "@/components/mall-card";
 import { estimateNewStore, fetchLocations, type LocationProfile, type NewStoreCandidate, type NewStoreEstimate } from "@/lib/api";
 
 const usd0 = (v: number) => `$${Math.round(v).toLocaleString("tr-TR")}`;
@@ -90,6 +91,7 @@ export default function NewStorePage() {
           </div>
         </CardContent>
       </Card>
+      {cand.lokasyon_tipi === "avm" && <MallCard ulke={cand.ulke} sehir={cand.sehir} />}
       {error && <p className="rounded-md border border-red-500/40 bg-red-500/10 p-2 text-sm">{error}</p>}
       {result && (
         <Card>
