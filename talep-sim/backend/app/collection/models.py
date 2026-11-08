@@ -9,6 +9,8 @@ Basis = Literal["ajan", "kural varsayımı", "LLM tahmini", "ERP", "kullanıcı 
 Role = Literal["hero", "çekirdek", "tamamlayıcı", "destek", "riskli", "belirsiz"]
 DeclaredRole = Literal["hero", "çekirdek", "tamamlayıcı", "deneme"]
 Currency = Literal["TRY", "USD"]
+Kind = Literal["koleksiyon", "bagimsiz"]
+Decision = Literal["üret", "azalt", "üretme"]
 
 
 class CollectionItem(BaseModel):
@@ -17,8 +19,8 @@ class CollectionItem(BaseModel):
     category: str = ""
     subcategory: str = ""
     technical_specs: str = ""
-    unit_cost: Optional[float] = Field(None, description="Koleksiyon para biriminde")
-    planned_price: Optional[float] = Field(None, description="Koleksiyon para biriminde")
+    unit_cost: Optional[float] = Field(None, description="Maliyet fiyatı, koleksiyon para biriminde (zorunlu)")
+    planned_price: Optional[float] = Field(None, description="Excel'den okunmaz; fiyatı sistem önerir. Yalnızca 'fiyat dene' senaryosu ve eski kayıtlar için")
     images: List[str] = Field(default_factory=list, description="Koleksiyon klasöründeki dosya adları; ilki ana görsel")
     colors: List[str] = Field(default_factory=list)
     sizes: str = ""
@@ -31,6 +33,8 @@ class CollectionItem(BaseModel):
 
 
 class CollectionMeta(BaseModel):
+    kind: Kind = Field("koleksiyon", description="koleksiyon: aynı panel bütün ürünlere bakar, ürünler birbirine göre de "
+                       "değerlendirilir. bagimsiz: her ürün kendi paneliyle ayrı değerlendirilir (tekli ekranın toplu hali)")
     name: str = "Adsız koleksiyon"
     brand: Optional[str] = None
     brand_notes: str = Field("", description="Marka profili çıkarılırken kullanılan notlar")
@@ -141,6 +145,7 @@ class WhatIf(BaseModel):
     planned_prices: Dict[str, float] = Field(default_factory=dict, description="SKU -> yeni planlanan fiyat (koleksiyon para birimi)")
     total_budget: Optional[float] = None
     allocation_objective: Optional[Literal["balanced", "profit", "blended"]] = None
+    decisions: Dict[str, Decision] = Field(default_factory=dict, description="SKU -> kullanıcının elle verdiği üretim kararı")
 
 
 # ---------- Sonuç ----------
@@ -164,6 +169,9 @@ class ItemRegion(BaseModel):
     return_pct: float
     demand_units: int                 # 120 gün, stok sınırsız
     price_fit: Optional[Literal["altında", "içinde", "üstünde"]] = None
+    ipp: Optional[float] = Field(None, description="USD, kayıtsızlık fiyatı (Van Westendorp IPP)")
+    zones: List[dict] = Field(default_factory=list, description="Van Westendorp fiyat bölgeleri (USD): key, label, low, high")
+    net_margin_pct: Optional[float] = Field(None, description="Önerilen (ya da denenen) fiyatta iade sonrası net marj")
     objections: List[str] = Field(default_factory=list)
     confidence: str = ""
 
@@ -208,6 +216,11 @@ class ShowcaseSummary(BaseModel):
     agreement_pct: Optional[float] = Field(None, description="Tek tek ve vitrin sıralamasının uyumu (sıra korelasyonu x100)")
 
 
+class Reason(BaseModel):
+    text: str
+    basis: Basis
+
+
 class ItemResult(BaseModel):
     sku: str
     name: str
@@ -223,6 +236,12 @@ class ItemResult(BaseModel):
     enthusiast_pct: Metric
     role: Role
     role_why: str
+    decision: Optional[Decision] = Field(None, description="Üret / azalt / üretme (değerlendirilmeyen üründe boş)")
+    decision_source: Literal["sistem", "kullanıcı"] = "sistem"
+    decision_reasons: List[Reason] = Field(default_factory=list)
+    recommended_price: Metric = Field(default_factory=lambda: Metric(value=None, basis="ajan"),
+                                      description="USD; en çok talep beklenen bölgedeki en kârlı fiyat")
+    net_margin: Metric = Field(default_factory=lambda: Metric(value=None, basis="kural varsayımı"))
     recommended_qty: Metric
     qty_by_region: Dict[str, int] = Field(default_factory=dict)
     planned_qty: Optional[int] = None
@@ -259,7 +278,7 @@ class CategorySummary(BaseModel):
 
 
 class Action(BaseModel):
-    kind: Literal["çıkar", "fiyat", "kanibalizasyon", "derinlik", "eksik", "veri", "kombin", "vitrin"]
+    kind: Literal["üretme", "azalt", "çıkar", "fiyat", "kanibalizasyon", "derinlik", "eksik", "veri", "kombin", "vitrin"]
     text: str
     skus: List[str] = Field(default_factory=list)
     basis: Basis
@@ -273,6 +292,7 @@ class CollectionSummary(BaseModel):
     reach_by_region: Dict[str, float] = Field(default_factory=dict)
     reach_curve: List[ReachPoint] = Field(default_factory=list)
     roles: Dict[str, int]
+    decisions: Dict[str, int] = Field(default_factory=dict)
     mean_appeal: Metric
     categories: List[CategorySummary]
     cannibal_pairs: List[CannibalPair]
@@ -286,6 +306,7 @@ class CollectionSummary(BaseModel):
 class CollectionResult(BaseModel):
     collection_id: str
     name: str
+    kind: Kind = "koleksiyon"
     currency: str
     fx_rate: float
     regions: List[str]

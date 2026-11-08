@@ -58,7 +58,8 @@ def test_headers_numbers_and_meta_are_read_flexibly():
     assert prev.meta.name == "SS27" and prev.meta.currency == "TRY" and prev.meta.target_regions == ["TR", "EU"]
     assert prev.meta.total_budget == 2_000_000
     it = {p.item.sku: p.item for p in prev.items}
-    assert it["SW27-002"].unit_cost == 510.5 and it["SW27-002"].planned_price == 1799
+    assert it["SW27-002"].unit_cost == 510.5 and it["SW27-002"].planned_price is None      # satış fiyatı okunmaz
+    assert any("Satış fiyatı sütunu (Planlanan fiyat) okunmadı" in i.message for i in prev.issues)
     assert it["SW27-001"].declared_role == "çekirdek" and it["SW27-003"].moq == 200
     assert prev.column_map["Ürün Adı"] == "name"
 
@@ -94,19 +95,30 @@ def test_preview_reports_errors_and_warnings():
     assert any(l == "hata" and "Aynı SKU" in m for l, _, m in msgs)
     assert any(l == "hata" and m == "SKU boş" for l, _, m in msgs)
     assert any(s == "SW27-020" and m == "Görsel bulunamadı" for _, s, m in msgs)
-    assert any(s == "SW27-020" and "Birim maliyet boş" in m for _, s, m in msgs)
+    assert any(l == "hata" and s == "SW27-020" and "Maliyet fiyatı boş" in m for l, s, m in msgs)
     assert any(s == "SW27-020" and "Hedef rol tanınmadı" in m for _, s, m in msgs)
     assert any(s == "SW27-003" and "Görsel küçük" in m for _, s, m in msgs)
-    assert any(l == "bilgi" and "koleksiyon sayfası" in m for l, _, m in msgs)
+    assert any(l == "bilgi" and "genel bilgi" in m for l, _, m in msgs)
     st = [(p.item.sku, p.status) for p in prev.items]
     assert ("SW27-001", "ok") in st and ("SW27-001", "hata") in st and ("SW27-020", "hata") in st
 
 
 def test_template_is_readable_by_importer():
     prev = build_preview("t3", read_workbook(template_bytes()), [])
-    assert [p.item.sku for p in prev.items] == ["SW27-001", "SW27-002", "SW27-003"]
-    assert prev.meta.currency == "TRY" and prev.meta.target_regions == ["TR", "EU"]
+    assert [p.item.sku for p in prev.items] == ["URN-001", "URN-002", "URN-003"]
+    assert prev.meta.currency == "TRY" and prev.meta.target_regions == ["TR", "EU"] and prev.meta.name == "SS27 Ana Koleksiyon"
     assert not prev.ignored_columns
+    first = prev.items[0].item
+    assert first.unit_cost == 420 and first.technical_specs.startswith("%100 keten") and first.planned_price is None
+    assert first.attributes["Hedef kitle"] == "kadın" and first.attributes["yaka"] == "klasik"
+    wb = load_workbook(io.BytesIO(template_bytes()))
+    heads = [c.value for c in wb["Ürünler"][1]]
+    assert not any("fiyat" in h and "maliyet" not in h for h in heads)          # satış fiyatı sütunu yok
+    assert {"sku", "urun_adi", "kategori", "urun_icerigi", "maliyet_fiyati"} <= set(heads)
+    # aynı şablon bağımsız ürün ekranında da okunur
+    ind = build_preview("t3b", read_workbook(template_bytes()), [], kind="bagimsiz")
+    assert ind.meta.kind == "bagimsiz" and len(ind.items) == 3
+    assert any("Koleksiyona özel sütunlar" in i.message for i in ind.issues)
 
 
 def test_csv_with_semicolons():
@@ -415,3 +427,116 @@ def test_showcase_end_to_end_with_panel_and_resume(client):
     client.post(f"/api/collections/{cid}/run", json={"block_size": 4})
     _wait(client, cid)
     assert len(server.bodies) == n_before                                 # kaldığı yerden: hiçbir şey yeniden sorulmadı
+
+
+# ---------- üretim kararı (üret / azalt / üretme) ----------
+
+def test_production_decision_drops_low_demand_and_low_margin_items():
+    col = _col(5)
+    for it in col.items:
+        it.planned_price = None                       # yeni akış: satış fiyatı girilmez, sistem önerir
+    col.items[3].unit_cost = 40.0                     # 50$ fiyatta iade sonrası net marj ~%9: üretme
+    results = {
+        "S0": _resp({"TR": [80, 82, 78, 81]}, demand=70),
+        "S1": _resp({"TR": [70, 72, 69, 71]}, demand=62),
+        "S2": _resp({"TR": [50, 52, 49, 51]}, demand=44),    # orta talep: azalt
+        "S3": _resp({"TR": [75, 74, 76, 73]}, demand=66),
+        "S4": _resp({"TR": [20, 22, 25, 21]}, demand=25),    # düşük talep: üretme
+    }
+    res = summarize(col, results, 42.0)
+    by = {i.sku: i for i in res.items}
+    assert by["S4"].decision == "üretme" and by["S4"].decision_reasons[0].basis == "ajan"
+    assert "Talep skoru 25/100" in by["S4"].decision_reasons[0].text
+    assert by["S3"].decision == "üretme" and by["S3"].decision_reasons[0].basis == "kural varsayımı"
+    assert "net marj" in by["S3"].decision_reasons[0].text and by["S3"].net_margin.value < 15
+    assert by["S2"].decision == "azalt" and by["S0"].decision == "üret"
+    assert by["S4"].recommended_qty.value == 0 and by["S3"].recommended_qty.value == 0
+    assert not by["S4"].qty_by_region.get("TR") and by["S0"].recommended_qty.value > 0
+    assert "Önerilen fiyatta" in by["S3"].decision_reasons[0].text
+    # S1 güçlü (çekirdek) ürün: S0 ile aynı kişiler seviyor ama bu yalnızca bilgi olarak gerekçeye düşer
+    assert by["S1"].decision == "üret" and any("kanibalizasyon" in r.text for r in by["S1"].decision_reasons)
+    assert res.summary.decisions == {"üret": 2, "azalt": 1, "üretme": 2}
+    assert {a.kind for a in res.summary.actions} >= {"üretme", "azalt"}
+    assert all(r.basis in ("ajan", "kural varsayımı", "kullanıcı girdisi") for i in res.items for r in i.decision_reasons)
+    # önerilen fiyat panelden gelir ve dayanağı ajan
+    assert by["S0"].recommended_price.value == 50.0 and by["S0"].recommended_price.basis == "ajan"
+    assert by["S0"].recommended_price.low == 40.0 and by["S0"].recommended_price.high == 60.0
+
+    # elle karar: üretme -> üret; ürün bütçeye girer ve kaynağı kullanıcı olur
+    wi = summarize(col, results, 42.0, WhatIf(decisions={"S3": "üret"}))
+    s3 = next(i for i in wi.items if i.sku == "S3")
+    assert s3.decision == "üret" and s3.decision_source == "kullanıcı" and s3.recommended_qty.value > 0
+    assert s3.decision_reasons[0].basis == "kullanıcı girdisi" and "sistem önerisi: üretme" in s3.decision_reasons[0].text
+
+
+def test_trial_price_changes_margin_and_decision():
+    col = _col(3)
+    for it in col.items:
+        it.planned_price = None
+    results = {f"S{i}": _resp({"TR": [70, 72, 71]}, demand=70) for i in range(3)}
+    base = {i.sku: i for i in summarize(col, results, 42.0).items}
+    assert base["S0"].decision == "üret"
+    cheap = {i.sku: i for i in summarize(col, results, 42.0, WhatIf(planned_prices={"S0": 22.0})).items}
+    assert cheap["S0"].decision == "üretme" and "Denenen fiyatta" in cheap["S0"].decision_reasons[0].text
+
+
+def test_weak_region_is_left_out_of_budget():
+    col = _col(3)
+    col.meta.target_regions = ["TR", "EU"]
+    ok = _resp({"TR": [70, 72, 71]}, demand=70)
+    weak = _resp({"EU": [20, 22, 21]}, demand=20)
+    mixed = {"panel_seed": "x", "response": {"regional_breakdown": ok["response"]["regional_breakdown"] + weak["response"]["regional_breakdown"],
+                                             "failed_regions": []}}
+    results = {"S0": mixed, "S1": _resp({"TR": [60, 61, 62], "EU": [60, 61, 62]}, demand=65),
+               "S2": _resp({"TR": [65, 61, 62], "EU": [65, 61, 62]}, demand=66)}
+    res = summarize(col, results, 42.0)
+    s0 = next(i for i in res.items if i.sku == "S0")
+    assert s0.decision == "azalt" and any("EU bölgesinde talep" in r.text for r in s0.decision_reasons)
+    assert not s0.qty_by_region.get("EU") and s0.qty_by_region.get("TR", 0) > 0
+
+
+# ---------- bağımsız ürünler (koleksiyonu olmayan toplu yükleme) ----------
+
+def test_independent_items_skip_collection_logic():
+    col = _col(5)
+    col.meta.kind = "bagimsiz"
+    ans = {"S0": [95, 90, 92, 72], "S1": [94, 91, 90, 71], "S2": [80, 80, 80, 30], "S3": [70, 72, 71, 20], "S4": [60, 60, 60, 10]}
+    results = {s: _resp({"TR": a}) for s, a in ans.items()}
+    res = summarize(col, results, 42.0, showcase={"TR": [{"region": "TR", "person": 1, "order": ["S0", "S1"],
+                                                          "letters": {"A": "S0", "B": "S1"}, "answer": None}]})
+    assert res.kind == "bagimsiz" and not res.panel_shared
+    assert {i.role for i in res.items} == {"belirsiz"} and not res.summary.cannibal_pairs and res.summary.reach.value is None
+    assert res.showcase is None
+    assert all(i.decision == "üret" for i in res.items)               # her ürün kendi talep/marjıyla
+    assert any("Bağımsız ürün listesi" in n for n in res.notes)
+
+
+def test_api_independent_items_each_get_own_panel(client, monkeypatch):
+    from app.panel import engine as panel_engine
+    seeds = []
+    real = panel_engine.sample_panel
+    monkeypatch.setattr(panel_engine, "sample_panel", lambda lib, n, seed="", *a, **k: (seeds.append(seed), real(lib, n, seed, *a, **k))[1])
+    server = FakeLLMServer()
+    app.dependency_overrides[get_engine] = lambda: make_engine(server=server, panel_size=6, min_valid=2)
+    files = [("sheet", ("l.xlsx", template_bytes(), "application/octet-stream"))]
+    files += [("images", (f"URN-00{i}.jpg", png(), "image/png")) for i in (1, 2, 3)]
+    r = client.post("/api/collections/import", files=files, data={"kind": "bagimsiz"})
+    assert r.status_code == 200, r.text
+    prev = r.json()
+    assert prev["meta"]["kind"] == "bagimsiz"
+    meta = {**prev["meta"], "target_regions": ["TR"]}
+    cid = prev["collection_id"]
+    col = client.post(f"/api/collections/{cid}/confirm", json={"meta": meta, "items": [p["item"] for p in prev["items"]]}).json()
+    assert col["meta"]["kind"] == "bagimsiz"
+    client.post(f"/api/collections/{cid}/run", json={})
+    st = _wait(client, cid)
+    assert not st["failed"], st
+    assert not any("VİTRİN TURU" in b["messages"][1]["content"] for b in server.bodies)    # vitrin turu yok
+    for sku in ("URN-001", "URN-002", "URN-003"):
+        p = client.get(f"/api/collections/{cid}/items/{sku}/prediction").json()
+        assert "panel_seed" not in p["product_card"]
+    assert len(set(seeds)) == 3 and not any(x.startswith("koleksiyon:") for x in seeds)   # her ürüne ayrı panel (ürün adıyla)
+    res = client.get(f"/api/collections/{cid}/result").json()
+    assert res["kind"] == "bagimsiz" and all(i["decision"] in ("üret", "azalt", "üretme") for i in res["items"])
+    assert all(i["recommended_price"]["value"] for i in res["items"])
+    assert client.get(f"/api/collections/{cid}/export.xlsx").status_code == 200

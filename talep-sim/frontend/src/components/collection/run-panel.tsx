@@ -43,7 +43,7 @@ export function RunPanel({ col, onFinished }: { col: Collection; onFinished: () 
   async function start(rerun = false) {
     setError(null);
     try {
-      const s = await startRun(col.id, { rerun, showcase, block_size: blockSize });
+      const s = await startRun(col.id, { rerun, showcase: showcase && col.meta.kind !== "bagimsiz", block_size: blockSize });
       wasRunning.current = true;
       setSt(s);
     } catch (e) {
@@ -58,18 +58,20 @@ export function RunPanel({ col, onFinished }: { col: Collection; onFinished: () 
   const n = col.items.length;
   const groups = n <= blockSize ? 1 : Math.ceil(n / blockSize) * 2;
   const pct = st && st.total ? Math.round((100 * st.done) / st.total) : 0;
+  const indep = col.meta.kind === "bagimsiz";
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">3. Paneli çalıştır</CardTitle>
         <CardDescription>
-          {col.items.length} ürün × {regions} bölge = {pairs} değerlendirme. Her bölgede aynı kişiler bütün ürünlere bakar.
+          {col.items.length} ürün × {regions} bölge = {pairs} değerlendirme.{" "}
+          {indep ? "Her ürün kendi paneliyle ayrı değerlendirilir (tekli ekrandaki gibi)." : "Her bölgede aynı kişiler bütün ürünlere bakar."}
           Mac&apos;te (12 kişi, 2 paralel) ürün-bölge başına yaklaşık 1-2 dakika: toplam kabaca {fmtDur(pairs * 60)}-{fmtDur(pairs * 120)} (tahmin, ölçülmedi).
           Koşu sunucuda sürer; sayfayı kapatabilirsiniz. Durdurulursa ya da API yeniden başlarsa, tekrar başlatınca biten ürünler atlanır.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3">
-        <label className="flex items-start gap-2 rounded-md border p-2 text-sm">
+        {!indep && <label className="flex items-start gap-2 rounded-md border p-2 text-sm">
           <Checkbox className="mt-0.5" checked={showcase} onCheckedChange={(v) => setShowcase(v === true)} disabled={st?.running} />
           <span>
             <b>Vitrin turu</b>: tek tek değerlendirmeden sonra her kişi ürünleri en fazla
@@ -81,7 +83,7 @@ export function RunPanel({ col, onFinished }: { col: Collection; onFinished: () 
             ve birinden birini seçeceği ürünleri işaretler. Kişi başı {groups} grup × {regions} bölge ek soru.
             <span className="block text-xs text-muted-foreground">Yalnızca panel motorunda çalışır. Küçük yerel modelde (7B) 8&apos;den büyük grup önerilmez.</span>
           </span>
-        </label>
+        </label>}
         <div className="flex flex-wrap items-center gap-2">
           {!st?.running ? (
             <>

@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 const TABS = [
   { href: "/", label: "Tekli ürün", hint: "Tek bir tasarımı ayrıntılı simüle et" },
   { href: "/koleksiyon", label: "Koleksiyon (çoklu)", hint: "Koleksiyonun bütün ürünlerini toplu değerlendir" },
+  { href: "/toplu", label: "Toplu ürün (ayrı ayrı)", hint: "Koleksiyonu olmayan ürünleri toplu yükle, her biri ayrı değerlendirilsin" },
   { href: "/yeni-magaza", label: "Yeni mağaza", hint: "Yeni bölgede mağaza öngörüsü" },
 ];
 

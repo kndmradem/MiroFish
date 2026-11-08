@@ -54,24 +54,28 @@ def _dims(data: bytes):
 
 
 @router.get("")
-async def list_collections(store: CollectionStore = Depends(get_store)) -> list:
-    return [{"id": c.id, "name": c.meta.name, "season": c.meta.season, "status": c.status, "items": len(c.items),
-             "created": c.created, "running": runner.running(c.id)} for c in store.list()]
+async def list_collections(kind: Optional[str] = None, store: CollectionStore = Depends(get_store)) -> list:
+    return [{"id": c.id, "name": c.meta.name, "kind": c.meta.kind, "season": c.meta.season, "status": c.status,
+             "items": len(c.items), "created": c.created, "running": runner.running(c.id)}
+            for c in store.list() if not kind or c.meta.kind == kind]
 
 
 @router.get("/template.xlsx")
 async def template() -> Response:
     return Response(template_bytes(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    headers={"Content-Disposition": 'attachment; filename="koleksiyon-sablonu.xlsx"'})
+                    headers={"Content-Disposition": 'attachment; filename="urun-yukleme-sablonu.xlsx"'})
 
 
 @router.post("/import", response_model=ImportPreview)
 async def import_collection(sheet: UploadFile = File(..., description="Excel (.xlsx) ya da CSV"),
                             images: List[UploadFile] = File(default_factory=list, description="Görseller ya da zip"),
                             collection_id: Optional[str] = Form(None),
+                            kind: str = Form("koleksiyon", description="koleksiyon ya da bagimsiz (aynı şablon)"),
                             store: CollectionStore = Depends(get_store)) -> ImportPreview:
     """Excel + görselleri alır, eşleştirir ve önizleme döner. Koleksiyon onaylanana kadar kaydedilmez
     (görseller taslak klasörüne yazılır). collection_id verilirse aynı taslağa yeni dosyalar eklenir."""
+    if kind not in ("koleksiyon", "bagimsiz"):
+        raise HTTPException(422, "kind koleksiyon ya da bagimsiz olmalı")
     name = sheet.filename or "liste.xlsx"
     if not name.lower().endswith((".xlsx", ".xlsm", ".csv")):
         raise HTTPException(422, "Ürün listesi .xlsx ya da .csv olmalı (eski .xls biçimini Excel'de .xlsx olarak kaydedin)")
@@ -120,7 +124,7 @@ async def import_collection(sheet: UploadFile = File(..., description="Excel (.x
     for rel in store.list_images(cid):
         d = _dims(store.image_path(cid, rel).read_bytes())
         infos.append(ImageInfo(rel, *(d or (None, None))))
-    prev = build_preview(cid, book, infos)
+    prev = build_preview(cid, book, infos, kind)
     prev.issues = skipped + prev.issues
     store.save_preview(prev)
     return prev
@@ -257,24 +261,31 @@ async def export(cid: str, store: CollectionStore = Depends(get_store)) -> Respo
     ws = wb.active
     ws.title = "Ürünler"
     rate = res.fx_rate if res.currency == "TRY" else 1.0
-    head = ["SKU", "Ürün", "Kategori", "Sıra", "Sıra aralığı", "Talep skoru (ajan)", "Koleksiyon içi fark (ajan)",
-            "Hevesli % (ajan)", "Rol (kural)", "Rol nedeni", "Hedef rol", f"Planlanan fiyat ({res.currency})",
-            "Önerilen adet (kural)", "Planlanan adet", "Bayraklar"]
+    indep = res.kind == "bagimsiz"
+    head = ["SKU", "Ürün", "Kategori", "Karar", "Karar kaynağı", "Karar gerekçesi (dayanak)", "Talep skoru (ajan)",
+            f"Önerilen fiyat ({res.currency}, ajan)", f"Kabul aralığı ({res.currency}, ajan)", "Net marj % (kural)"]
+    if not indep:
+        head += ["Sıra", "Sıra aralığı", "Koleksiyon içi fark (ajan)", "Hevesli % (ajan)", "Rol (kural)", "Rol nedeni", "Hedef rol"]
+    head += ["Önerilen adet (kural)", "Planlanan adet", "Bayraklar"]
     for r in res.regions:
-        head += [f"{r} talep", f"{r} ideal fiyat ({res.currency})", f"{r} fiyat uyumu", f"{r} iade %", f"{r} adet"]
+        head += [f"{r} talep", f"{r} önerilen fiyat ({res.currency})", f"{r} net marj %", f"{r} iade %", f"{r} adet"]
     ws.append(head)
     for c in ws[1]:
         c.font = Font(bold=True)
     for it in res.items:
         reg = {x.region: x for x in it.regions}
-        row = [it.sku, it.name, it.category, it.rank.value,
-               f"{int(it.rank.low)}-{int(it.rank.high)}" if it.rank.low is not None else "", it.appeal.value,
-               it.relative.value, it.enthusiast_pct.value, it.role, it.role_why, it.declared_role or "",
-               round(it.planned_price_usd * rate, 2) if it.planned_price_usd else None, it.recommended_qty.value,
-               it.planned_qty, ", ".join(it.flags)]
+        rp = it.recommended_price
+        row = [it.sku, it.name, it.category, it.decision or "", it.decision_source if it.decision else "",
+               "; ".join(f"{x.text} ({x.basis})" for x in it.decision_reasons), it.appeal.value,
+               round(rp.value * rate, 2) if rp.value else None,
+               f"{round(rp.low * rate):,} - {round(rp.high * rate):,}" if rp.low is not None else "", it.net_margin.value]
+        if not indep:
+            row += [it.rank.value, f"{int(it.rank.low)}-{int(it.rank.high)}" if it.rank.low is not None else "",
+                    it.relative.value, it.enthusiast_pct.value, it.role, it.role_why, it.declared_role or ""]
+        row += [it.recommended_qty.value, it.planned_qty, ", ".join(it.flags)]
         for r in res.regions:
             x = reg.get(r)
-            row += [x.demand, round(x.optimal_price * rate, 2), x.price_fit or "", x.return_pct, it.qty_by_region.get(r)] if x else [None] * 5
+            row += [x.demand, round(x.optimal_price * rate, 2), x.net_margin_pct, x.return_pct, it.qty_by_region.get(r)] if x else [None] * 5
         ws.append(row)
     notes = wb.create_sheet("Notlar")
     for a in res.summary.actions:
@@ -285,4 +296,4 @@ async def export(cid: str, store: CollectionStore = Depends(get_store)) -> Respo
     buf = io.BytesIO()
     wb.save(buf)
     return Response(buf.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    headers={"Content-Disposition": f'attachment; filename="koleksiyon-{cid}.xlsx"'})
+                    headers={"Content-Disposition": f'attachment; filename="{"urunler" if indep else "koleksiyon"}-{cid}.xlsx"'})

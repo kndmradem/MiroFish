@@ -13,8 +13,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  exportUrl, imageUrl, money, ROLE_CLASS, ROLE_LABEL, whatIf,
-  type Basis, type CollectionResult, type ItemResult, type Metric, type WhatIf,
+  DECISION_CLASS, DECISION_LABEL, exportUrl, imageUrl, money, ROLE_CLASS, ROLE_LABEL, whatIf,
+  type Basis, type CollectionResult, type Decision, type ItemResult, type Metric, type WhatIf,
 } from "@/lib/collection-api";
 import { cn } from "@/lib/utils";
 
@@ -44,7 +44,16 @@ function Tile({ label, value, sub, m }: { label: string; value: string; sub?: st
 
 const TABS = ["Özet", "Ürünler", "Vitrin", "Bölgeler", "Fiyat", "Bütçe"] as const;
 type Tab = (typeof TABS)[number];
-const FIT_CLASS = { "altında": "text-sky-700", "içinde": "text-emerald-700", "üstünde": "text-rose-700" } as const;
+const DECISIONS: Decision[] = ["üret", "azalt", "üretme"];
+
+export function DecisionChip({ d, user }: { d: Decision | null; user?: boolean }) {
+  if (!d) return <span className="text-xs text-muted-foreground">–</span>;
+  return (
+    <span className={cn("rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap", DECISION_CLASS[d])}>
+      {DECISION_LABEL[d]}{user ? " (elle)" : ""}
+    </span>
+  );
+}
 
 export function CollectionResults({ base }: { base: CollectionResult }) {
   const [tab, setTab] = useState<Tab>("Özet");
@@ -52,7 +61,10 @@ export function CollectionResults({ base }: { base: CollectionResult }) {
   const [res, setRes] = useState<CollectionResult>(base);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const active = !!(scenario.exclude?.length || Object.keys(scenario.planned_prices ?? {}).length || scenario.total_budget != null || scenario.allocation_objective);
+  const active = !!(scenario.exclude?.length || Object.keys(scenario.planned_prices ?? {}).length || scenario.total_budget != null
+    || scenario.allocation_objective || Object.keys(scenario.decisions ?? {}).length);
+  const indep = base.kind === "bagimsiz";
+  const tabs = TABS.filter((t) => !(indep && t === "Vitrin"));
 
   useEffect(() => { setRes(base); setScenario({}); }, [base]);
   useEffect(() => {
@@ -68,14 +80,24 @@ export function CollectionResults({ base }: { base: CollectionResult }) {
   const fx = res.fx_rate;
   const m = (v: number | null | undefined) => money(v, cur, fx);
   const excluded = new Set(scenario.exclude ?? []);
+  const setDecision = (sku: string, d: Decision | "") =>
+    setScenario((x) => {
+      const ds = { ...(x.decisions ?? {}) };
+      if (d) ds[sku] = d; else delete ds[sku];
+      return { ...x, decisions: ds };
+    });
   const toggleExclude = (sku: string, on: boolean) =>
     setScenario((s) => ({ ...s, exclude: on ? [...(s.exclude ?? []), sku] : (s.exclude ?? []).filter((x) => x !== sku) }));
   const s = res.summary;
   const allItems = useMemo(() => {
     // çıkarılan ürünler de tabloda (soluk) kalsın ki geri alınabilsin
     const map = new Map(res.items.map((i) => [i.sku, i]));
-    return [...res.items, ...base.items.filter((i) => !map.has(i.sku))].sort((a, b) => (a.rank.value ?? 999) - (b.rank.value ?? 999));
-  }, [res, base]);
+    const order = { "üret": 0, azalt: 1, "üretme": 2 } as Record<string, number>;
+    const all = [...res.items, ...base.items.filter((i) => !map.has(i.sku))];
+    return indep
+      ? all.sort((a, b) => (order[a.decision ?? ""] ?? 3) - (order[b.decision ?? ""] ?? 3) || (b.appeal.value ?? -1) - (a.appeal.value ?? -1))
+      : all.sort((a, b) => (a.rank.value ?? 999) - (b.rank.value ?? 999));
+  }, [res, base, indep]);
 
   return (
     <Card>
@@ -86,6 +108,7 @@ export function CollectionResults({ base }: { base: CollectionResult }) {
             <CardDescription>
               {s.n_evaluated}/{s.n_items} ürün değerlendirildi · bölgeler: {res.regions.join(", ")}
               {res.panel_shared ? " · her bölgede bütün ürünlere aynı kişiler baktı" : ""}
+              {indep ? " · her ürün kendi paneliyle ayrı değerlendirildi" : ""}
               {res.data_basis?.persona_version ? ` · persona ${String(res.data_basis.persona_version)}` : ""}
               {res.data_basis?.context_as_of ? `, bağlam ${String(res.data_basis.context_as_of)}` : ""}
             </CardDescription>
@@ -97,14 +120,14 @@ export function CollectionResults({ base }: { base: CollectionResult }) {
         {active && (
           <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
             Ne olur senaryosu açık{excluded.size ? `: ${excluded.size} ürün çıkarıldı` : ""}{Object.keys(scenario.planned_prices ?? {}).length ? `, ${Object.keys(scenario.planned_prices ?? {}).length} fiyat değişti` : ""}
-            {scenario.total_budget != null ? ", bütçe değişti" : ""}. Panel yeniden sorulmadı; sonuçlar kayıtlı cevaplardan yeniden hesaplandı.
+            {scenario.total_budget != null ? ", bütçe değişti" : ""}{Object.keys(scenario.decisions ?? {}).length ? `, ${Object.keys(scenario.decisions ?? {}).length} karar elle değişti` : ""}. Panel yeniden sorulmadı; sonuçlar kayıtlı cevaplardan yeniden hesaplandı.
             <Button size="sm" variant="outline" onClick={() => setScenario({})}><RotateCcw className="size-3" />Geri al</Button>
             {busy && <span className="text-xs">hesaplanıyor…</span>}
           </div>
         )}
         {error && <div className="text-sm text-rose-600">{error}</div>}
         <div className="flex flex-wrap gap-1 border-b">
-          {TABS.map((t) => (
+          {tabs.map((t) => (
             <button key={t} onClick={() => setTab(t)}
               className={cn("-mb-px border-b-2 px-3 py-1.5 text-sm", tab === t ? "border-primary font-medium" : "border-transparent text-muted-foreground")}>{t}</button>
           ))}
@@ -112,18 +135,34 @@ export function CollectionResults({ base }: { base: CollectionResult }) {
       </CardHeader>
       <CardContent>
         {tab === "Özet" && <Summary res={res} m={m} />}
-        {tab === "Ürünler" && <Items res={res} items={allItems} excluded={excluded} onExclude={toggleExclude} m={m} />}
+        {tab === "Ürünler" && <Items res={res} items={allItems} excluded={excluded} onExclude={toggleExclude} m={m}
+          overrides={scenario.decisions ?? {}} onDecision={setDecision} />}
         {tab === "Vitrin" && <Showcase res={res} />}
         {tab === "Bölgeler" && <Heatmap res={res} />}
         {tab === "Fiyat" && <Prices res={res} m={m} scenario={scenario} setScenario={setScenario} />}
         {tab === "Bütçe" && <Budget res={res} m={m} scenario={scenario} setScenario={setScenario} />}
+        {tab === "Özet" && <p className="mt-4 text-xs text-muted-foreground">Bir ürünün kararını değiştirmek için Ürünler sekmesinde &quot;Karar&quot; sütununu kullanın; bütçe dağıtımı anında yeniden hesaplanır.</p>}
       </CardContent>
     </Card>
   );
 }
 
+function DecisionTile({ res }: { res: CollectionResult }) {
+  const d = res.summary.decisions ?? {};
+  return (
+    <div className="grid gap-1 rounded-lg border p-3">
+      <div className="flex items-center justify-between text-xs text-muted-foreground">Üretim kararı
+        <BasisChip basis="kural varsayımı" how="Talep (ajan) ve önerilen fiyattaki net marj eşiklerinden; koleksiyonda iç sıra ve kanibalizasyon da hesaba katılır" /></div>
+      <div className="flex flex-wrap content-start items-start gap-1.5 pt-1">
+        {DECISIONS.map((k) => <span key={k} className={cn("rounded-full border px-2 py-0.5 text-xs", DECISION_CLASS[k])}>{DECISION_LABEL[k]} {d[k] ?? 0}</span>)}
+      </div>
+    </div>
+  );
+}
+
 function Summary({ res, m }: { res: CollectionResult; m: (v: number | null | undefined) => string }) {
   const s = res.summary;
+  const indep = res.kind === "bagimsiz";
   const curve: EChartsOption = {
     grid: { left: 40, right: 16, top: 16, bottom: 60 },
     tooltip: { trigger: "axis", valueFormatter: (v) => `%${v}` },
@@ -137,18 +176,19 @@ function Summary({ res, m }: { res: CollectionResult; m: (v: number | null | und
   const sat = s.reach_curve.length;
   return (
     <div className="grid gap-5">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Tile label="Koleksiyon erişimi" m={s.reach} value={s.reach.value != null ? `%${s.reach.value}` : "–"}
-          sub={s.reach.value != null ? "panelin en az bir ürünü çok beğenen kısmı" : "kişi bazlı puan yok"} />
+      <div className={cn("grid gap-3 sm:grid-cols-2", indep ? "lg:grid-cols-3" : "lg:grid-cols-5")}>
+        <DecisionTile res={res} />
+        {!indep && <Tile label="Koleksiyon erişimi" m={s.reach} value={s.reach.value != null ? `%${s.reach.value}` : "–"}
+          sub={s.reach.value != null ? "panelin en az bir ürünü çok beğenen kısmı" : "kişi bazlı puan yok"} />}
         <Tile label="Ortalama talep skoru" m={s.mean_appeal} value={s.mean_appeal.value != null ? String(s.mean_appeal.value) : "–"} sub="0-100" />
-        <div className="grid gap-1 rounded-lg border p-3">
+        {!indep && <div className="grid gap-1 rounded-lg border p-3">
           <div className="flex items-center justify-between text-xs text-muted-foreground">Ürün rolleri<BasisChip basis="kural varsayımı" how="Koleksiyon içi sıra, hevesli kişi oranı ve görüş ayrılığından kurallarla" /></div>
           <div className="flex flex-wrap gap-1.5 pt-1">
             {(["hero", "çekirdek", "tamamlayıcı", "destek", "riskli"] as const).filter((r) => r !== "tamamlayıcı" || s.roles[r]).map((r) => (
               <span key={r} className={cn("rounded-full border px-2 py-0.5 text-xs", ROLE_CLASS[r])}>{ROLE_LABEL[r]} {s.roles[r] ?? 0}</span>
             ))}
           </div>
-        </div>
+        </div>}
         <Tile label="Önerilen üretim" m={s.expected_units} value={`${s.total_qty.toLocaleString("tr-TR")} adet`}
           sub={s.budget_total_usd ? `${m(s.budget_used_usd)} / ${m(s.budget_total_usd)} bütçe · 120 günde ~${(s.expected_units.value ?? 0).toLocaleString("tr-TR")} satış` : "bütçe girilmedi"} />
       </div>
@@ -162,10 +202,10 @@ function Summary({ res, m }: { res: CollectionResult; m: (v: number | null | und
 
       {s.actions.length > 0 && (
         <div className="grid gap-2">
-          <h3 className="text-sm font-medium">Bu koleksiyon için öneriler</h3>
+          <h3 className="text-sm font-medium">{indep ? "Bu ürünler için öneriler" : "Bu koleksiyon için öneriler"}</h3>
           {s.actions.map((a, i) => (
             <div key={i} className="flex items-start gap-2 rounded-md border p-2 text-sm">
-              <Badge variant="outline" className="shrink-0">{a.kind}</Badge>
+              {a.kind === "üretme" || a.kind === "azalt" ? <span className="shrink-0"><DecisionChip d={a.kind as Decision} /></span> : <Badge variant="outline" className="shrink-0">{a.kind}</Badge>}
               <span className="flex-1">{a.text}</span>
               <BasisChip basis={a.basis} />
             </div>
@@ -197,19 +237,17 @@ function Summary({ res, m }: { res: CollectionResult; m: (v: number | null | und
         <h3 className="text-sm font-medium">Kategoriler</h3>
         <Table>
           <TableHeader><TableRow>
-            <TableHead>Kategori</TableHead><TableHead className="text-right">Ürün</TableHead><TableHead>Roller</TableHead>
-            <TableHead className="text-right">Fiyat aralığı (planlanan)</TableHead><TableHead className="text-right">Ort. talep</TableHead>
-            <TableHead className="text-right">Kabul aralığında</TableHead>
+            <TableHead>Kategori</TableHead><TableHead className="text-right">Ürün</TableHead>{!indep && <TableHead>Roller</TableHead>}
+            <TableHead className="text-right">Önerilen fiyat aralığı</TableHead><TableHead className="text-right">Ort. talep</TableHead>
           </TableRow></TableHeader>
           <TableBody>
             {s.categories.map((c) => (
               <TableRow key={c.category}>
                 <TableCell>{c.category}</TableCell>
                 <TableCell className="text-right">{c.count}</TableCell>
-                <TableCell className="text-xs">{Object.entries(c.roles).filter(([, v]) => v).map(([k, v]) => `${ROLE_LABEL[k as keyof typeof ROLE_LABEL]} ${v}`).join(" · ")}</TableCell>
+                {!indep && <TableCell className="text-xs">{Object.entries(c.roles).filter(([, v]) => v).map(([k, v]) => `${ROLE_LABEL[k as keyof typeof ROLE_LABEL]} ${v}`).join(" · ")}</TableCell>}
                 <TableCell className="text-right">{c.price_min != null ? `${m(c.price_min)} – ${m(c.price_max)}` : "–"}</TableCell>
                 <TableCell className="text-right">{c.mean_appeal}</TableCell>
-                <TableCell className="text-right">{c.in_zone + c.out_zone ? `${c.in_zone}/${c.in_zone + c.out_zone}` : "–"}</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -245,36 +283,43 @@ function BrandEffectCard({ b, regions }: { b: NonNullable<CollectionResult["bran
   );
 }
 
-function Items({ res, items, excluded, onExclude, m }: {
+function Items({ res, items, excluded, onExclude, m, overrides, onDecision }: {
   res: CollectionResult; items: ItemResult[]; excluded: Set<string>; onExclude: (sku: string, on: boolean) => void;
-  m: (v: number | null | undefined) => string;
+  m: (v: number | null | undefined) => string; overrides: Record<string, Decision>; onDecision: (sku: string, d: Decision | "") => void;
 }) {
   const [open, setOpen] = useState<string | null>(null);
   const n = res.summary.n_evaluated;
+  const indep = res.kind === "bagimsiz";
+  const cols = indep ? 8 : 12;
   return (
     <div className="overflow-x-auto">
       <p className="mb-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-        Kaynaklar: sıra, talep ve hevesli oranı <BasisChip basis="ajan" />, rol ve adet <BasisChip basis="kural varsayımı" />, planlanan fiyat ve hedef rol <BasisChip basis="kullanıcı girdisi" />.
-        &quot;Çıkar&quot; kutusu ürünü ne olur senaryosunda koleksiyondan çıkarır.
+        Kaynaklar: talep, önerilen fiyat ve kabul aralığı <BasisChip basis="ajan" />, net marj, karar eşikleri ve adet <BasisChip basis="kural varsayımı" />,
+        maliyet{indep ? "" : " ve hedef rol"} <BasisChip basis="kullanıcı girdisi" />. Satıra tıklayınca kararın gerekçesi ve bölge ayrıntısı açılır.
+        {!indep && <> &quot;Çıkar&quot; kutusu ürünü ne olur senaryosunda koleksiyondan tamamen çıkarır.</>}
       </p>
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-6" /><TableHead>Ürün</TableHead><TableHead>Sıra</TableHead><TableHead className="text-right">Talep</TableHead>
-            <TableHead>Koleksiyona göre</TableHead><TableHead className="text-right">Hevesli</TableHead><TableHead className="text-right">Vitrin sırası</TableHead><TableHead>Rol (hedef → panel)</TableHead>
-            <TableHead>Fiyat uyumu</TableHead><TableHead className="text-right">Önerilen adet</TableHead><TableHead>Bayraklar</TableHead><TableHead>Çıkar</TableHead>
+            <TableHead className="w-6" /><TableHead>Ürün</TableHead><TableHead>Karar</TableHead>
+            {!indep && <TableHead>Sıra</TableHead>}
+            <TableHead className="text-right">Talep</TableHead>
+            {!indep && <><TableHead>Koleksiyona göre</TableHead><TableHead className="text-right">Vitrin sırası</TableHead><TableHead>Rol (hedef → panel)</TableHead></>}
+            <TableHead className="text-right">Önerilen fiyat</TableHead><TableHead className="text-right">Net marj</TableHead>
+            <TableHead className="text-right">Önerilen adet</TableHead><TableHead>Bayraklar</TableHead>
+            {!indep && <TableHead>Çıkar</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
           {items.map((it) => {
             const ex = excluded.has(it.sku);
-            const fits = it.regions.map((r) => r.price_fit).filter(Boolean);
             const rel = it.relative.value ?? 0;
+            const rp = it.recommended_price;
             return (
               <Fragment key={it.sku}>
-                <TableRow className={cn(ex && "opacity-40")}>
+                <TableRow className={cn(ex && "opacity-40", it.decision === "üretme" && !ex && "bg-rose-50/40")}>
                   <TableCell>
-                    <button onClick={() => setOpen(open === it.sku ? null : it.sku)} disabled={!it.regions.length}>
+                    <button onClick={() => setOpen(open === it.sku ? null : it.sku)} disabled={!it.regions.length} aria-label="Ayrıntı">
                       {open === it.sku ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
                     </button>
                   </TableCell>
@@ -285,47 +330,80 @@ function Items({ res, items, excluded, onExclude, m }: {
                       <div className="min-w-40 whitespace-normal"><div className="font-medium">{it.name}</div><div className="font-mono text-[11px] text-muted-foreground">{it.sku} · {it.category || "kategorisiz"}</div></div>
                     </div>
                   </TableCell>
-                  <TableCell className="whitespace-nowrap" title={it.rank.how}>
-                    {it.rank.value != null ? <><b>{it.rank.value}</b><span className="text-muted-foreground">/{n}</span>{it.rank.low != null && <span className="text-xs text-muted-foreground"> ({it.rank.low}-{it.rank.high})</span>}</> : "–"}
+                  <TableCell className="min-w-44 whitespace-normal">
+                    <div className="flex items-center gap-1.5">
+                      <DecisionChip d={it.decision} user={it.decision_source === "kullanıcı"} />
+                      {it.decision && (
+                        <select className="h-6 rounded border bg-background px-1 text-[11px]" value={overrides[it.sku] ?? ""} title="Kararı elle değiştir"
+                          onChange={(e) => onDecision(it.sku, e.target.value as Decision | "")}>
+                          <option value="">sistem</option>
+                          {DECISIONS.map((d) => <option key={d} value={d}>{DECISION_LABEL[d]}</option>)}
+                        </select>
+                      )}
+                    </div>
+                    {it.decision_reasons[0] && <div className="mt-1 text-[11px] leading-snug text-muted-foreground">{it.decision_reasons[0].text}</div>}
+                    {!it.decision && <div className="mt-1 text-[11px] text-muted-foreground">{it.role_why}</div>}
                   </TableCell>
+                  {!indep && (
+                    <TableCell className="whitespace-nowrap" title={it.rank.how}>
+                      {it.rank.value != null ? <><b>{it.rank.value}</b><span className="text-muted-foreground">/{n}</span>{it.rank.low != null && <span className="text-xs text-muted-foreground"> ({it.rank.low}-{it.rank.high})</span>}</> : "–"}
+                    </TableCell>
+                  )}
                   <TableCell className="text-right">{it.appeal.value ?? "–"}</TableCell>
-                  <TableCell title={it.relative.how}>
-                    {it.relative.value != null && (
-                      <div className="flex w-28 items-center">
-                        <div className="relative h-2 w-full rounded bg-muted">
-                          <div className="absolute top-0 left-1/2 h-2 w-px bg-foreground/40" />
-                          <div className={cn("absolute top-0 h-2 rounded", rel >= 0 ? "left-1/2 bg-emerald-500" : "right-1/2 bg-rose-400")}
-                            style={{ width: `${Math.min(50, Math.abs(rel) * 25)}%` }} />
-                        </div>
-                      </div>
-                    )}
+                  {!indep && (
+                    <>
+                      <TableCell title={it.relative.how}>
+                        {it.relative.value != null && (
+                          <div className="flex w-24 items-center">
+                            <div className="relative h-2 w-full rounded bg-muted">
+                              <div className="absolute top-0 left-1/2 h-2 w-px bg-foreground/40" />
+                              <div className={cn("absolute top-0 h-2 rounded", rel >= 0 ? "left-1/2 bg-emerald-500" : "right-1/2 bg-rose-400")}
+                                style={{ width: `${Math.min(50, Math.abs(rel) * 25)}%` }} />
+                            </div>
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right" title="Ürünler bir arada gösterildiğinde seçilme sırası">
+                        {it.showcase ? <><b>{it.showcase.rank}</b><div className="text-[11px] text-muted-foreground">en çok %{it.showcase.best_pct}</div></> : "–"}
+                      </TableCell>
+                      <TableCell title={it.role_why}>
+                        <span className="text-xs text-muted-foreground">{it.declared_role ? `${it.declared_role} → ` : ""}</span>
+                        <span className={cn("rounded-full border px-2 py-0.5 text-xs", ROLE_CLASS[it.role])}>{ROLE_LABEL[it.role]}</span>
+                      </TableCell>
+                    </>
+                  )}
+                  <TableCell className="text-right whitespace-nowrap" title={rp.how}>
+                    {rp.value != null ? <><b>{m(rp.value)}</b>
+                      {rp.low != null && <div className="text-[11px] text-muted-foreground">kabul {m(rp.low)} – {m(rp.high)}</div>}</> : "–"}
                   </TableCell>
-                  <TableCell className="text-right">{it.enthusiast_pct.value != null ? `%${it.enthusiast_pct.value}` : "–"}</TableCell>
-                  <TableCell className="text-right" title="Ürünler bir arada gösterildiğinde seçilme sırası">
-                    {it.showcase ? <><b>{it.showcase.rank}</b><div className="text-[11px] text-muted-foreground">en çok %{it.showcase.best_pct}</div></> : "–"}
+                  <TableCell className={cn("text-right", it.net_margin.value != null && it.net_margin.value < 15 && "text-rose-700")} title={it.net_margin.how}>
+                    {it.net_margin.value != null ? `%${it.net_margin.value}` : "–"}
                   </TableCell>
-                  <TableCell title={it.role_why}>
-                    <span className="text-xs text-muted-foreground">{it.declared_role ? `${it.declared_role} → ` : ""}</span>
-                    <span className={cn("rounded-full border px-2 py-0.5 text-xs", ROLE_CLASS[it.role])}>{ROLE_LABEL[it.role]}</span>
-                  </TableCell>
-                  <TableCell className="text-xs">
-                    {fits.length ? it.regions.map((r) => r.price_fit && <div key={r.region} className={FIT_CLASS[r.price_fit]}>{r.region}: {r.price_fit}</div>) : <span className="text-muted-foreground">fiyat girilmedi</span>}
-                  </TableCell>
-                  <TableCell className="text-right">{it.recommended_qty.value != null ? it.recommended_qty.value.toLocaleString("tr-TR") : "–"}
+                  <TableCell className="text-right" title={it.recommended_qty.how}>{it.recommended_qty.value != null ? it.recommended_qty.value.toLocaleString("tr-TR") : "–"}
                     {it.planned_qty != null && <div className="text-[11px] text-muted-foreground">plan {it.planned_qty.toLocaleString("tr-TR")}</div>}</TableCell>
                   <TableCell className="max-w-48 text-xs whitespace-normal">{it.flags.join(", ")}</TableCell>
-                  <TableCell><Checkbox checked={ex} onCheckedChange={(v) => onExclude(it.sku, v === true)} /></TableCell>
+                  {!indep && <TableCell><Checkbox checked={ex} onCheckedChange={(v) => onExclude(it.sku, v === true)} /></TableCell>}
                 </TableRow>
                 {open === it.sku && (
                   <TableRow className="bg-muted/30 hover:bg-muted/30">
-                    <TableCell colSpan={12}>
-                      <div className="grid gap-2 py-1">
-                        <div className="text-xs text-muted-foreground">{it.role_why}</div>
+                    <TableCell colSpan={cols}>
+                      <div className="grid gap-3 py-1">
+                        {it.decision_reasons.length > 0 && (
+                          <div className="grid gap-1">
+                            <div className="flex items-center gap-2 text-sm font-medium">Karar: <DecisionChip d={it.decision} user={it.decision_source === "kullanıcı"} /> gerekçeler</div>
+                            <ul className="grid gap-0.5 text-sm">
+                              {it.decision_reasons.map((r, k) => (
+                                <li key={k} className="flex items-start gap-2"><span className="mt-1.5 size-1 shrink-0 rounded-full bg-foreground/50" /><span className="flex-1">{r.text}</span><BasisChip basis={r.basis} /></li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {!indep && <div className="text-xs text-muted-foreground">Rol: {it.role_why}</div>}
                         <Table>
                           <TableHeader><TableRow>
                             <TableHead>Bölge</TableHead><TableHead className="text-right">Talep</TableHead><TableHead className="text-right">Hevesli</TableHead>
-                            <TableHead className="text-right">İdeal fiyat</TableHead><TableHead className="text-right">Kabul aralığı</TableHead>
-                            <TableHead className="text-right">Marj</TableHead><TableHead className="text-right">İade</TableHead><TableHead className="text-right">Adet</TableHead>
+                            <TableHead className="text-right">Önerilen fiyat</TableHead><TableHead className="text-right">Kabul aralığı</TableHead>
+                            <TableHead className="text-right">Brüt marj</TableHead><TableHead className="text-right">Net marj</TableHead><TableHead className="text-right">İade</TableHead><TableHead className="text-right">Adet</TableHead>
                             <TableHead>En sık itirazlar</TableHead><TableHead>Güven</TableHead>
                           </TableRow></TableHeader>
                           <TableBody>
@@ -335,7 +413,9 @@ function Items({ res, items, excluded, onExclude, m }: {
                                 <TableCell className="text-right">{r.enthusiast_pct != null ? `%${r.enthusiast_pct}` : "–"}</TableCell>
                                 <TableCell className="text-right">{m(r.optimal_price)}</TableCell>
                                 <TableCell className="text-right whitespace-nowrap">{m(r.range_low)} – {m(r.range_high)}</TableCell>
-                                <TableCell className="text-right">%{r.margin_pct}</TableCell><TableCell className="text-right">%{r.return_pct}</TableCell>
+                                <TableCell className="text-right">%{r.margin_pct}</TableCell>
+                                <TableCell className="text-right">{r.net_margin_pct != null ? `%${r.net_margin_pct}` : "–"}</TableCell>
+                                <TableCell className="text-right">%{r.return_pct}</TableCell>
                                 <TableCell className="text-right">{it.qty_by_region[r.region] ?? "–"}</TableCell>
                                 <TableCell className="text-xs">{r.objections.join(" · ")}</TableCell><TableCell className="text-xs">{r.confidence}</TableCell>
                               </TableRow>
@@ -465,47 +545,69 @@ function Heatmap({ res }: { res: CollectionResult }) {
   );
 }
 
+const ZONE_CLASS: Record<string, string> = {
+  too_cheap: "bg-slate-200", cheap: "bg-sky-200", ideal: "bg-emerald-300", expensive: "bg-amber-200", too_expensive: "bg-rose-200",
+};
+
 function Prices({ res, m, scenario, setScenario }: {
   res: CollectionResult; m: (v: number | null | undefined) => string; scenario: WhatIf; setScenario: (f: (s: WhatIf) => WhatIf) => void;
 }) {
   const [region, setRegion] = useState(res.regions[0]);
   const items = res.items.filter((i) => i.regions.length);
   const cats = Array.from(new Set(items.map((i) => i.category || "kategorisiz")));
-  const toLocal = (usdV: number) => (res.currency === "TRY" ? usdV * res.fx_rate : usdV);
+  const legend = items.flatMap((i) => i.regions).find((r) => r.zones.length)?.zones ?? [];
   return (
     <div className="grid gap-4">
-      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        Gri bant panelin kabul edilebilir fiyat aralığı <BasisChip basis="ajan" />, ince çizgi ideal fiyat, nokta planlanan fiyat <BasisChip basis="kullanıcı girdisi" />.
-        Fiyatı değiştirip sonucu görebilirsiniz (panel yeniden sorulmaz).
+      <div className="flex items-start gap-3 text-xs text-muted-foreground">
+        <p className="flex-1 leading-relaxed">
+          Renkli bantlar panelin fiyat bölgeleri (Van Westendorp) <BasisChip basis="ajan" />, koyu çizgi sistemin önerdiği en kârlı fiyat.
+          Satış fiyatını siz girmiyorsunuz; isterseniz sağdaki kutuya bir fiyat yazıp marjı ve kararı deneyebilirsiniz (panel yeniden sorulmaz) <BasisChip basis="kullanıcı girdisi" />.
+          Her satırın ölçeği kendi fiyat aralığına göredir.
+        </p>
         <select className="ml-auto h-8 rounded-md border bg-background px-2 text-sm text-foreground" value={region} onChange={(e) => setRegion(e.target.value)}>
           {res.regions.map((r) => <option key={r}>{r}</option>)}
         </select>
       </div>
+      {legend.length > 0 && (
+        <div className="flex flex-wrap gap-3 text-xs">
+          {legend.map((z) => <span key={z.key} className="flex items-center gap-1"><span className={cn("inline-block size-3 rounded-sm", ZONE_CLASS[z.key] ?? "bg-muted")} />{z.label}</span>)}
+        </div>
+      )}
       {cats.map((c) => {
         const rows = items.filter((i) => (i.category || "kategorisiz") === c);
-        const max = Math.max(...rows.flatMap((i) => { const r = i.regions.find((x) => x.region === region); return [r?.range_high ?? 0, i.planned_price_usd ?? 0]; })) * 1.1 || 1;
         return (
           <div key={c} className="grid gap-2">
             <h3 className="text-sm font-medium">{c}</h3>
             {rows.map((i) => {
               const r = i.regions.find((x) => x.region === region);
               if (!r) return null;
-              const pos = (v: number) => `${Math.min(100, (100 * v) / max)}%`;
+              const trial = i.planned_price_usd;
+              const min = Math.min(r.range_low * 0.6, trial ?? Infinity);
+              const max = Math.max(r.range_high * 1.4, trial ? trial * 1.05 : 0);
+              const pos = (v: number) => Math.max(0, Math.min(100, (100 * (v - min)) / (max - min || 1)));
+              const zones = r.zones.length ? r.zones : [{ key: "ideal", label: "Kabul aralığı", low: r.range_low, high: r.range_high }];
               return (
-                <div key={i.sku} className="grid grid-cols-[minmax(120px,200px)_1fr_120px] items-center gap-3 text-sm">
-                  <span className="truncate" title={i.name}>{i.name}</span>
-                  <div className="relative h-6 rounded bg-muted/50">
-                    <div className="absolute top-1 h-4 rounded bg-slate-300" style={{ left: pos(r.range_low), width: `calc(${pos(r.range_high)} - ${pos(r.range_low)})` }}
-                      title={`Kabul aralığı ${m(r.range_low)} – ${m(r.range_high)}`} />
-                    <div className="absolute top-0 h-6 w-0.5 bg-slate-700" style={{ left: pos(r.optimal_price) }} title={`İdeal ${m(r.optimal_price)}`} />
-                    {i.planned_price_usd != null && (
-                      <div className={cn("absolute top-1.5 size-3 -translate-x-1/2 rounded-full border-2 border-white",
-                        r.price_fit === "içinde" ? "bg-emerald-600" : r.price_fit === "üstünde" ? "bg-rose-600" : "bg-sky-600")}
-                        style={{ left: pos(i.planned_price_usd) }} title={`Planlanan ${m(i.planned_price_usd)}`} />
+                <div key={i.sku} className="grid grid-cols-[minmax(110px,190px)_1fr_minmax(150px,auto)_110px] items-center gap-3 text-sm">
+                  <span className="grid min-w-0 gap-0.5"><span className="truncate" title={i.name}>{i.name}</span><span><DecisionChip d={i.decision} /></span></span>
+                  <div className="relative h-7 overflow-hidden rounded bg-muted/50">
+                    {zones.map((z) => {
+                      const lo = pos(z.low), hi = pos(z.high ?? max);
+                      return <div key={z.key} className={cn("absolute top-1 h-5", ZONE_CLASS[z.key] ?? "bg-slate-300")}
+                        style={{ left: `${lo}%`, width: `${Math.max(0, hi - lo)}%` }} title={`${z.label}: ${m(z.low)} – ${z.high != null ? m(z.high) : "üstü"}`} />;
+                    })}
+                    <div className="absolute top-0 h-7 w-0.5 bg-slate-900" style={{ left: `${pos(r.optimal_price)}%` }} title={`Önerilen ${m(r.optimal_price)}`} />
+                    {trial != null && (
+                      <div className={cn("absolute top-2 size-3 -translate-x-1/2 rounded-full border-2 border-white",
+                        r.price_fit === "içinde" ? "bg-emerald-700" : r.price_fit === "üstünde" ? "bg-rose-600" : "bg-sky-600")}
+                        style={{ left: `${pos(trial)}%` }} title={`Denenen ${m(trial)}`} />
                     )}
                   </div>
-                  <Input className="h-8 text-right" type="number" placeholder="planlanan"
-                    value={scenario.planned_prices?.[i.sku] ?? (i.planned_price_usd != null ? Math.round(toLocal(i.planned_price_usd)) : "")}
+                  <span className="text-right text-xs whitespace-nowrap">
+                    <b className="text-sm">{m(r.optimal_price)}</b> önerilen<br />
+                    <span className="text-muted-foreground">kabul {m(r.range_low)} – {m(r.range_high)}{r.net_margin_pct != null ? ` · net marj %${r.net_margin_pct}` : ""}</span>
+                  </span>
+                  <Input className="h-8 text-right" type="number" placeholder="fiyat dene"
+                    value={scenario.planned_prices?.[i.sku] ?? ""}
                     onChange={(e) => {
                       const v = e.target.value;
                       setScenario((s) => {
@@ -551,11 +653,11 @@ function Budget({ res, m, scenario, setScenario }: {
       </div>
       <p className="text-xs text-muted-foreground">
         Bütçe, ürün × bölge hücrelerine bir sonraki birimin satılma olasılığına göre dağıtılır; son birimin satılma olasılığı %50&apos;nin altına inince o hücre durur.
-        Bütçe talebi aşıyorsa kalan bütçe harcanmaz. Talep panelden, kitle ve dönüşüm varsayımlardan gelir; ERP ile kalibre edilene kadar adetler varsayımdır.
+        Bütçe talebi aşıyorsa kalan bütçe harcanmaz. &quot;Üretme&quot; kararlı ürünler ve talebi düşük bölgeler dağıtıma girmez; &quot;azalt&quot; kararında talebin %60&apos;ı esas alınır. Talep panelden, kitle ve dönüşüm varsayımlardan gelir; ERP ile kalibre edilene kadar adetler varsayımdır.
       </p>
       <Table>
         <TableHeader><TableRow>
-          <TableHead>Ürün</TableHead><TableHead>Rol</TableHead>
+          <TableHead>Ürün</TableHead><TableHead>Karar</TableHead>
           {res.regions.map((r) => <TableHead key={r} className="text-right">{r}</TableHead>)}
           <TableHead className="text-right">Toplam</TableHead><TableHead className="text-right">Planlanan</TableHead><TableHead className="text-right">Tutar</TableHead>
         </TableRow></TableHeader>
@@ -565,7 +667,7 @@ function Budget({ res, m, scenario, setScenario }: {
             return (
               <TableRow key={i.sku}>
                 <TableCell>{i.name}<div className="text-[11px] text-muted-foreground">{i.flags.filter((f) => f.startsWith("MOQ") || f === "maliyet yok").join(", ")}</div></TableCell>
-                <TableCell><span className={cn("rounded-full border px-2 py-0.5 text-xs", ROLE_CLASS[i.role])}>{ROLE_LABEL[i.role]}</span></TableCell>
+                <TableCell><DecisionChip d={i.decision} user={i.decision_source === "kullanıcı"} /></TableCell>
                 {res.regions.map((r) => <TableCell key={r} className="text-right">{(i.qty_by_region[r] ?? 0).toLocaleString("tr-TR")}</TableCell>)}
                 <TableCell className="text-right font-medium">{i.recommended_qty.value != null ? tot.toLocaleString("tr-TR") : "–"}</TableCell>
                 <TableCell className="text-right text-muted-foreground">{i.planned_qty?.toLocaleString("tr-TR") ?? "–"}</TableCell>

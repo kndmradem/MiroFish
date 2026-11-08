@@ -1,4 +1,4 @@
-# Koleksiyon modu (toplu ürün değerlendirme)
+# Koleksiyon modu ve toplu ürün değerlendirme
 
 Arayüzün üstünde üç sekme var: **Tekli ürün** (eski ekran, değişmedi), **Koleksiyon (çoklu)** ve **Yeni mağaza**.
 Koleksiyon modunda bütün ürünler Excel + görsellerle yüklenir, her bölgede **aynı panel kişileri bütün ürünlere bakar**,
@@ -35,7 +35,9 @@ ya da ekrandan.
 | Talep skoru, koleksiyon içi sıra ve aralığı, hevesli oranı, erişim, kabul edilebilir fiyat aralığı | ajan |
 | Kanibalizasyon çiftleri | ajan (hevesli kişi örtüşmesi) + kural varsayımı (eşikler) |
 | Roller (hero / çekirdek / destek / riskli), önerilen adet, beklenen satış | kural varsayımı |
-| Planlanan fiyat, hedef rol, maliyet | kullanıcı girdisi |
+| Önerilen fiyat ve fiyat bölgeleri | ajan |
+| Net marj, üretim kararı eşikleri | kural varsayımı (fiyat ajandan) |
+| Maliyet, hedef rol, elle verilen karar, denenen fiyat | kullanıcı girdisi |
 
 - **Kişi içi normalizasyon:** her kişinin puanı kendi ortalamasına göre ölçeklenir; "her şeye 60 veren" kişi ile
   "her şeye 40 veren" kişi aynı ölçeğe gelir.
@@ -73,6 +75,45 @@ Sonuç "Vitrin" sekmesinde: vitrin sırası (en çok seçilen − almam denen), 
 uyum (sıra korelasyonu), **sıra etkisi kontrolü** (seçimlerin listede ilk/orta/son konuma dağılımı beklenene göre;
 beklenenin 1.5 katını aşarsa ve en az 20 seçim varsa uyarı). Kombin ve vitrinde belirgin güçlü/zayıf ürünler öneri
 olarak Özet'e de düşer. Ek süre: kişi başı grup sayısı × bölge kadar ek LLM sorusu.
+
+## Ortak toplu yükleme şablonu
+
+`GET /api/collections/template.xlsx` (`urun-yukleme-sablonu.xlsx`) iki ekranda da aynıdır: **Koleksiyon (çoklu)** ve
+**Toplu ürün (ayrı ayrı)**. Sayfalar: Okuma rehberi, Genel bilgi (marka, bütçe, para birimi, bölgeler, kanal;
+koleksiyon adı yalnızca koleksiyonda), Ürünler.
+
+Ürün sütunları: `sku`, `urun_adi`, `kategori`, `urun_icerigi` (kumaş/kompozisyon), `maliyet_fiyati` zorunlu;
+`alt_kategori`, `gorsel_dosyalari`, `renkler`, `beden_araligi`, `hedef_kitle`, `kalip`, `desen`, `gramaj`,
+`planlanan_adet`, `min_siparis_adedi`, `lansman_ayi`, `ek_ozellikler` isteğe bağlı; `hedef_rol` ve `kombin_grubu`
+yalnızca koleksiyonda kullanılır. Hedef kitle, kalıp, desen, gramaj ve menşei ürün kartına (panelin gördüğü bilgi) eklenir.
+
+**Satış fiyatı sütunu yoktur.** Eski bir Excel'de "Satış fiyatı / Planlanan fiyat / Fiyat" sütunu varsa okunmaz ve
+önizlemede not düşülür. Önerilen fiyat panelin fiyat cevaplarından gelir: en çok talep beklenen bölgedeki en kârlı
+fiyat ve panelin kabul aralığı (Van Westendorp) (ajan). Fiyat sekmesi her ürün için fiyat bölgelerini (çok ucuz,
+avantajlı, ideal, pahalı ama kabul edilebilir, çok pahalı) gösterir; "fiyat dene" kutusu marjı ve kararı yeniden
+hesaplar, paneli yeniden sormaz. Maliyet fiyatı boşsa satır hatalıdır (marj ve karar hesaplanamaz).
+
+## Bağımsız ürünler (Toplu ürün sekmesi, `kind=bagimsiz`)
+
+Bir koleksiyona bağlı olmayan ürünler aynı şablonla toplu yüklenir. Her ürün **kendi paneliyle** değerlendirilir
+(tekli ekrandaki gibi, panel tohumu ürün adı); koleksiyon içi sıra, rol, erişim, kanibalizasyon ve vitrin turu
+hesaplanmaz. Her ürün için talep, önerilen fiyat, net marj, üretim kararı ve (bütçe girildiyse) adet çıkar.
+Ekranda ayrı sekme: `/toplu`. API aynı (`/api/collections`, içe aktarmada `kind=bagimsiz`).
+
+## Üretim kararı: üret / azalt / üretme
+
+Her değerlendirilen ürün bir karar ve gerekçe listesi alır; her gerekçe dayanak etiketlidir.
+
+| Karar | Ne zaman (eşikler kural varsayımı) |
+|---|---|
+| Üretme | Talep skoru 35 altı (ajan); ya da önerilen fiyatta iade sonrası net marj %15 altı (kural varsayımı); ya da (koleksiyonda) alt dilimde, müşterisini daha güçlü bir ürünle paylaşıyor ve panelde yeni kimseye ulaşmıyor (ajan) |
+| Azalt | Talep 50 altı; net marj %30 altı; bir bölgede talep 35 altı (o bölge bütçeden çıkar); koleksiyonda riskli rol ya da zayıf bir ürünün kanibalizasyonu / vitrinde belirgin zayıflaması |
+| Üret | Yukarıdakilerin hiçbiri yok |
+
+Net marj = (fiyat × (1 − iade oranı × 1,08) − maliyet) / fiyat; bölgelerin beklenen satışına göre ağırlıklı.
+"Üretme" ürünler bütçe dağıtımına girmez; "azalt" ürünler talebin %60'ı ile girer. Karar Ürünler sekmesinden elle
+değiştirilebilir (`WhatIf.decisions`); elle karar "kullanıcı girdisi" olarak işaretlenir ve sistem önerisi gerekçede
+kalır. Excel çıktısında karar, kaynak ve gerekçe sütunları vardır.
 
 ## Henüz yok (sonraki adım)
 

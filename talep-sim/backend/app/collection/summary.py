@@ -15,7 +15,7 @@ from .. import brand as brandlib
 from ..allocation import DEMAND_SCENARIOS, STOP_P, p_sells
 from ..models import BrandProfile
 from .importer import norm
-from .models import (Action, BrandEffect, PairCount, PositionBias, ShowcaseItem, ShowcaseSummary, CannibalPair, CategorySummary, Collection, CollectionResult, CollectionSummary,
+from .models import (Action, Reason, BrandEffect, PairCount, PositionBias, ShowcaseItem, ShowcaseSummary, CannibalPair, CategorySummary, Collection, CollectionResult, CollectionSummary,
                      ItemRegion, ItemResult, Metric, ReachPoint, WhatIf)
 
 ENTHUSIAST = 70          # ilgi puanı bu ve üstü: "hevesli" (prompttaki ölçek: hevesli 70-95)
@@ -24,6 +24,13 @@ CANNIBAL_PRICE = 0.25    # fiyatlar birbirinin ±%25'i içinde
 BOOTSTRAP = 200
 REVERSE_LOGISTICS_PCT = 8.0
 
+# Üretim kararı eşikleri (kural varsayımı; ERP ile kalibre edilene kadar sabit)
+DEMAND_DROP = 35         # talep skoru (0-100) bunun altındaysa: üretme
+DEMAND_REDUCE = 50       # bunun altındaysa: azalt
+MARGIN_DROP = 15.0       # önerilen fiyatta iade sonrası net marj (%) bunun altındaysa: üretme
+MARGIN_REDUCE = 30.0     # bunun altındaysa: azalt
+REDUCE_FACTOR = 0.6      # "azalt" kararında bütçe dağıtımına giren talep oranı
+
 Person = Tuple[str, int]  # (bölge, kişi no)
 
 
@@ -31,7 +38,16 @@ def _pct(x: float) -> float:
     return round(100 * x, 1)
 
 
-def _item_regions(resp: dict, planned_usd: Optional[float]) -> Tuple[List[ItemRegion], Dict[Person, float], dict]:
+def _net_margin(price: float, return_pct: float, cost: Optional[float]) -> Optional[float]:
+    """İade (ve ters lojistik) düşüldükten sonra satış başına net marj yüzdesi. İade oranı kural varsayımıdır."""
+    if not cost or not price:
+        return None
+    net = price * (1 - return_pct / 100 * (1 + REVERSE_LOGISTICS_PCT / 100))
+    return round(100 * (net - cost) / price, 1)
+
+
+def _item_regions(resp: dict, planned_usd: Optional[float], cost_usd: Optional[float] = None
+                  ) -> Tuple[List[ItemRegion], Dict[Person, float], dict]:
     regions, interests, basis = [], {}, None
     for rb in resp.get("regional_breakdown", []):
         r = rb["region"]
@@ -46,12 +62,22 @@ def _item_regions(resp: dict, planned_usd: Optional[float]) -> Tuple[List[ItemRe
                 own[(r, int(a["agent"]))] = float(a["interest"])
         interests.update(own)
         alloc = rb.get("allocation") or {}
+        ret = rb.get("returns") or {}
+        opt = float(rb["optimal_sale_price"])
+        if planned_usd or ret.get("net_margin_pct") is None:
+            nm = _net_margin(planned_usd or opt, float(ret.get("rate_pct") or 0), cost_usd)
+        else:
+            nm = float(ret["net_margin_pct"])
+        zones = [{"key": z.get("key"), "label": z.get("label"), "low": float(z["low"]),
+                  "high": float(z["high"]) if z.get("high") is not None else None} for z in vw.get("zones") or []]
         regions.append(ItemRegion(
             region=r, demand=int(rb["demand_score_100"]),
             enthusiast_pct=_pct(sum(v >= ENTHUSIAST for v in own.values()) / len(own)) if own else None,
             optimal_price=float(rb["optimal_sale_price"]), range_low=lo, range_high=hi,
             margin_pct=float(rb["estimated_margin_percentage"]), return_pct=float(rb["returns"]["rate_pct"]),
             demand_units=int(alloc.get("demand_units") or 0), price_fit=fit,
+            ipp=float(vw["indifference_price_point"]) if vw.get("indifference_price_point") is not None else None,
+            zones=zones, net_margin_pct=nm,
             objections=list(rb.get("key_objections") or [])[:3],
             confidence=(rb.get("confidence") or {}).get("level", "")))
         basis = basis or rb.get("data_basis")
@@ -292,6 +318,7 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
     cur = col.meta.currency
     to_usd = (lambda v: v / fx_rate) if cur == "TRY" else (lambda v: v)
     excluded = set(w.exclude)
+    indep = col.meta.kind == "bagimsiz"
     items = [it for it in col.items if it.sku not in excluded]
     evaluated = [it for it in items if it.sku in results and results[it.sku].get("response")]
     notes: List[str] = []
@@ -302,14 +329,15 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
     brand = None
     for it in evaluated:
         planned = w.planned_prices.get(it.sku, it.planned_price)
-        regs, ints, b = _item_regions(results[it.sku]["response"], to_usd(planned) if planned else None)
+        regs, ints, b = _item_regions(results[it.sku]["response"], to_usd(planned) if planned else None,
+                                      to_usd(it.unit_cost) if it.unit_cost else None)
         per_item_regions[it.sku], per_item_int[it.sku] = regs, ints
         data_basis = data_basis or b
         brand = brand or results[it.sku]["response"].get("brand_profile")
 
     persons: Set[Person] = {p for d in per_item_int.values() for p in d}
-    shared = bool(persons) and all(r.get("panel_seed") for r in (results[i.sku] for i in evaluated))
-    have_panel = len(persons) > 0 and len(evaluated) >= 2
+    shared = not indep and bool(persons) and all(r.get("panel_seed") for r in (results[i.sku] for i in evaluated))
+    have_panel = not indep and len(persons) > 0 and len(evaluated) >= 2
     skus = [it.sku for it in evaluated]
 
     appeal = {s: statistics.fmean(r.demand for r in per_item_regions[s]) if per_item_regions[s] else 0.0 for s in skus}
@@ -323,7 +351,11 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
         rel = {s: (appeal[s] - m) / (sd or 1) for s in skus}
         intervals = {}
         rel_basis, rel_how = "ajan", "Talep skorunun koleksiyon ortalamasından farkı. Kişi bazında puan yok (panel motoru kullanılmadı); kişi içi normalizasyon yapılamadı."
-        if evaluated:
+        if indep:
+            rel_how = "Talep skorunun liste ortalamasından farkı (yalnızca sıralama için; ürünler birbirine göre değerlendirilmedi)."
+            notes.append("Bağımsız ürün listesi: her ürün kendi paneliyle ayrı değerlendirildi (tekli ekrandaki gibi). Koleksiyon "
+                         "içi rol, erişim, kanibalizasyon ve vitrin turu hesaplanmaz; sıralama yalnızca talep skoruna göre listelemedir.")
+        elif evaluated:
             notes.append("Kişi bazlı ilgi puanı yok (panel motoru kapalı); erişim ve kanibalizasyon hesaplanmadı, sıralama talep skorundan.")
     if have_panel and not shared:
         notes.append("Ürünler farklı kişi panelleriyle değerlendirilmiş görünüyor; kişi içi karşılaştırmalar zayıflar.")
@@ -334,7 +366,7 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
     ent_pct = {s: (len(ent[s]) / len(per_item_int[s]) if per_item_int.get(s) else None) for s in skus}
     disp = {s: (statistics.pstdev(per_item_int[s].values()) if len(per_item_int.get(s, {})) > 1 else None) for s in skus}
 
-    sc_items, sc_summary = summarize_showcase(showcase or {}, skus, ranks)
+    sc_items, sc_summary = summarize_showcase({} if indep else (showcase or {}), skus, ranks)
 
     # roller (kural varsayımı)
     n = len(skus)
@@ -357,7 +389,9 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
         regs = per_item_regions[s]
         fits = [r.price_fit for r in regs if r.price_fit]
         over = fits and sum(f == "üstünde" for f in fits) > len(fits) / 2
-        if n < 3:
+        if indep:
+            roles[s], why[s] = "belirsiz", "Bağımsız ürün: koleksiyon içi rol verilmez."
+        elif n < 3:
             roles[s], why[s] = "belirsiz", "Rol için en az 3 değerlendirilmiş ürün gerekli."
         elif flat:
             roles[s], why[s] = "belirsiz", "Panel ürünleri birbirinden ayırt etmedi (puanlar neredeyse aynı); rol verilemez."
@@ -435,18 +469,95 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
                 pairs.append(CannibalPair(a=sp.a, b=sp.b, category=cat.get(sp.a, ""), overlap_pct=sp.pct,
                                           why=f"Vitrinde {sp.count} kişi 'ikisinden birini alırım' dedi"))
 
+    # üretim kararı: üret / azalt / üretme. Sinyaller ajandan, eşikler kural varsayımı.
+    in_curve = {p.sku for p in reach_curve}
+    name_by = {i.sku: i.name for i in evaluated}
+    decision: Dict[str, str] = {}
+    source: Dict[str, str] = {}
+    decisive: Dict[str, List[Reason]] = {}
+    context: Dict[str, List[Reason]] = {}
+    drop_regions: Dict[str, Set[str]] = {}
+    net_margin: Dict[str, Optional[float]] = {}
+    for it in evaluated:
+        s = it.sku
+        regs = per_item_regions[s]
+        a = appeal[s]
+        nms = [(r.net_margin_pct, max(1, r.demand_units)) for r in regs if r.net_margin_pct is not None]
+        nm = round(sum(v * k for v, k in nms) / sum(k for _, k in nms), 1) if nms else None
+        net_margin[s] = nm
+        drop, red, ctx = [], [], []
+        if a < DEMAND_DROP:
+            drop.append(Reason(text=f"Talep skoru {a:.0f}/100, üretme eşiği {DEMAND_DROP}'in altında", basis="ajan"))
+        elif a < DEMAND_REDUCE:
+            red.append(Reason(text=f"Talep skoru {a:.0f}/100, temkinli üretim eşiği {DEMAND_REDUCE}'nin altında", basis="ajan"))
+        else:
+            ctx.append(Reason(text=f"Talep skoru {a:.0f}/100", basis="ajan"))
+        price_word = "denenen fiyatta" if w.planned_prices.get(s, it.planned_price) else "önerilen fiyatta"
+        if nm is None:
+            ctx.append(Reason(text="Maliyet fiyatı yok: marj hesaplanamadı, karar yalnızca talebe dayanıyor", basis="kullanıcı girdisi"))
+        elif nm < MARGIN_DROP:
+            drop.append(Reason(text=f"{price_word.capitalize()} iade sonrası net marj %{nm:g}, üretme eşiği %{MARGIN_DROP:g}'in altında "
+                                    "(maliyet bu fiyata göre yüksek)", basis="kural varsayımı"))
+        elif nm < MARGIN_REDUCE:
+            red.append(Reason(text=f"{price_word.capitalize()} iade sonrası net marj %{nm:g}, temkinli üretim eşiği %{MARGIN_REDUCE:g}'un altında",
+                              basis="kural varsayımı"))
+        else:
+            ctx.append(Reason(text=f"{price_word.capitalize()} iade sonrası net marj %{nm:g}", basis="kural varsayımı"))
+        weak = [r.region for r in regs if r.demand < DEMAND_DROP]
+        if weak and len(weak) < len(regs):
+            drop_regions[s] = set(weak)
+            red.append(Reason(text=f"{', '.join(weak)} bölgesinde talep {DEMAND_DROP}'in altında: bu bölge için üretim önerilmez",
+                              basis="ajan"))
+        if not indep:
+            better = sorted({(p.b if p.a == s else p.a) for p in pairs if s in (p.a, p.b)} - {s},
+                            key=lambda x: ranks.get(x, 999))
+            better = [x for x in better if ranks.get(x, 999) < ranks[s]]
+            bn = ", ".join(name_by.get(x, x) for x in better[:2])
+            if roles[s] == "riskli":
+                if have_panel and s not in in_curve and better:
+                    drop.append(Reason(text=f"Koleksiyonun alt diliminde; müşterisini daha güçlü {bn} ile paylaşıyor ve panelde "
+                                            "ona özgü yeni bir kişiye ulaşmıyor", basis="ajan"))
+                else:
+                    red.append(Reason(text=f"Koleksiyon içinde zayıf: {why[s][0].lower() + why[s][1:]}", basis="ajan"))
+            elif better:
+                # zayıf ürün güçlü eşinin müşterisini paylaşıyorsa azalt; güçlü üründe yalnızca bilgi
+                txt = f"Aynı müşteriyi daha güçlü {bn} ile paylaşıyor (kanibalizasyon)"
+                (red if roles[s] in ("destek", "belirsiz") else ctx).append(Reason(text=txt, basis="ajan"))
+            sci = sc_items.get(s)
+            if sci and sci.single_rank and n >= 5 and sci.rank - sci.single_rank >= max(3, n // 4):
+                txt = f"Vitrinde diğer ürünlerin yanında belirgin zayıflıyor (tek tek sıra {sci.single_rank}, vitrin sırası {sci.rank})"
+                (red if roles[s] in ("destek", "belirsiz") else ctx).append(Reason(text=txt, basis="ajan"))
+            if roles[s] == "hero":
+                ctx.append(Reason(text="Koleksiyonun öne çıkan (hero) ürünü", basis="kural varsayımı"))
+            elif roles[s] == "tamamlayıcı":
+                ctx.append(Reason(text="Vitrinde kombin parçası olarak seçiliyor", basis="ajan"))
+        sys_dec = "üretme" if drop else "azalt" if red else "üret"
+        decisive[s] = drop or red or []
+        context[s] = (red if drop else []) + ctx
+        user = w.decisions.get(s)
+        if user:
+            decision[s], source[s] = user, "kullanıcı"
+            if user != sys_dec:
+                decisive[s] = [Reason(text=f"Elle verilen karar (sistem önerisi: {sys_dec})", basis="kullanıcı girdisi")] + decisive[s]
+            drop_regions.pop(s, None)       # kullanıcı kararı bölge elemesini de geçersiz kılar
+        else:
+            decision[s], source[s] = sys_dec, "sistem"
+
     # bütçe dağıtımı (kural varsayımı)
     budget_total = w.total_budget if w.total_budget is not None else col.meta.total_budget
     budget_usd = to_usd(budget_total) if budget_total else None
     signals = []
     for it in evaluated:
-        if not it.unit_cost:
+        if not it.unit_cost or decision[it.sku] == "üretme":
             continue
         cost = to_usd(it.unit_cost)
+        factor = REDUCE_FACTOR if decision[it.sku] == "azalt" else 1.0
         for r in per_item_regions[it.sku]:
+            if r.region in drop_regions.get(it.sku, ()):
+                continue
             price = to_usd(w.planned_prices.get(it.sku, it.planned_price)) if (w.planned_prices.get(it.sku, it.planned_price)) else r.optimal_price
             net = price * (1 - r.return_pct / 100 * (1 + REVERSE_LOGISTICS_PCT / 100))
-            signals.append({"sku": it.sku, "region": r.region, "demand": r.demand_units, "net": net, "cost": cost})
+            signals.append({"sku": it.sku, "region": r.region, "demand": r.demand_units * factor, "net": net, "cost": cost})
     alloc = allocate_items(signals, budget_usd or 0, objective) if budget_usd else {}
     if not budget_usd:
         notes.append("Toplam bütçe girilmedi; bütçe dağıtımı yapılmadı.")
@@ -482,7 +593,9 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
             flags.append("fiyat aralığın üstünde")
         elif fits and sum(f == "altında" for f in fits) > len(fits) / 2:
             flags.append("fiyat aralığın altında")
-        if any(s in (p.a, p.b) for p in pairs):
+        if indep:
+            pass
+        elif any(s in (p.a, p.b) for p in pairs):
             flags.append("kanibalizasyon adayı")
         if not it.unit_cost:
             flags.append("maliyet yok")
@@ -500,6 +613,21 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
             elif sc.rank - sc.single_rank >= max(3, n // 4):
                 flags.append("vitrinde daha zayıf")
         lo_hi = intervals.get(s)
+        top = max(regs, key=lambda r: (r.demand_units, r.demand)) if regs else None
+        rec_price = Metric(value=round(top.optimal_price, 2) if top else None, low=top.range_low if top else None,
+                           high=top.range_high if top else None, basis="ajan",
+                           how=(f"{top.region} bölgesinde (en çok talep beklenen bölge) panelin fiyat cevaplarından bulunan en kârlı "
+                                "fiyat; aralık panelin kabul edilebilir fiyat aralığı (Van Westendorp). Diğer bölgeler ürün "
+                                "ayrıntısında.") if top else "")
+        nm_metric = Metric(value=net_margin.get(s), basis="kural varsayımı",
+                           how=f"Fiyattan iade (ve %{REVERSE_LOGISTICS_PCT:g} ters lojistik) ile maliyet düşülerek; bölgelerin "
+                               "beklenen satışına göre ağırlıklı. Fiyat panelden, iade oranı kural varsayımı.")
+        if decision[s] == "üretme":
+            qty_metric = Metric(value=0, basis="kural varsayımı", how="Üretme kararı: bütçe dağıtımına alınmadı.")
+        else:
+            qty_metric = Metric(value=tq if it.unit_cost and budget_usd else None, basis="kural varsayımı",
+                                how="Bütçenin satış hızına göre dağıtımı: talep panelden, kitle ve dönüşüm varsayımdan."
+                                    + (f" Azalt kararında talebin %{int(REDUCE_FACTOR * 100)}'ı esas alındı." if decision[s] == "azalt" else ""))
         out_items.append(ItemResult(
             sku=s, name=it.name, category=it.category, image=it.images[0] if it.images else None,
             unit_cost_usd=to_usd(it.unit_cost) if it.unit_cost else None,
@@ -510,9 +638,9 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
                         how="Koleksiyon içi sıra. Aralık, panel kişileri yeniden örneklenince sıranın %80 olasılıkla düştüğü bant." if lo_hi else "Koleksiyon içi sıra."),
             enthusiast_pct=Metric(value=_pct(ent_pct[s]) if ent_pct[s] is not None else None, basis="ajan",
                                   how=f"Ürüne {ENTHUSIAST}+ ilgi puanı veren kişi oranı."),
-            role=roles[s], role_why=why[s],
-            recommended_qty=Metric(value=tq if it.unit_cost and budget_usd else None, basis="kural varsayımı",
-                                   how="Koleksiyon bütçesinin satış hızına göre dağıtımı: talep panelden, kitle ve dönüşüm varsayımdan."),
+            role=roles[s], role_why=why[s], decision=decision[s], decision_source=source[s],
+            decision_reasons=decisive[s] + context[s], recommended_price=rec_price, net_margin=nm_metric,
+            recommended_qty=qty_metric,
             qty_by_region=qty_item.get(s, {}), planned_qty=it.planned_qty, flags=flags, failed_regions=failed,
             showcase=sc_items.get(s)))
 
@@ -523,7 +651,7 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
             cats.setdefault(r.category or "(kategorisiz)", []).append(r)
     categories = []
     for c, rs in sorted(cats.items()):
-        prices = [r.planned_price_usd for r in rs if r.planned_price_usd]
+        prices = [r.planned_price_usd or r.recommended_price.value for r in rs if r.planned_price_usd or r.recommended_price.value]
         fits = [x.price_fit for r in rs for x in r.regions if x.price_fit]
         categories.append(CategorySummary(
             category=c, count=len(rs), roles={k: sum(r.role == k for r in rs) for k in ("hero", "çekirdek", "tamamlayıcı", "destek", "riskli")},
@@ -533,11 +661,13 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
 
     # öneriler
     actions: List[Action] = []
-    in_curve = {p.sku for p in reach_curve}
     for r in out_items:
-        if r.role == "riskli" and (not have_panel or r.sku not in in_curve):
-            actions.append(Action(kind="çıkar", skus=[r.sku], basis="kural varsayımı",
-                                  text=f"{r.name}: {r.role_why.lower()}" + ("; panelde ona özgü yeni bir kişiye ulaşmıyor" if have_panel else "") + ". Çıkarmayı ya da tasarımı gözden geçirmeyi düşünün."))
+        if r.decision in ("üretme", "azalt") and r.sku in decisive:
+            why_ = "; ".join(x.text for x in decisive[r.sku][:3])
+            tail = (" Üretmeyin ya da tasarımı/maliyeti gözden geçirin." if r.decision == "üretme"
+                    else f" Daha az adetle başlayın (talebin %{int(REDUCE_FACTOR * 100)}'ı esas alındı), satışa göre tekrar sipariş verin.")
+            actions.append(Action(kind=r.decision, skus=[r.sku], basis=decisive[r.sku][0].basis if decisive[r.sku] else "kural varsayımı",
+                                  text=f"{r.name}: {why_}.{tail}"))
     for p in pairs[:5]:
         na = next(i.name for i in out_items if i.sku == p.a)
         nb = next(i.name for i in out_items if i.sku == p.b)
@@ -592,15 +722,26 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
     if flat:
         notes.append("Panel ürünleri birbirinden ayırt etmedi: ürün puanları neredeyse aynı. Sahte LLM ya da çok küçük bir "
                      "model kullanıldıysa beklenir; sıralama ve roller bu koşuda anlamlı değildir.")
+    notes.append(f"Üretim kararı eşikleri kural varsayımıdır: talep skoru {DEMAND_DROP} altı ya da önerilen fiyatta iade sonrası net "
+                 f"marj %{MARGIN_DROP:g} altı 'üretme'; talep {DEMAND_REDUCE} altı, marj %{MARGIN_REDUCE:g} altı"
+                 + ("" if indep else ", koleksiyon içi zayıflık ya da kanibalizasyon") + f" ya da bir bölgede talep {DEMAND_DROP} altı "
+                 f"'azalt' (bütçeye talebin %{int(REDUCE_FACTOR * 100)}'ı ile girer). Kararı ürün satırından elle değiştirebilirsiniz.")
     notes += [
-        "Panel bir tüketici anketi değil, dil modelinin persona ve güncel bağlamla yaptığı tahmindir; en güvenilir kullanımı koleksiyon içi göreli karşılaştırmadır.",
-        "Roller, erişim ve kanibalizasyon eşikleri kural varsayımıdır (hevesli = 70+ ilgi; örtüşme %60+, fiyat farkı %25 içinde).",
-        "Önerilen adetler ERP ile kalibre edilene kadar varsayımdır; planlanan fiyat değişikliği yalnızca fiyat uyumunu ve gelir hesabını değiştirir, panel cevaplarını değiştirmez.",
+        "Panel bir tüketici anketi değil, dil modelinin persona ve güncel bağlamla yaptığı tahmindir"
+        + ("." if indep else "; en güvenilir kullanımı koleksiyon içi göreli karşılaştırmadır."),
+    ]
+    if not indep:
+        notes.append("Roller, erişim ve kanibalizasyon eşikleri kural varsayımıdır (hevesli = 70+ ilgi; örtüşme %60+, fiyat farkı %25 içinde).")
+    notes += [
+        "Önerilen satış fiyatı panelin fiyat cevaplarından (Van Westendorp) gelir; Excel'den satış fiyatı okunmaz. Fiyat sekmesinde "
+        "denenen fiyat yalnızca fiyat uyumunu, marjı ve kararı yeniden hesaplar, panel cevaplarını değiştirmez.",
+        "Önerilen adetler ERP ile kalibre edilene kadar varsayımdır.",
     ]
     summary = CollectionSummary(
         n_items=len(items), n_evaluated=len(evaluated), n_failed=sum(1 for i in items if i.sku in results and not results[i.sku].get("response")),
         reach=reach, reach_by_region=reach_by_region, reach_curve=reach_curve,
         roles={k: sum(r.role == k for r in out_items if r.regions) for k in ("hero", "çekirdek", "tamamlayıcı", "destek", "riskli", "belirsiz")},
+        decisions={k: sum(r.decision == k for r in out_items) for k in ("üret", "azalt", "üretme")},
         mean_appeal=Metric(value=round(statistics.fmean(appeal.values()), 1) if appeal else None, basis="ajan",
                            how="Ürünlerin talep skoru ortalaması."),
         categories=categories, cannibal_pairs=pairs, budget_total_usd=round(budget_usd, 2) if budget_usd else None,
@@ -609,6 +750,6 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
                               how="120 günde beklenen satış (orta senaryo), önerilen adetlerle sınırlı."),
         actions=actions)
     regions = sorted({r.region for rs in per_item_regions.values() for r in rs}) or list(col.meta.target_regions)
-    return CollectionResult(collection_id=col.id, name=col.meta.name, currency=cur, fx_rate=fx_rate, regions=regions,
+    return CollectionResult(collection_id=col.id, name=col.meta.name, kind=col.meta.kind, currency=cur, fx_rate=fx_rate, regions=regions,
                             items=out_items, summary=summary, notes=notes, data_basis=data_basis, panel_shared=shared,
                             brand_profile=brand, brand_effect=brand_effect(brand, col, regions), showcase=sc_summary)

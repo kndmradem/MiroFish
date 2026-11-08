@@ -27,7 +27,7 @@ COST_FALLBACK_MULTIPLE = 2.7   # maliyet yoksa planlanan fiyat / 2.7 (kural vars
 class SeededEngine:
     """Motoru sarar: ürün kartına koleksiyonun panel tohumunu ekler ve kartı görsel başına önbelleğe alır."""
 
-    def __init__(self, inner, seed: str, cache_dir):
+    def __init__(self, inner, seed: Optional[str], cache_dir):
         self.inner, self.seed, self.cache_dir = inner, seed, cache_dir
 
     def __getattr__(self, name):
@@ -42,7 +42,10 @@ class SeededEngine:
             card = dict(await self.inner.fuse_product_card(req))
             self.cache_dir.mkdir(parents=True, exist_ok=True)
             path.write_text(json.dumps(card, ensure_ascii=False), encoding="utf-8")
-        card["panel_seed"] = self.seed
+        if self.seed:       # bağımsız üründe tohum yok: panel motoru tekli ekrandaki gibi ürün adına göre kişi seçer
+            card["panel_seed"] = self.seed
+        else:
+            card.pop("panel_seed", None)
         return card
 
     async def simulate_region(self, *a, **kw):
@@ -60,9 +63,11 @@ def item_specs(it: CollectionItem) -> str:
     return ". ".join(p for p in parts if p) or it.name
 
 
-def input_hash(it: CollectionItem, regions, brand: Optional[str], image_digest: str) -> str:
-    payload = json.dumps([it.model_dump(exclude={"planned_price", "planned_qty", "declared_role", "moq"}),
-                          sorted(regions), brand or "", image_digest], sort_keys=True, ensure_ascii=False, default=str)
+def input_hash(it: CollectionItem, regions, brand: Optional[str], image_digest: str, kind: str = "koleksiyon") -> str:
+    parts = [it.model_dump(exclude={"planned_price", "planned_qty", "declared_role", "moq"}), sorted(regions), brand or "", image_digest]
+    if kind != "koleksiyon":    # tür değişirse panel değişir (ortak panel / ürün başına panel), ürün yeniden sorulur
+        parts.append(kind)
+    payload = json.dumps(parts, sort_keys=True, ensure_ascii=False, default=str)
     return hashlib.sha1(payload.encode()).hexdigest()[:16]
 
 
@@ -176,7 +181,8 @@ class CollectionRunner:
             items = [it for it in col.items if not opts.only or it.sku in opts.only]
             st.total = len(items)
             brand = await self._brand(col, store, profiler, say)
-            seeded = SeededEngine(engine, f"koleksiyon:{col.id}", store.dir(col.id) / "cards")
+            independent = col.meta.kind == "bagimsiz"
+            seeded = SeededEngine(engine, None if independent else f"koleksiyon:{col.id}", store.dir(col.id) / "cards")
             to_usd = (lambda v: v / fx_rate) if col.meta.currency == "TRY" else (lambda v: v)
             budget_usd = to_usd(col.meta.total_budget) if col.meta.total_budget else 100000.0
             per_item_budget = max(1000, int(budget_usd / max(1, len(items))))
@@ -191,7 +197,7 @@ class CollectionRunner:
                     continue
                 img = store.image_path(col.id, it.images[0]).read_bytes()
                 digest = hashlib.sha1(img).hexdigest()[:16]
-                h = input_hash(it, regions, brand.model_dump_json() if brand else "", digest)
+                h = input_hash(it, regions, brand.model_dump_json() if brand else "", digest, col.meta.kind)
                 old = store.load_result(col.id, it.sku)
                 if old and old.get("response") and old.get("input_hash") == h and not opts.rerun:
                     say(f"{i}/{len(items)} {it.name}: önceki sonuç kullanıldı")
@@ -200,7 +206,7 @@ class CollectionRunner:
                 cost = it.unit_cost or (it.planned_price / COST_FALLBACK_MULTIPLE if it.planned_price else None)
                 if not cost:
                     st.failed.append(it.sku)
-                    store.save_result(col.id, it.sku, {"error": "Birim maliyet ve planlanan fiyat yok; fiyat analizi yapılamaz"})
+                    store.save_result(col.id, it.sku, {"error": "Maliyet fiyatı yok; marj, fiyat önerisi ve üretim kararı hesaplanamaz"})
                     st.done += 1
                     continue
                 say(f"{i}/{len(items)} {it.name} değerlendiriliyor")
@@ -232,7 +238,7 @@ class CollectionRunner:
                     store.save_result(col.id, it.sku, {"error": str(detail)[:500], "input_hash": h})
                     say(f"{it.name}: hata ({str(detail)[:160]})")
                 st.done += 1
-            if opts.showcase:
+            if opts.showcase and not independent:
                 await self._showcase(col, opts, store, engine, brand, regions, fx_rate, say, st)
             col.status = "bitti"
             say(f"Bitti: {st.done - len(st.failed)} ürün değerlendirildi" + (f", {len(st.failed)} hata" if st.failed else ""))

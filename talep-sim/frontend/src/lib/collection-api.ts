@@ -6,6 +6,10 @@ export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000
 export type Basis = "ajan" | "kural varsayımı" | "LLM tahmini" | "ERP" | "kullanıcı girdisi";
 export type Role = "hero" | "çekirdek" | "tamamlayıcı" | "destek" | "riskli" | "belirsiz";
 export type DeclaredRole = "hero" | "çekirdek" | "tamamlayıcı" | "deneme";
+/** koleksiyon: aynı panel bütün ürünlere bakar. bagimsiz: koleksiyonu olmayan ürünler, her biri kendi paneliyle. */
+export type Kind = "koleksiyon" | "bagimsiz";
+export type Decision = "üret" | "azalt" | "üretme";
+export interface Reason { text: string; basis: Basis }
 
 export interface CollectionItem {
   sku: string;
@@ -27,6 +31,7 @@ export interface CollectionItem {
 }
 
 export interface CollectionMeta {
+  kind: Kind;
   name: string;
   brand: string | null;
   brand_notes: string;
@@ -56,7 +61,7 @@ export interface ImportPreview {
 }
 
 export interface Collection { id: string; meta: CollectionMeta; items: CollectionItem[]; created: number; status: string }
-export interface CollectionListRow { id: string; name: string; season: string; status: string; items: number; created: number; running: boolean }
+export interface CollectionListRow { id: string; name: string; kind: Kind; season: string; status: string; items: number; created: number; running: boolean }
 
 export interface RunStatus {
   collection_id: string;
@@ -74,6 +79,8 @@ export interface RunStatus {
 
 export interface Metric { value: number | null; low?: number | null; high?: number | null; basis: Basis; how: string }
 
+export interface PriceZoneLite { key: string; label: string; low: number; high: number | null }
+
 export interface ItemRegion {
   region: string;
   demand: number;
@@ -85,6 +92,9 @@ export interface ItemRegion {
   return_pct: number;
   demand_units: number;
   price_fit: "altında" | "içinde" | "üstünde" | null;
+  ipp: number | null;
+  zones: PriceZoneLite[];
+  net_margin_pct: number | null;
   objections: string[];
   confidence: string;
 }
@@ -104,6 +114,11 @@ export interface ItemResult {
   enthusiast_pct: Metric;
   role: Role;
   role_why: string;
+  decision: Decision | null;
+  decision_source: "sistem" | "kullanıcı";
+  decision_reasons: Reason[];
+  recommended_price: Metric;
+  net_margin: Metric;
   recommended_qty: Metric;
   qty_by_region: Record<string, number>;
   planned_qty: number | null;
@@ -142,6 +157,7 @@ export interface CollectionSummary {
   reach_by_region: Record<string, number>;
   reach_curve: ReachPoint[];
   roles: Record<string, number>;
+  decisions: Record<Decision, number>;
   mean_appeal: Metric;
   categories: CategorySummary[];
   cannibal_pairs: CannibalPair[];
@@ -173,6 +189,7 @@ export interface BrandEffect {
 export interface CollectionResult {
   collection_id: string;
   name: string;
+  kind: Kind;
   currency: "TRY" | "USD";
   fx_rate: number;
   regions: string[];
@@ -190,6 +207,7 @@ export interface WhatIf {
   planned_prices?: Record<string, number>;
   total_budget?: number | null;
   allocation_objective?: "balanced" | "profit" | "blended";
+  decisions?: Record<string, Decision>;
 }
 
 async function json<T>(res: Response): Promise<T> {
@@ -207,8 +225,9 @@ export const imageUrl = (cid: string, path: string) =>
   `${API_URL}/api/collections/${cid}/images/${path.split("/").map(encodeURIComponent).join("/")}`;
 
 /** Klasörden seçilen dosyalarda göreli yol (klasör/dosya) korunur; böylece SKU adlı klasörler eşleşir. */
-export async function importCollection(sheet: File, images: File[], collectionId?: string): Promise<ImportPreview> {
+export async function importCollection(sheet: File, images: File[], collectionId?: string, kind: Kind = "koleksiyon"): Promise<ImportPreview> {
   const fd = new FormData();
+  fd.append("kind", kind);
   fd.append("sheet", sheet, sheet.name);
   for (const f of images) {
     const rel = (f as File & { webkitRelativePath?: string }).webkitRelativePath;
@@ -220,7 +239,8 @@ export async function importCollection(sheet: File, images: File[], collectionId
   return json(await fetch(`${API_URL}/api/collections/import`, { method: "POST", body: fd }));
 }
 
-export const listCollections = async (): Promise<CollectionListRow[]> => json(await fetch(`${API_URL}/api/collections`));
+export const listCollections = async (kind?: Kind): Promise<CollectionListRow[]> =>
+  json(await fetch(`${API_URL}/api/collections${kind ? `?kind=${kind}` : ""}`));
 export const getCollection = async (cid: string): Promise<Collection> => json(await fetch(`${API_URL}/api/collections/${cid}`));
 export const getPreview = async (cid: string): Promise<ImportPreview> => json(await fetch(`${API_URL}/api/collections/${cid}/preview`));
 
@@ -270,4 +290,11 @@ export const ROLE_CLASS: Record<Role, string> = {
   destek: "bg-slate-100 text-slate-800 border-slate-300",
   riskli: "bg-rose-100 text-rose-900 border-rose-300",
   belirsiz: "bg-muted text-muted-foreground",
+};
+
+export const DECISION_LABEL: Record<Decision, string> = { "üret": "Üret", azalt: "Azalt", "üretme": "Üretme" };
+export const DECISION_CLASS: Record<Decision, string> = {
+  "üret": "bg-emerald-100 text-emerald-900 border-emerald-300",
+  azalt: "bg-amber-100 text-amber-900 border-amber-300",
+  "üretme": "bg-rose-100 text-rose-900 border-rose-300",
 };

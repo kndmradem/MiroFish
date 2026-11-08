@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { REGIONS, type RegionCode } from "@/lib/api";
 import {
   confirmCollection, imageUrl, importCollection, templateUrl,
-  type Collection, type CollectionItem, type CollectionMeta, type ImportPreview, type ItemPreview,
+  type Collection, type CollectionItem, type CollectionMeta, type ImportPreview, type ItemPreview, type Kind,
 } from "@/lib/collection-api";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +26,7 @@ const STATUS_ICON = {
 };
 
 /** 1. adım: Excel + görselleri yükle. 2. adım: önizlemede düzelt ve kaydet. */
-export function ImportStep({ onSaved }: { onSaved: (c: Collection) => void }) {
+export function ImportStep({ kind, onSaved }: { kind: Kind; onSaved: (c: Collection) => void }) {
   const [sheet, setSheet] = useState<File | null>(null);
   const [images, setImages] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
@@ -38,7 +38,7 @@ export function ImportStep({ onSaved }: { onSaved: (c: Collection) => void }) {
     setBusy(true);
     setError(null);
     try {
-      setPreview(await importCollection(sheet, images, extraOnly ? preview?.collection_id : undefined));
+      setPreview(await importCollection(sheet, images, extraOnly ? preview?.collection_id : undefined, kind));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -50,11 +50,12 @@ export function ImportStep({ onSaved }: { onSaved: (c: Collection) => void }) {
     <div className="grid gap-4">
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">1. Koleksiyonu yükle</CardTitle>
+          <CardTitle className="text-base">1. {kind === "bagimsiz" ? "Ürünleri yükle" : "Koleksiyonu yükle"}</CardTitle>
           <CardDescription>
-            Ürün bilgilerinin olduğu Excel ile görselleri birlikte yükleyin. Görseller dosya adındaki SKU ile, ya da Excel&apos;deki
-            görsel sütunuyla eşleşir. Hiçbir şey onayınız olmadan kaydedilmez.{" "}
-            <a className="inline-flex items-center gap-1 underline" href={templateUrl}><Download className="size-3" />Örnek Excel şablonu</a>
+            Ürün bilgilerinin olduğu Excel ile görselleri birlikte yükleyin. Excel&apos;de her ürün için ürün adı, SKU, kategori,
+            ürün içeriği (kumaş/kompozisyon) ve maliyet fiyatı olmalı; satış fiyatı yazılmaz, sistem önerir. Görseller dosya adındaki
+            SKU ile ya da Excel&apos;deki görsel sütunuyla eşleşir. Hiçbir şey onayınız olmadan kaydedilmez.{" "}
+            <a className="inline-flex items-center gap-1 underline" href={templateUrl}><Download className="size-3" />Toplu yükleme şablonu (koleksiyon ve bağımsız ürünler için aynı)</a>
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
@@ -96,15 +97,15 @@ export function ImportStep({ onSaved }: { onSaved: (c: Collection) => void }) {
           </div>
         </CardContent>
       </Card>
-      {preview && <PreviewStep key={preview.collection_id + preview.items.length + preview.counts.images} preview={preview} onSaved={onSaved} />}
+      {preview && <PreviewStep key={preview.collection_id + preview.items.length + preview.counts.images} kind={kind} preview={preview} onSaved={onSaved} />}
     </div>
   );
 }
 
-function PreviewStep({ preview, onSaved }: { preview: ImportPreview; onSaved: (c: Collection) => void }) {
-  const [meta, setMeta] = useState<CollectionMeta>(preview.meta);
+function PreviewStep({ kind, preview, onSaved }: { kind: Kind; preview: ImportPreview; onSaved: (c: Collection) => void }) {
+  const [meta, setMeta] = useState<CollectionMeta>({ ...preview.meta, kind });
   const [rows, setRows] = useState<(ItemPreview & { include: boolean })[]>(
-    preview.items.map((p) => ({ ...p, include: p.status !== "hata" || (!!p.item.sku && !!p.item.name && p.item.images.length > 0) })),
+    preview.items.map((p) => ({ ...p, include: p.status !== "hata" || (!!p.item.sku && !!p.item.name && p.item.images.length > 0 && !!p.item.unit_cost) })),
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -126,8 +127,8 @@ function PreviewStep({ preview, onSaved }: { preview: ImportPreview; onSaved: (c
     setRows((prev) => prev.map((r) => (r.item.sku === sku ? { ...r, item: { ...r.item, images: [...r.item.images, file] } } : r)));
 
   const included = rows.filter((r) => r.include);
-  const problems = included.filter((r) => !r.item.sku || !r.item.name || r.item.images.length === 0 || skuCount[r.item.sku] > 1);
-  const noCost = included.filter((r) => !r.item.unit_cost).length;
+  const problems = included.filter((r) => !r.item.sku || !r.item.name || r.item.images.length === 0 || !r.item.unit_cost || skuCount[r.item.sku] > 1);
+  const noSpecs = included.filter((r) => !r.item.technical_specs).length;
   const toggleRegion = (code: RegionCode, on: boolean) =>
     setMeta((m) => ({ ...m, target_regions: on ? [...m.target_regions, code] : m.target_regions.filter((r) => r !== code) }));
 
@@ -160,7 +161,7 @@ function PreviewStep({ preview, onSaved }: { preview: ImportPreview; onSaved: (c
       </CardHeader>
       <CardContent className="grid gap-5">
         <div className="grid gap-3 rounded-lg border p-3 md:grid-cols-4">
-          <div className="grid gap-1 md:col-span-2"><Label>Koleksiyon adı</Label>
+          <div className="grid gap-1 md:col-span-2"><Label>{kind === "bagimsiz" ? "Liste adı" : "Koleksiyon adı"}</Label>
             <Input value={meta.name} onChange={(e) => setMeta({ ...meta, name: e.target.value })} /></div>
           <div className="grid gap-1 md:col-span-2"><Label>Sezon</Label>
             <Input value={meta.season} onChange={(e) => setMeta({ ...meta, season: e.target.value })} /></div>
@@ -204,8 +205,8 @@ function PreviewStep({ preview, onSaved }: { preview: ImportPreview; onSaved: (c
                 <TableHead>SKU</TableHead>
                 <TableHead>Ürün</TableHead>
                 <TableHead>Kategori</TableHead>
-                <TableHead className="text-right">Maliyet</TableHead>
-                <TableHead className="text-right">Planlanan fiyat</TableHead>
+                <TableHead>Ürün içeriği</TableHead>
+                <TableHead className="text-right">Maliyet fiyatı</TableHead>
                 <TableHead>Eşleşme</TableHead>
                 <TableHead>Sorun</TableHead>
               </TableRow>
@@ -237,10 +238,10 @@ function PreviewStep({ preview, onSaved }: { preview: ImportPreview; onSaved: (c
                     <TableCell className={cn("font-mono text-xs", dup && "text-rose-600")}>{r.item.sku || "—"}</TableCell>
                     <TableCell><Input className="h-8 min-w-36" value={r.item.name} onChange={(e) => setItem(i, { name: e.target.value })} /></TableCell>
                     <TableCell><Input className="h-8 min-w-28" value={r.item.category} onChange={(e) => setItem(i, { category: e.target.value })} /></TableCell>
-                    <TableCell><Input className="h-8 w-24 text-right" type="number" value={r.item.unit_cost ?? ""}
+                    <TableCell><Input className="h-8 min-w-44" value={r.item.technical_specs} placeholder="kumaş / kompozisyon"
+                      onChange={(e) => setItem(i, { technical_specs: e.target.value })} /></TableCell>
+                    <TableCell><Input className={cn("h-8 w-24 text-right", r.include && !r.item.unit_cost && "border-rose-400")} type="number" value={r.item.unit_cost ?? ""}
                       onChange={(e) => setItem(i, { unit_cost: e.target.value ? Number(e.target.value) : null })} /></TableCell>
-                    <TableCell><Input className="h-8 w-24 text-right" type="number" value={r.item.planned_price ?? ""}
-                      onChange={(e) => setItem(i, { planned_price: e.target.value ? Number(e.target.value) : null })} /></TableCell>
                     <TableCell className="text-xs text-muted-foreground">{r.match_rule || (r.item.images.length ? "elle" : "—")}</TableCell>
                     <TableCell className="max-w-72 text-xs">
                       {dup && <div className="text-rose-700">Aynı SKU birden fazla dahil satırda</div>}
@@ -293,8 +294,8 @@ function PreviewStep({ preview, onSaved }: { preview: ImportPreview; onSaved: (c
           <Button onClick={save} disabled={busy || included.length === 0 || problems.length > 0 || meta.target_regions.length === 0}>
             {busy && <Loader2 className="size-4 animate-spin" />}{included.length} ürünü kaydet
           </Button>
-          {problems.length > 0 && <span className="text-sm text-rose-600">{problems.length} dahil satırda SKU, ad ya da görsel eksik veya SKU tekrarlı; düzeltin ya da dahil etmeyin.</span>}
-          {noCost > 0 && problems.length === 0 && <span className="text-sm text-amber-700">{noCost} üründe maliyet yok: değerlendirilir ama bütçe dağıtımına girmez.</span>}
+          {problems.length > 0 && <span className="text-sm text-rose-600">{problems.length} dahil satırda SKU, ad, maliyet fiyatı ya da görsel eksik veya SKU tekrarlı; düzeltin ya da dahil etmeyin.</span>}
+          {noSpecs > 0 && problems.length === 0 && <span className="text-sm text-amber-700">{noSpecs} üründe ürün içeriği boş: panel yalnızca görsel ve addan değerlendirir.</span>}
           {error && <span className="text-sm text-rose-600">{error}</span>}
         </div>
       </CardContent>

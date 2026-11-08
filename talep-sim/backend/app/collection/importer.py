@@ -43,13 +43,14 @@ def ext(filename: str) -> str:
 # ---------- Excel başlıkları ----------
 # Aynı alana giden farklı yazımlar. Anahtarlar norm() + boşluk/altçizgi temizliğiyle karşılaştırılır.
 ITEM_ALIASES: Dict[str, List[str]] = {
-    "sku": ["sku", "model kodu", "model_kodu", "urun kodu", "ürün kodu", "stok kodu", "kod", "style", "style code", "article"],
+    "sku": ["sku", "sku kodu", "sku_kodu", "model kodu", "model_kodu", "urun kodu", "ürün kodu", "stok kodu", "kod", "style", "style code", "article"],
     "name": ["urun adi", "ürün adı", "urun_adi", "ad", "ürün", "urun", "model adi", "model adı", "name", "product name", "aciklama", "açıklama"],
     "category": ["kategori", "category", "ana kategori", "urun grubu", "ürün grubu"],
     "subcategory": ["alt kategori", "alt_kategori", "subcategory", "alt grup"],
-    "technical_specs": ["teknik ozellikler", "teknik özellikler", "teknik_ozellikler", "kumas", "kumaş", "icerik", "içerik", "specs", "bilesim", "bileşim"],
-    "unit_cost": ["birim maliyet", "birim_maliyet", "maliyet", "cost", "unit cost", "alis fiyati", "alış fiyatı"],
-    "planned_price": ["planlanan fiyat", "planlanan_fiyat", "satis fiyati", "satış fiyatı", "fiyat", "price", "retail price", "psf"],
+    "technical_specs": ["urun icerigi", "ürün içeriği", "urun_icerigi", "icerik", "içerik", "kompozisyon", "composition",
+                        "kumas", "kumaş", "bilesim", "bileşim", "teknik ozellikler", "teknik özellikler", "teknik_ozellikler", "specs"],
+    "unit_cost": ["maliyet fiyati", "maliyet fiyatı", "maliyet_fiyati", "birim maliyet", "birim_maliyet", "maliyet", "cost",
+                  "unit cost", "alis fiyati", "alış fiyatı"],
     "images": ["gorsel dosyalari", "görsel dosyaları", "gorsel_dosyalari", "gorsel", "görsel", "foto", "fotograf", "fotoğraf", "resim", "image", "images", "dosya adi", "dosya adı"],
     "colors": ["renkler", "renk", "color", "colors", "colour"],
     "sizes": ["beden araligi", "beden aralığı", "beden_araligi", "beden", "bedenler", "size", "sizes"],
@@ -59,6 +60,15 @@ ITEM_ALIASES: Dict[str, List[str]] = {
     "launch_month": ["lansman ayi", "lansman ayı", "lansman_ayi", "ay", "launch month"],
     "moq": ["min siparis adedi", "min sipariş adedi", "min_siparis_adedi", "moq", "minimum siparis"],
     "attributes": ["ek ozellikler", "ek özellikler", "ek_ozellikler", "ozellikler", "özellikler"],
+    # Ürün detayı sütunları: panele ürün kartının parçası olarak gider (ek özelliklere yazılır)
+    "attr:Hedef kitle": ["hedef kitle", "hedef_kitle", "cinsiyet", "gender", "kitle"],
+    "attr:Kalıp": ["kalip", "kalıp", "fit", "kesim"],
+    "attr:Desen": ["desen", "pattern", "baski", "baskı"],
+    "attr:Gramaj": ["gramaj", "gsm", "kumas gramaji", "kumaş gramajı"],
+    "attr:Menşei": ["mensei", "menşei", "uretim yeri", "üretim yeri", "origin"],
+    # Satış fiyatı okunmaz: önerilen fiyatı sistem hesaplar. Sütun varsa önizlemede not düşülür.
+    "ignored_price": ["satis fiyati", "satış fiyatı", "satis_fiyati", "planlanan fiyat", "planlanan_fiyat", "fiyat", "price",
+                      "retail price", "psf", "etiket fiyati", "etiket fiyatı"],
 }
 META_ALIASES: Dict[str, List[str]] = {
     "name": ["koleksiyon adi", "koleksiyon adı", "koleksiyon_adi", "koleksiyon", "collection"],
@@ -159,14 +169,15 @@ def read_workbook(data: bytes, filename: str = "liste.xlsx") -> Dict[str, Sheet]
 
 
 def _pick_sheets(book: Dict[str, Sheet]) -> Tuple[Optional[Sheet], Optional[Sheet]]:
-    """Ürün sayfası: SKU başlığı olan ve en çok satırı olan sayfa. Koleksiyon sayfası: koleksiyon adı başlığı olan."""
+    """Ürün sayfası: SKU başlığı olan ve en çok satırı olan sayfa. Genel bilgi sayfası: SKU'su olmayan ve en az iki
+    genel bilgi başlığı (koleksiyon adı, marka, sezon, bütçe, para birimi, bölgeler...) taşıyan sayfa."""
     items, meta = None, None
     for title, sh in book.items():
         hm, _ = map_headers(sh.headers, ITEM_ALIASES)
         mm, _ = map_headers(sh.headers, META_ALIASES)
         if "sku" in hm.values() and (items is None or len(sh.rows) > len(items.rows)):
             items = sh
-        elif "name" in mm.values() and ("season" in mm.values() or "total_budget" in mm.values()) and meta is None:
+        elif "sku" not in hm.values() and len(set(mm.values())) >= 2 and meta is None:
             meta = sh
     return items, meta
 
@@ -174,7 +185,7 @@ def _pick_sheets(book: Dict[str, Sheet]) -> Tuple[Optional[Sheet], Optional[Shee
 def parse_meta(sheet: Optional[Sheet], issues: List[Issue]) -> CollectionMeta:
     meta = CollectionMeta()
     if sheet is None or not sheet.rows:
-        issues.append(Issue(level="bilgi", message="Excel'de koleksiyon sayfası bulunamadı; koleksiyon bilgilerini ekrandan girin."))
+        issues.append(Issue(level="bilgi", message="Excel'de genel bilgi (koleksiyon) sayfası bulunamadı; marka, bütçe ve bölgeleri ekrandan girin."))
         return meta
     cols, _ = map_headers(sheet.headers, META_ALIASES)
     _, row = sheet.rows[0]
@@ -232,12 +243,12 @@ def parse_items(sheet: Sheet, issues: List[Issue]) -> Tuple[List[Tuple[int, Coll
         d: dict = {"sku": _str(vals.get("sku")), "name": _str(vals.get("name"))}
         for f in ("category", "subcategory", "technical_specs", "outfit_group", "sizes"):
             d[f] = _str(vals.get(f))
-        for f in ("unit_cost", "planned_price"):
-            try:
-                n = _num(vals.get(f))
-                d[f] = n if n is None or n > 0 else None
-            except ValueError as e:
-                probs.append(f"{'Birim maliyet' if f == 'unit_cost' else 'Planlanan fiyat'} {e}")
+        try:
+            n = _num(vals.get("unit_cost"))
+            d["unit_cost"] = n if n is None or n > 0 else None
+        except ValueError as e:
+            d["unit_cost"] = None
+            probs.append(f"Maliyet fiyatı {e}")
         for f in ("planned_qty", "moq"):
             n = _num_safe(vals.get(f))
             d[f] = int(n) if n and n > 0 else None
@@ -255,6 +266,9 @@ def parse_items(sheet: Sheet, issues: List[Issue]) -> Tuple[List[Tuple[int, Coll
             if "=" in part:
                 k, v = part.split("=", 1)
                 attrs[k.strip()] = v.strip()
+        for f, v in vals.items():
+            if f.startswith("attr:") and _str(v):
+                attrs.setdefault(f[5:], _str(v))
         d["attributes"] = attrs
         out.append((rowno, CollectionItem(**d), probs))
     colmap = {sheet.headers[i]: f for i, f in cols.items()}
@@ -353,18 +367,33 @@ def _image_order(path: str):
     return (0 if not re.search(r"[_\- (]", st) else 1 if m and m.group(1) == "1" else 2, int(m.group(1)) if m else 0, st)
 
 
-def build_preview(collection_id: str, book: Dict[str, Sheet], images: List[ImageInfo]) -> ImportPreview:
+def build_preview(collection_id: str, book: Dict[str, Sheet], images: List[ImageInfo], kind: str = "koleksiyon") -> ImportPreview:
+    """Aynı şablon iki ekranda da çalışır: kind=koleksiyon ya da bagimsiz (koleksiyonu olmayan ürünler)."""
     issues: List[Issue] = []
     items_sheet, meta_sheet = _pick_sheets(book)
     meta = parse_meta(meta_sheet, issues)
+    upd = {"kind": kind}
+    if kind == "bagimsiz" and meta.name == CollectionMeta().name:
+        upd["name"] = "Toplu ürün listesi"
+    meta = meta.model_copy(update=upd)
     if items_sheet is None:
         issues.append(Issue(level="hata", message="Ürün sayfası bulunamadı: SKU / Model kodu başlıklı bir sütun gerekli."))
         return ImportPreview(collection_id=collection_id, meta=meta, items=[], orphans=[OrphanImage(file=i.path) for i in images],
                              issues=issues, counts={"rows": 0, "images": len(images)})
     parsed, colmap, ignored = parse_items(items_sheet, issues)
-    for need, label in (("name", "Ürün adı"), ("category", "Kategori"), ("unit_cost", "Birim maliyet")):
+    for need, label, lvl in (("name", "Ürün adı", "uyarı"), ("category", "Kategori", "uyarı"), ("unit_cost", "Maliyet fiyatı", "hata"),
+                             ("technical_specs", "Ürün içeriği", "uyarı")):
         if need not in colmap.values():
-            issues.append(Issue(level="uyarı", message=f"'{label}' sütunu bulunamadı."))
+            issues.append(Issue(level=lvl, message=f"'{label}' sütunu bulunamadı."))
+    price_cols = [h for h, f in colmap.items() if f == "ignored_price"]
+    if price_cols:
+        issues.append(Issue(level="bilgi", message=f"Satış fiyatı sütunu ({', '.join(price_cols)}) okunmadı: önerilen satış "
+                                                   "fiyatını sistem panelin fiyat cevaplarından hesaplar."))
+    if kind == "bagimsiz":
+        coll_cols = [h for h, f in colmap.items() if f in ("declared_role", "outfit_group")]
+        if coll_cols:
+            issues.append(Issue(level="bilgi", message=f"Koleksiyona özel sütunlar ({', '.join(coll_cols)}) bağımsız "
+                                                       "ürün değerlendirmesinde kullanılmaz."))
     if ignored:
         issues.append(Issue(level="bilgi", message=f"Tanınmayan sütunlar yok sayıldı: {', '.join(ignored)}"))
 
@@ -390,12 +419,13 @@ def build_preview(collection_id: str, book: Dict[str, Sheet], images: List[Image
         cands = ambiguous.get(it.sku, []) if it.sku else []
         if not imgs and not cands and it.sku:
             errs.append("Görsel bulunamadı")
-        if it.unit_cost is None and not any("maliyet" in p.lower() for p in probs):
-            warns.append("Birim maliyet boş: değerlendirilir ama bütçe dağıtımına girmez")
+        if it.unit_cost is None:
+            errs.append("Maliyet fiyatı boş ya da geçersiz: marj ve üretim kararı için gerekli")
+            warns = [w for w in warns if not w.startswith("Maliyet fiyatı")]
+        if not it.technical_specs:
+            warns.append("Ürün içeriği (kumaş/kompozisyon) boş: panel ürünü yalnızca görsel ve addan değerlendirir")
         if not it.category:
             warns.append("Kategori boş: fiyat mimarisi ve kanibalizasyon analizine girmez")
-        if it.unit_cost and it.planned_price and it.unit_cost >= it.planned_price:
-            warns.append("Birim maliyet planlanan fiyattan yüksek ya da eşit")
         for p in imgs:
             d = dims.get(p)
             if d and d.width and d.height and min(d.width, d.height) < MIN_IMAGE_PX:
@@ -433,20 +463,38 @@ def build_preview(collection_id: str, book: Dict[str, Sheet], images: List[Image
                          column_map=colmap, ignored_columns=ignored, counts=counts)
 
 
+TEMPLATE_ITEM_COLS = ["sku", "urun_adi", "kategori", "alt_kategori", "urun_icerigi", "maliyet_fiyati", "gorsel_dosyalari",
+                      "renkler", "beden_araligi", "hedef_kitle", "kalip", "desen", "gramaj", "planlanan_adet",
+                      "min_siparis_adedi", "lansman_ayi", "hedef_rol", "kombin_grubu", "ek_ozellikler"]
+TEMPLATE_REQUIRED = {"sku", "urun_adi", "kategori", "urun_icerigi", "maliyet_fiyati"}
+TEMPLATE_EXAMPLES = [
+    ["URN-001", "Keten gömlek", "Üst giyim", "Gömlek", "%100 keten, 160 gsm, sedef düğme", 420, "", "ekru, mavi", "S-XL",
+     "kadın", "rahat", "düz", "160 gsm", 800, 300, 3, "çekirdek", "Sahil", "yaka=klasik"],
+    ["URN-002", "Geniş paça pantolon", "Alt giyim", "Pantolon", "%55 keten %45 viskon, 220 gsm", 510,
+     "URN-002_on.jpg; URN-002_arka.jpg", "ekru", "34-44", "kadın", "geniş paça", "düz", "220 gsm", 600, 300, 3,
+     "tamamlayıcı", "Sahil", ""],
+    ["URN-003", "Çiçek desenli midi elbise", "Elbise", "Midi", "%100 viskon, 120 gsm, astarlı", 640, "", "", "XS-L",
+     "kadın", "A kesim", "çiçek", "120 gsm", None, 200, 4, "hero", "", ""],
+]
+
+
 def template_bytes() -> bytes:
-    """Boş şablon: Okuma rehberi, Koleksiyon, Ürünler (3 örnek satır), Kategoriler."""
+    """Ortak toplu yükleme şablonu (koleksiyon ve bağımsız ürünler aynı dosyayı kullanır).
+    Sayfalar: Okuma rehberi, Genel bilgi, Ürünler (3 örnek satır). Satış fiyatı sütunu yoktur: fiyatı sistem önerir."""
     from openpyxl import Workbook
+    from openpyxl.comments import Comment
     from openpyxl.styles import Alignment, Font, PatternFill
     from openpyxl.worksheet.datavalidation import DataValidation
 
     wb = Workbook()
     bold_w = Font(bold=True, color="FFFFFF")
-    req, opt = PatternFill("solid", fgColor="1F4E78"), PatternFill("solid", fgColor="7F7F7F")
+    req, opt, coll = PatternFill("solid", fgColor="1F4E78"), PatternFill("solid", fgColor="7F7F7F"), PatternFill("solid", fgColor="8E7CC3")
 
-    def header(ws, cols, required):
+    def header(ws, cols, required, collection_only=()):
         for i, c in enumerate(cols, 1):
             x = ws.cell(1, i, c)
-            x.font, x.fill = bold_w, (req if c in required else opt)
+            x.font = bold_w
+            x.fill = req if c in required else coll if c in collection_only else opt
             x.alignment = Alignment(wrap_text=True)
             ws.column_dimensions[x.column_letter].width = max(14, len(c) + 4)
         ws.freeze_panes = "A2"
@@ -454,46 +502,55 @@ def template_bytes() -> bytes:
     guide = wb.active
     guide.title = "Okuma rehberi"
     for line in [
-        "Koleksiyon yükleme şablonu. Örnek satırlar uydurmadır; silip kendi verinizi yazın.",
-        "Koyu mavi başlık zorunlu, gri başlık isteğe bağlıdır.",
-        "1) 'Koleksiyon' sayfasına tek satır üst bilgi yazın (ekrandan da düzeltilebilir).",
-        "2) 'Ürünler' sayfasına her model için bir satır yazın. SKU benzersiz olmalı.",
+        "Toplu ürün yükleme şablonu. Koleksiyon ekranında da, bağımsız ürünler ekranında da aynı dosya kullanılır.",
+        "Örnek satırlar uydurmadır; silip kendi verinizi yazın.",
+        "Koyu mavi başlık zorunlu, gri başlık isteğe bağlı, mor başlık yalnızca koleksiyon değerlendirmesinde kullanılır.",
+        "Satış fiyatı yazmayın: önerilen satış fiyatını ve fiyat bölgelerini sistem panelin fiyat cevaplarından hesaplar.",
+        "1) 'Genel bilgi' sayfasına tek satır yazın (marka, bütçe, para birimi, bölgeler). Ekrandan da düzeltilebilir.",
+        "   Koleksiyon yüklüyorsanız koleksiyon_adi yazın; bağımsız ürünlerde boş bırakabilirsiniz.",
+        "2) 'Ürünler' sayfasına her ürün için bir satır yazın. SKU benzersiz olmalı.",
+        "   urun_icerigi: kumaş ve kompozisyon (ör. %100 pamuk, 180 gsm, süprem). Panel ürünü bu bilgiyle ve görselle değerlendirir.",
+        "   maliyet_fiyati: birim maliyet, Genel bilgi sayfasındaki para biriminde. Marj ve üret/azalt/üretme kararı buna dayanır.",
         "3) Görselleri klasör, çoklu dosya ya da zip olarak yükleyin. Eşleştirme sırası:",
         "   a. gorsel_dosyalari sütunundaki adlar (birden fazlaysa ; ile ayırın, ilk yazılan ana görsel)",
-        "   b. Dosya adı SKU ile başlıyorsa otomatik: SW27-014.jpg, SW27-014_2.jpg, SW27-014-arka.jpg",
-        "   c. Görseller SKU adlı klasördeyse: SW27-014/on.jpg",
-        "4) Büyük/küçük harf, uzantı ve Türkçe karakter farkı önemsizdir.",
+        "   b. Dosya adı SKU ile başlıyorsa otomatik: URN-001.jpg, URN-001_2.jpg, URN-001-arka.jpg",
+        "   c. Görseller SKU adlı klasördeyse: URN-001/on.jpg",
+        "4) Büyük/küçük harf, uzantı ve Türkçe karakter farkı önemsizdir. Başlıklar esnek okunur (ör. 'Model kodu' = sku).",
         "5) Yüklemeden sonra önizleme ekranı eşleşmeyen satırları ve görselleri gösterir; onaysız hiçbir şey kaydedilmez.",
-        "Para birimi TRY ya da USD. Maliyet ve fiyatlar bu para biriminde yazılır.",
-        "hedef_rol: hero / çekirdek / tamamlayıcı / deneme (tasarımcının niyeti; panel sonucuyla karşılaştırılır)",
+        "Para birimi TRY ya da USD.",
+        "hedef_rol (koleksiyon): hero / çekirdek / tamamlayıcı / deneme. Tasarımcının niyetidir; panel sonucuyla karşılaştırılır.",
+        "kombin_grubu (koleksiyon): birlikte satılması düşünülen ürünler için aynı ad.",
+        "ek_ozellikler: anahtar=değer; ile ayırarak (ör. yaka=klasik; kol=uzun).",
     ]:
         guide.append([line])
-    guide.column_dimensions["A"].width = 110
+    guide.column_dimensions["A"].width = 120
     guide["A1"].font = Font(bold=True, size=13)
 
-    meta = wb.create_sheet("Koleksiyon")
+    meta = wb.create_sheet("Genel bilgi")
     header(meta, ["koleksiyon_adi", "marka", "sezon", "toplam_butce", "para_birimi", "hedef_bolgeler", "kanal",
                   "lansman_ayi", "notlar"],
-           {"koleksiyon_adi", "sezon", "toplam_butce", "para_birimi", "hedef_bolgeler"})
+           {"para_birimi", "hedef_bolgeler"}, {"koleksiyon_adi"})
     meta.append(["SS27 Ana Koleksiyon", "Örnek Marka", "İlkbahar-Yaz 2027", 2500000, "TRY", "TR, EU", "online", 3, "örnek satır"])
     dv = DataValidation(type="list", formula1='"online,mağaza"')
     meta.add_data_validation(dv)
     dv.add("G2")
+    dvc = DataValidation(type="list", formula1='"TRY,USD"')
+    meta.add_data_validation(dvc)
+    dvc.add("E2")
 
     items = wb.create_sheet("Ürünler")
-    header(items, ["sku", "urun_adi", "kategori", "alt_kategori", "teknik_ozellikler", "birim_maliyet", "planlanan_fiyat",
-                   "gorsel_dosyalari", "renkler", "beden_araligi", "planlanan_adet", "hedef_rol", "kombin_grubu",
-                   "lansman_ayi", "min_siparis_adedi", "ek_ozellikler"],
-           {"sku", "urun_adi", "kategori", "teknik_ozellikler", "birim_maliyet"})
-    for r in [
-        ["SW27-001", "Keten gömlek", "Üst giyim", "Gömlek", "%100 keten, 160 gsm, sedef düğme", 420, 1499, "", "ekru, mavi", "S-XL", 800, "çekirdek", "Sahil", 3, 300, "yaka=klasik"],
-        ["SW27-002", "Geniş paça keten pantolon", "Alt giyim", "Pantolon", "%55 keten %45 viskon, 220 gsm", 510, 1799, "SW27-002_on.jpg; SW27-002_arka.jpg", "ekru", "34-44", 600, "tamamlayıcı", "Sahil", 3, 300, ""],
-        ["SW27-003", "Çiçek desenli midi elbise", "Elbise", "Midi", "%100 viskon, 120 gsm, astarlı", 640, 2299, "", "", "XS-L", None, "hero", "", 4, 200, "desen=çiçek"],
-    ]:
+    header(items, TEMPLATE_ITEM_COLS, TEMPLATE_REQUIRED, {"hedef_rol", "kombin_grubu"})
+    items["E1"].comment = Comment("Kumaş ve kompozisyon: ör. %100 pamuk, 180 gsm, süprem", "şablon")
+    items["F1"].comment = Comment("Birim maliyet (Genel bilgi sayfasındaki para biriminde). Satış fiyatı yazılmaz.", "şablon")
+    for r in TEMPLATE_EXAMPLES:
         items.append(r)
+    col_of = {c: items.cell(1, i + 1).column_letter for i, c in enumerate(TEMPLATE_ITEM_COLS)}
     dv2 = DataValidation(type="list", formula1='"hero,çekirdek,tamamlayıcı,deneme"')
     items.add_data_validation(dv2)
-    dv2.add("L2:L2000")
+    dv2.add(f"{col_of['hedef_rol']}2:{col_of['hedef_rol']}2000")
+    dv3 = DataValidation(type="list", formula1='"kadın,erkek,unisex,kız çocuk,erkek çocuk,bebek"', allow_blank=True)
+    items.add_data_validation(dv3)
+    dv3.add(f"{col_of['hedef_kitle']}2:{col_of['hedef_kitle']}2000")
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
