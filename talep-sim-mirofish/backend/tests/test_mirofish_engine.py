@@ -1,0 +1,416 @@
+import json
+
+import httpx
+import pytest
+
+from app.models import PredictionRequest
+from app.pricing import analyze
+from app.services.engine import MockSimulationEngine
+from app.services.mirofish_client import MiroFishClient, MiroFishError
+from app.services.answer_extractor import AnswerExtractor
+from app.services.llm import LLMClient
+from app.services.mirofish_engine import MiroFishSimulationEngine, RegionUnavailable, parse_agent_answer
+from app.services.personas import SEED_CONSUMERS, build_seed_document, region_of
+
+
+def test_parse_agent_answer_accepts_wrapped_json():
+    text = 'Tabii: {"interest": 80, "too_cheap": 20, "cheap": 40, "expensive": 80, "too_expensive": 120, "objection": "Kalın"} bu kadar.'
+    a = parse_agent_answer(text)
+    assert a == {"interest": 80.0, "prices": [20.0, 40.0, 80.0, 120.0], "objection": "Kalın", "estimated": False,
+                 "price_source": "numeric"}
+
+
+@pytest.mark.parametrize("text", [
+    "", "no json",
+])
+def test_parse_agent_answer_rejects_bad(text):
+    assert parse_agent_answer(text) is None
+
+
+def test_region_mapping_from_seed_names_and_cities():
+    assert region_of("Fatima Al Mansoori, marketing manager") == "MENA"
+    assert region_of("Someone living in Novosibirsk") == "CIS"
+    assert region_of("bir kişi") is None
+    assert "Lena Hoffmann" in build_seed_document()
+
+
+class FakeMiroFish:
+    """MiroFish Flask API'sinin test çifti; çağrı sırasını kaydeder."""
+
+    def __init__(self, bad_json=False, fail_first=False, timeout_calls=(), always_timeout=False):
+        self.timeout_calls = set(timeout_calls)
+        self.always_timeout = always_timeout
+        self.fail_first = fail_first
+        self.interview_calls = 0
+        self.calls = []
+        self.bad_json = bad_json
+        self.reply_text = None  # verilirse tüm ajanlar bu serbest metni söyler
+        self.started = False
+        names = [(i, p.split(",")[0]) for i, p in enumerate(p for ps in SEED_CONSUMERS.values() for p in ps)]
+        self.profiles = [{"user_id": i, "name": n, "bio": "", "persona": ""} for i, n in names]
+
+    def handler(self, request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        self.calls.append(path)
+        ok = lambda data: httpx.Response(200, json={"success": True, "data": data})
+        if path == "/api/graph/ontology/generate":
+            self.uploaded_seed = request.content.decode(errors="ignore")
+            return ok({"project_id": "proj_1"})
+        if path == "/api/graph/build":
+            return ok({"task_id": "t1"})
+        if path == "/api/graph/task/t1":
+            return ok({"status": "completed"})
+        if path == "/api/simulation/create":
+            return ok({"simulation_id": "sim_1"})
+        if path == "/api/simulation/prepare":
+            return ok({"task_id": "t2"})
+        if path == "/api/simulation/prepare/status":
+            return ok({"status": "ready", "already_prepared": True})
+        if path == "/api/simulation/sim_1/profiles":
+            return ok({"profiles": self.profiles})
+        if path == "/api/simulation/start":
+            self.started = True
+            return ok({"runner_status": "running"})
+        if path == "/api/simulation/env-status":
+            return ok({"env_alive": self.started})
+        if path == "/api/simulation/interview/batch":
+            body = json.loads(request.content)
+            self.interview_calls += 1
+            if self.always_timeout or self.interview_calls in self.timeout_calls:
+                return httpx.Response(504, json={"success": False, "error": "等待IPC响应超时"})
+            broken = self.bad_json or (self.fail_first and self.interview_calls == 1)
+            reply = self.reply_text or "bozuk" if broken or self.reply_text else json.dumps({
+                "interest": 70, "too_cheap": 30, "cheap": 55, "expensive": 90, "too_expensive": 130,
+                "objection": "Kumaş kalın"})
+            return ok({"result": {"results": {
+                f"reddit_{i['agent_id']}": {"agent_id": i["agent_id"], "response": reply}
+                for i in body["interviews"]}}})
+        if path in ("/api/simulation/close-env", "/api/simulation/stop"):
+            return ok({})
+        if request.method == "DELETE" and path.startswith("/api/graph/project/"):
+            self.deleted = path.rsplit("/", 1)[1]
+            return httpx.Response(409, json={"success": False, "error": "in use"}) if getattr(self, "delete_fails", False) else ok({})
+        return httpx.Response(404, json={"success": False, "error": path})
+
+
+def make_engine(tmp_path, fake, **kw):
+    client = MiroFishClient("http://mf", httpx.AsyncClient(
+        base_url="http://mf", transport=httpx.MockTransport(fake.handler)))
+    mock = MockSimulationEngine(latency_s=0)
+    kw.setdefault("agents_per_region", 5)  # testler 5 ajanlık panel varsayar
+    return MiroFishSimulationEngine(client, mock.fuse_product_card, str(tmp_path / "world.json"),
+                                    poll_s=0, env_wait_s=1, **kw)
+
+
+REQ = PredictionRequest(product_name="Kaban", image_base64="x", technical_specs="GSM: 450, yün",
+                        unit_cost="25", total_production_budget=10000, target_regions=["EU", "CIS"])
+
+
+async def test_world_built_once_and_regions_interviewed(tmp_path):
+    fake = FakeMiroFish()
+    engine = make_engine(tmp_path, fake)
+    card = await engine.fuse_product_card(REQ)
+    eu, cis = [await engine.simulate_region(card, r, 25.0, scope=["EU", "CIS"]) for r in ("EU", "CIS")]
+
+    assert fake.calls.count("/api/graph/ontology/generate") == 1  # ikinci bölge dünyayı yeniden kurmaz
+    assert eu.demand_score == 70 and len(eu.price_answers) == 5
+    assert eu.objections == ["Kumaş kalın"]
+    vw, best = analyze(cis.price_answers, 25.0)
+    assert vw.acceptable_range_low < best <= vw.acceptable_range_high
+
+
+async def test_saved_world_reused_after_restart(tmp_path):
+    fake = FakeMiroFish()
+    card = await make_engine(tmp_path, fake).fuse_product_card(REQ)
+    await make_engine(tmp_path, fake).simulate_region(card, "EU", 25.0, scope=["EU", "MENA"])
+    fake.calls.clear()
+    await make_engine(tmp_path, fake).simulate_region(card, "MENA", 25.0, scope=["EU", "MENA"])
+    assert "/api/graph/ontology/generate" not in fake.calls
+
+
+async def test_unparseable_agent_answers_raise(tmp_path):
+    engine = make_engine(tmp_path, FakeMiroFish(bad_json=True))
+    card = await engine.fuse_product_card(REQ)
+    with pytest.raises(MiroFishError):
+        await engine.simulate_region(card, "EU", 25.0)
+
+
+async def test_invalid_answers_are_retried_once(tmp_path):
+    fake = FakeMiroFish(fail_first=True)
+    engine = make_engine(tmp_path, fake)
+    card = await engine.fuse_product_card(REQ)
+    sim = await engine.simulate_region(card, "EU", 25.0)
+    assert fake.interview_calls == 3 and len(sim.price_answers) == 5  # 2 grup + 1 yeniden deneme
+
+
+async def test_stale_world_without_turkey_is_rebuilt(tmp_path):
+    fake = FakeMiroFish()
+    (tmp_path / "world.json").write_text(json.dumps(
+        {"project_id": "p", "simulation_id": "sim_1", "agents": {"EU": [0]}, "seed_hash": "eskiseed"}))
+    fake.started = True  # ortam canlı görünse bile seed değiştiği için yeniden kurulmalı
+    engine = make_engine(tmp_path, fake)
+    card = await engine.fuse_product_card(REQ)
+    sim = await engine.simulate_region(card, "TR", 25.0, None, {"TRY": 42})
+    assert "/api/graph/ontology/generate" in fake.calls and len(sim.price_answers) == 5
+
+
+async def test_interviews_are_chunked_into_small_batches(tmp_path):
+    fake = FakeMiroFish()
+    engine = make_engine(tmp_path, fake, batch_size=2)
+    card = await engine.fuse_product_card(REQ)
+    sim = await engine.simulate_region(card, "EU", 25.0)
+    assert fake.interview_calls == 3  # 5 ajan -> 2+2+1
+    assert sim.meta["n_valid"] == 5
+
+
+async def test_timeout_is_retried_and_succeeds(tmp_path):
+    fake = FakeMiroFish(timeout_calls=[1])
+    engine = make_engine(tmp_path, fake)
+    card = await engine.fuse_product_card(REQ)
+    sim = await engine.simulate_region(card, "EU", 25.0)
+    assert sim.meta["n_valid"] == 5 and sim.meta["n_timed_out"] == 0
+
+
+async def test_partial_result_when_one_chunk_times_out(tmp_path):
+    # batch 2: grup1 iki kez zaman aşımı (çağrı 1,2) -> atlanır; kalan 3 ajan cevaplar.
+    fake = FakeMiroFish(timeout_calls=[1, 2])
+    engine = make_engine(tmp_path, fake, batch_size=2, retries=0)
+    card = await engine.fuse_product_card(REQ)
+    sim = await engine.simulate_region(card, "EU", 25.0)
+    assert sim.meta["n_valid"] == 3 and sim.meta["n_timed_out"] == 2
+
+
+async def test_stuck_model_aborts_region_with_clear_error(tmp_path):
+    fake = FakeMiroFish(always_timeout=True)
+    engine = make_engine(tmp_path, fake, batch_size=1)
+    card = await engine.fuse_product_card(REQ)
+    with pytest.raises(RegionUnavailable, match="zaman aşımına"):
+        await engine.simulate_region(card, "EU", 25.0)
+    assert fake.interview_calls == 4  # 2 grup x (1 + 1 yeniden deneme), sonra vazgeçer
+
+
+async def test_world_contains_only_selected_regions(tmp_path):
+    fake = FakeMiroFish()
+    engine = make_engine(tmp_path, fake)
+    card = await engine.fuse_product_card(REQ)
+    await engine.simulate_region(card, "EU", 25.0, scope=["EU", "TR"])
+    assert "EU paneli" in fake.uploaded_seed and "TR paneli" in fake.uploaded_seed
+    for other in ("MENA paneli", "CIS paneli", "US paneli"):
+        assert other not in fake.uploaded_seed
+    world = json.loads((tmp_path / "world.json").read_text())
+    (w,) = world.values()
+    assert set(w["agents"]) == {"EU", "TR"}
+
+
+async def test_different_selection_builds_separate_world(tmp_path):
+    fake = FakeMiroFish()
+    engine = make_engine(tmp_path, fake)
+    card = await engine.fuse_product_card(REQ)
+    await engine.simulate_region(card, "EU", 25.0, scope=["EU"])
+    await engine.simulate_region(card, "EU", 25.0, scope=["EU", "US"])
+    assert fake.calls.count("/api/graph/ontology/generate") == 2
+    await engine.simulate_region(card, "EU", 25.0, scope=["US", "EU"])  # sıra önemsiz, yeniden kurulmaz
+    assert fake.calls.count("/api/graph/ontology/generate") == 2
+
+
+async def test_world_build_reports_progress_and_uses_long_timeout(tmp_path):
+    fake = FakeMiroFish()
+    engine = make_engine(tmp_path, fake)
+    card = await engine.fuse_product_card(REQ)
+    events = []
+
+    async def progress(ev):
+        events.append(ev)
+
+    await engine.simulate_region(card, "TR", 25.0, scope=["TR"], progress=progress)
+    world = [e["detail"] for e in events if e["stage"] == "world"]
+    assert len(world) == 6 and "10-30 dk" in world[0] and "TR" in world[0]
+    assert engine.client.build_timeout >= 1800
+
+
+async def test_ontology_read_timeout_is_clear_error(tmp_path):
+    def handler(request):
+        raise httpx.ReadTimeout("")
+    client = MiroFishClient("http://mf", httpx.AsyncClient(base_url="http://mf", transport=httpx.MockTransport(handler)))
+    with pytest.raises(MiroFishError, match="ollama ps"):
+        await client.generate_ontology("a.md", "x", "y", "z")
+
+
+def fenced(obj):
+    return "Harika bir ürün!\n```json\n" + json.dumps(obj) + "\n```\nUmarım yardımcı olmuştur."
+
+
+def test_parse_handles_code_fences_and_unordered_prices():
+    a = parse_agent_answer(fenced({"interest": 60, "too_cheap": 90, "cheap": 40, "expensive": 80, "too_expensive": 120}))
+    assert a["prices"] == [40.0, 80.0, 90.0, 120.0]
+
+
+class FakeLLM:
+    """Ollama sohbet uç noktası: extractor'ın istediği JSON'u döner."""
+
+    def __init__(self, reply):
+        self.calls = 0
+        self.reply = reply
+
+    def handler(self, request):
+        self.calls += 1
+        return httpx.Response(200, json={"choices": [{"message": {"content": self.reply}}]})
+
+
+def make_extractor(reply):
+    llm = FakeLLM(reply)
+    client = LLMClient("k", "http://llm/v1", "qwen", httpx.AsyncClient(transport=httpx.MockTransport(llm.handler)))
+    return AnswerExtractor(client), llm
+
+
+FREE_TEXT = "Bence bu kaban güzel ama biraz pahalı. 60 dolara alırdım, 120 dolardan fazlasına asla."
+
+
+async def test_free_text_answers_are_extracted_by_llm(tmp_path):
+    fake = FakeMiroFish()
+    fake.reply_text = FREE_TEXT
+    # merdivende şüpheli/uygun/uygun/pahalı/çok pahalı: eşiklerin hepsi cevapta dayanaklı değil -> tahmin etiketi yok
+    ext, llm = make_extractor(json.dumps({"interest": 55, "ladder": {"1": "supheli", "2": "uygun", "3": "uygun", "4": "uygun", "5": "uygun",
+                                                                      "6": "pahali", "7": "pahali", "8": "cok_pahali", "9": "cok_pahali"},
+                                          "objection": "Pahalı"}))
+    engine = make_engine(tmp_path, fake, extractor=ext)
+    card = await engine.fuse_product_card(REQ)
+    sim = await engine.simulate_region(card, "EU", 25.0)
+    assert llm.calls == 5 and sim.meta["n_valid"] == 5 and sim.meta["n_extracted"] == 5
+    assert sim.meta["n_priced"] == 5 and sim.meta["price_source"] == "agents"
+    assert sim.objections == ["Pahalı"]
+    assert len(sim.meta["ladder_votes"]) == 5 and sim.meta["ladder_votes"][0] == [0, 1, 1, 1, 1, 2, 2, 3, 3]
+    raw = sim.meta["raw_answers"]
+    assert raw[0]["status"] == "extracted" and FREE_TEXT in raw[0]["text"]
+    saved = (tmp_path / "world.json.answers.jsonl").read_text().splitlines()
+    assert len(saved) == 5 and json.loads(saved[0])["region"] == "EU"
+
+
+async def test_extraction_failure_error_includes_raw_snippet(tmp_path):
+    fake = FakeMiroFish()
+    fake.reply_text = FREE_TEXT
+    ext, _ = make_extractor("{}")  # geçersiz çıkarım
+    engine = make_engine(tmp_path, fake, extractor=ext, retries=0)
+    card = await engine.fuse_product_card(REQ)
+    with pytest.raises(RegionUnavailable, match="Örnek ham cevap") as exc:
+        await engine.simulate_region(card, "EU", 25.0)
+    assert FREE_TEXT[:30] in str(exc.value) and exc.value.raw_answers[0]["status"] == "failed"
+
+
+async def test_free_text_without_llm_fails_clearly(tmp_path):
+    fake = FakeMiroFish()
+    fake.reply_text = FREE_TEXT
+    engine = make_engine(tmp_path, fake, retries=0)
+    card = await engine.fuse_product_card(REQ)
+    with pytest.raises(RegionUnavailable, match="çıkarılamadı"):
+        await engine.simulate_region(card, "EU", 25.0)
+
+
+def test_ladder_labels_become_ordered_thresholds():
+    from app.services.answer_extractor import make_ladder
+    ladder = make_ladder(100)
+    assert ladder == sorted(ladder) and len(set(ladder)) == 9
+    a = parse_agent_answer(json.dumps({"interest": "65/100", "ladder": {"1": "şüpheli", "2": "Uygun", "3": "uygun", "4": "uygun",
+                                                                         "5": "uygun", "6": "pahalı", "7": "pahalı",
+                                                                         "8": "çok pahalı", "9": "çok pahalı"}}), ladder)
+    tc, ch, ex, te = a["prices"]
+    assert a["interest"] == 65 and tc < ch < ex < te and a["price_source"] == "ladder" and not a["estimated"]
+    assert ladder[0] < tc < ladder[2] and ladder[4] < ex < ladder[6]
+
+
+def test_prose_thresholds_give_partial_answer():
+    text = ('{"interest": 65, "too_cheap": "Fiyat çok düşüktür, üründen şüphe uyandırır.", '
+            '"cheap": "Fiyat uygun.", "expensive": "pahalı", "too_expensive": "asla"}')
+    a = parse_agent_answer(text)
+    assert a["interest"] == 65 and a["prices"] is None
+
+
+async def test_prose_thresholds_are_recovered_by_ladder_extraction(tmp_path):
+    fake = FakeMiroFish()
+    fake.reply_text = '{"interest": 65, "too_cheap": "çok düşük, şüphe uyandırır", "cheap": "uygun", "expensive": "x", "too_expensive": "y"}'
+    ext, llm = make_extractor(json.dumps({"interest": 70, "ladder": ["uygun"] * 4 + ["pahali"] * 3 + ["cok_pahali"] * 2}))
+    engine = make_engine(tmp_path, fake, extractor=ext)
+    card = await engine.fuse_product_card(REQ)
+    sim = await engine.simulate_region(card, "EU", 25.0)
+    assert sim.meta["n_priced"] == 5 and sim.meta["price_source"] == "agents"
+    assert sim.meta["n_estimated"] == 5  # 'şüpheli' basamağı yok -> alt eşik tahmin
+    analyze(sim.price_answers, 25.0)
+
+
+async def test_interest_only_answers_still_give_demand_and_fallback_prices(tmp_path):
+    fake = FakeMiroFish()
+    fake.reply_text = '{"interest": 62, "too_cheap": "ucuz", "objection": "Kalın"}'
+    engine = make_engine(tmp_path, fake)  # LLM çıkarıcı yok
+    card = await engine.fuse_product_card(REQ)
+    sim = await engine.simulate_region(card, "EU", 25.0)
+    assert sim.demand_score == 62 and sim.meta["n_priced"] == 0 and sim.meta["price_source"] == "brand_fallback"
+    vw, best = analyze(sim.price_answers, 25.0)
+    assert best > 25.0 and sim.objections == ["Kalın"]
+    assert all(r["status"] == "partial" for r in sim.meta["raw_answers"])
+
+
+async def test_interview_prompt_contains_price_ladder(tmp_path):
+    from app.services.mirofish_engine import build_interview_prompt
+    p = build_interview_prompt({"product_name": "K"}, "TR", None, 25.0, {"TRY": 42.0}, [50, 80, 110, 150, 210])
+    assert "1) $50 (≈ ₺2.100)" in p and "cok_pahali" in p and '"ladder"' in p
+
+
+async def test_reset_world_deletes_old_project_and_rebuilds(tmp_path):
+    fake = FakeMiroFish()
+    engine = make_engine(tmp_path, fake)
+    card = await engine.fuse_product_card(REQ)
+    await engine.simulate_region(card, "EU", 25.0, scope=["EU"])
+    notes = await engine.reset_world(["EU"])
+    assert fake.deleted == "proj_1" and "silindi" in notes[0]
+    assert "/api/simulation/close-env" in fake.calls
+    await engine.simulate_region(card, "EU", 25.0, scope=["EU"])
+    assert fake.calls.count("/api/graph/ontology/generate") == 2  # baştan kuruldu
+
+
+async def test_reset_world_survives_delete_failure(tmp_path):
+    fake = FakeMiroFish()
+    engine = make_engine(tmp_path, fake)
+    card = await engine.fuse_product_card(REQ)
+    await engine.simulate_region(card, "EU", 25.0, scope=["EU"])
+    fake.delete_fails = True
+    notes = await engine.reset_world(["EU"])
+    assert "silinemedi" in notes[0] and "Zep" in notes[0]
+    await engine.simulate_region(card, "EU", 25.0, scope=["EU"])
+    assert fake.calls.count("/api/graph/ontology/generate") == 2
+
+
+async def test_world_version_change_invalidates_cache(tmp_path, monkeypatch):
+    from app.services import mirofish_engine as me
+    fake = FakeMiroFish()
+    engine = make_engine(tmp_path, fake)
+    card = await engine.fuse_product_card(REQ)
+    await engine.simulate_region(card, "EU", 25.0, scope=["EU"])
+    monkeypatch.setattr("app.services.personas.WORLD_VERSION", 99)
+    engine2 = make_engine(tmp_path, fake)
+    await engine2.simulate_region(card, "EU", 25.0, scope=["EU"])
+    assert fake.calls.count("/api/graph/ontology/generate") == 2
+
+
+@pytest.mark.parametrize("content", [
+    {"project_id": "p0", "simulation_id": "s0", "agents": {"EU": [0]}},  # seed_hash'siz eski tek dünya
+    {"abc": "bozuk", "def": 3},  # değerleri dict olmayan kayıtlar
+    ["liste"], "metin",
+])
+async def test_old_or_malformed_cache_is_ignored_and_rebuilt(tmp_path, content):
+    (tmp_path / "world.json").write_text(json.dumps(content))
+    fake = FakeMiroFish()
+    engine = make_engine(tmp_path, fake)
+    card = await engine.fuse_product_card(REQ)
+    notes = await engine.reset_world(["EU"])  # eskiden 'str' object has no attribute 'get'
+    assert isinstance(notes, list)
+    sim = await engine.simulate_region(card, "EU", 25.0, scope=["EU"])
+    assert sim.demand_score == 70 and fake.calls.count("/api/graph/ontology/generate") == 1
+
+
+async def test_corrupt_cache_file_is_ignored(tmp_path):
+    (tmp_path / "world.json").write_text("{bozuk json")
+    fake = FakeMiroFish()
+    engine = make_engine(tmp_path, fake)
+    card = await engine.fuse_product_card(REQ)
+    await engine.simulate_region(card, "EU", 25.0, scope=["EU"])
+    assert fake.calls.count("/api/graph/ontology/generate") == 1
