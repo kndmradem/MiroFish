@@ -1,4 +1,8 @@
-# Talep Simülasyonu MVP (Faz 1)
+# Talep Simülasyonu MVP (Faz 1) — MiroFish motorlu kopya
+
+> Bu klasör `talep-sim/`'in kopyasıdır: varsayılan motor `SIM_ENGINE=mirofish`, portlar MiroFish **5101**,
+> API **8100**, dashboard **3200** (eski kurulum 5001/8000/3100 ile çakışmaz). Mac'te kurulum ve çalıştırma:
+> [MAC-KURULUM.md](MAC-KURULUM.md) ve `mac/` betikleri. Aşağıdaki genel notlardaki 8000/3100/5001 eski kurulumu anlatır.
 
 Tasarım görseli + teknik bilgi + maliyet/bütçe girilen bir ürün için bölgesel
 talep skoru, Van Westendorp optimal fiyatı, bütçe ağırlıklı üretim adedi ve
