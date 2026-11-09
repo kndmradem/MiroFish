@@ -219,7 +219,8 @@ class CollectionRunner:
                     technical_specs=item_specs(it), unit_cost=Decimal(str(round(to_usd(cost), 2))),
                     total_production_budget=per_item_budget, target_regions=regions, brand=brand.name if brand else None,
                     brand_profile=brand,
-                    assumptions=Assumptions(channel=col.meta.channel, launch_month=it.launch_month or col.meta.launch_month),
+                    assumptions=Assumptions(channel=col.meta.channel, launch_month=it.launch_month or col.meta.launch_month,
+                                            calendar_plan=False),  # takvim planı tekli üründe; koleksiyonda ek LLM turu yok
                     usd_try_rate=fx_rate, allocation_objective=opts.allocation_objective)
 
                 async def emit(ev: dict, _i=i, _it=it):

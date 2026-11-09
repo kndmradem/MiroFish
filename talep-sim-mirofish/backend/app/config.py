@@ -60,6 +60,14 @@ class Settings:
     mirofish_agents_per_region: int = field(default_factory=lambda: int(_env("MIROFISH_AGENTS_PER_REGION", "10")))
     mirofish_min_valid: int = field(default_factory=lambda: int(_env("MIROFISH_MIN_VALID", "2")))
 
+    # --- Perakende takvimi ve kampanya planı ---
+    # perakende_takvimi.csv, etkinlik_turleri.csv, ulke_bolge.csv, kampanya_kaldiraclari.csv (boşsa panel_data/takvim)
+    takvim_dir: Optional[str] = field(default_factory=lambda: _env("TAKVIM_DIR"))
+    # Takvim turu: panel kişilerine etkinlik uygunluğu ve bekleme sorusu (bölge başına kişi sayısı kadar ek LLM çağrısı)
+    takvim_turu: bool = field(default_factory=lambda: _env("TAKVIM_TURU", "true").lower() in ("1", "true", "yes", "on"))
+    # true: doğrulanmamış (dogrulandi=hayir) takvim satırları plana alınmaz
+    takvim_dogrulanmis_zorunlu: bool = field(default_factory=lambda: _env("TAKVIM_DOGRULANMIS_ZORUNLU", "false").lower() in ("1", "true", "yes", "on"))
+
     # --- Yeni mağaza öngörüsü ---
     # ERP veri sözleşmesi CSV klasörü (magazalar, satislar, doviz_kurlari) ve lokasyon profilleri dosyası.
     # Boşsa panel_data/ornek_erp (SENTETİK örnek veri) kullanılır ve sonuç ekranda öyle etiketlenir.

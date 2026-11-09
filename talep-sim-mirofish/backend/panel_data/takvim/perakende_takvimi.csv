@@ -1,0 +1,38 @@
+etkinlik_kodu,etkinlik_adi,yil,bolge,baslangic,bitis,on_pencere_gun,tur,ilgili_segmentler,pazar_mekanigi,yasal_not,tarih_kurali,kaynak,dogrulandi,dogrulayan,guncelleme
+SINGLES_DAY,11.11,2026,TR,2026-11-11,2026-11-11,3,pazaryeri,genel,yuzde_indirim,,sabit:11-11,genel bilgi,hayir,,2026-11-09
+SINGLES_DAY,11.11,2026,CIS,2026-11-11,2026-11-11,3,pazaryeri,genel,yuzde_indirim,,sabit:11-11,genel bilgi,hayir,,2026-11-09
+BLACK_FRIDAY,Black Friday / Efsane Cuma,2026,TR,2026-11-27,2026-11-30,7,mega_indirim,genel,yuzde_indirim,Indirim oncesi fiyat kurali (avukat sorusu H4),kasim_4_persembe_sonrasi,genel bilgi,hayir,,2026-11-09
+BLACK_FRIDAY,Black Friday,2026,EU,2026-11-27,2026-11-30,7,mega_indirim,genel,yuzde_indirim,AB fiyat gostergesi direktifi: son 30 gun en dusuk fiyat (dogrulanmali),kasim_4_persembe_sonrasi,genel bilgi,hayir,,2026-11-09
+BLACK_FRIDAY,White Friday,2026,MENA,2026-11-27,2026-11-30,10,mega_indirim,genel,yuzde_indirim,Pazaryerine gore tarih degisebilir,kasim_4_persembe_sonrasi,genel bilgi,hayir,,2026-11-09
+BLACK_FRIDAY,Black Friday / Cyber Monday,2026,US,2026-11-27,2026-11-30,7,mega_indirim,genel,yuzde_indirim,,kasim_4_persembe_sonrasi,genel bilgi,hayir,,2026-11-09
+YILBASI,Yilbasi hediye donemi,2026,TR,2026-12-24,2026-12-31,14,hediye,hediye;aksesuar;ic_giyim;triko,,,sabit:12-31,genel bilgi,hayir,,2026-11-09
+NOEL,Noel,2026,EU,2026-12-24,2026-12-26,21,hediye,hediye;aksesuar;triko,,,sabit:12-25,genel bilgi,hayir,,2026-11-09
+NOEL,Christmas,2026,US,2026-12-24,2026-12-26,21,hediye,hediye;aksesuar;triko,,,sabit:12-25,genel bilgi,hayir,,2026-11-09
+YENI_YIL,Yeni Yil,2026,CIS,2026-12-28,2027-01-08,14,hediye,hediye;genel,,,elle,genel bilgi,hayir,,2026-11-09
+DSF,Dubai Shopping Festival (yaklasik),2026,AE,2026-12-15,2027-01-29,0,mega_indirim,genel,yuzde_indirim,Tarihler yaklasik; resmi duyurudan girilmeli,elle,genel bilgi,hayir,,2026-11-09
+SOLDES_KIS,Soldes d'hiver,2027,FR,2027-01-06,2027-02-02,0,sezon_sonu,genel,yuzde_indirim,Fransa: sezon indirimi yalnizca yasal donemde,ocak_2_carsamba_(12den_sonraysa_1),yasal kural (dogrulanmali),hayir,,2026-11-09
+SEVGILILER,Sevgililer Gunu,2027,TR,2027-02-14,2027-02-14,10,hediye,kadin;erkek;ic_giyim;aksesuar;hediye,,,sabit:02-14,genel bilgi,hayir,,2026-11-09
+SEVGILILER,Valentine's Day,2027,EU,2027-02-14,2027-02-14,10,hediye,ic_giyim;aksesuar;hediye,,,sabit:02-14,genel bilgi,hayir,,2026-11-09
+SEVGILILER,Valentine's Day,2027,US,2027-02-14,2027-02-14,10,hediye,ic_giyim;aksesuar;hediye,,,sabit:02-14,genel bilgi,hayir,,2026-11-09
+PRESIDENTS_DAY,Presidents Day,2027,US,2027-02-13,2027-02-15,0,milli,genel,yuzde_indirim,,subat_3_pazartesi,genel bilgi,hayir,,2026-11-09
+ERKEKLER_GUNU,23 Subat,2027,CIS,2027-02-23,2027-02-23,7,hediye,erkek;hediye,,,sabit:02-23,genel bilgi,hayir,,2026-11-09
+RAMAZAN,Ramazan (yaklasik),2027,TR,2027-02-08,2027-03-08,0,dini,kadin;erkek;cocuk;tesettur,,,elle,yaklasik; Diyanet takviminden dogrulanmali,hayir,,2026-11-09
+RAMAZAN,Ramadan (yaklasik),2027,MENA,2027-02-08,2027-03-08,0,dini,kadin;erkek;cocuk;tesettur,,,elle,yaklasik; resmi takvimden dogrulanmali,hayir,,2026-11-09
+ANNELER_GUNU_UK,Mothering Sunday,2027,GB,2027-03-07,2027-03-07,10,hediye,kadin;hediye,,,paskalyadan_3_hafta_once,genel bilgi,hayir,,2026-11-09
+KADINLAR_GUNU,8 Mart,2027,CIS,2027-03-08,2027-03-08,10,hediye,kadin;hediye;aksesuar,,,sabit:03-08,genel bilgi,hayir,,2026-11-09
+RAMAZAN_BAYRAMI,Ramazan Bayrami (yaklasik),2027,TR,2027-03-09,2027-03-11,21,dini,kadin;erkek;cocuk;bayramlik,,,elle,yaklasik; Diyanet takviminden dogrulanmali,hayir,,2026-11-09
+RAMAZAN_BAYRAMI,Eid al-Fitr (yaklasik),2027,MENA,2027-03-09,2027-03-12,21,dini,kadin;erkek;cocuk;bayramlik,,,elle,yaklasik; resmi takvimden dogrulanmali,hayir,,2026-11-09
+ANNELER_GUNU_MENA,Anneler Gunu,2027,MENA,2027-03-21,2027-03-21,10,hediye,kadin;hediye,,,sabit:03-21,genel bilgi,hayir,,2026-11-09
+ANNELER_GUNU,Anneler Gunu,2027,TR,2027-05-09,2027-05-09,14,hediye,kadin;hediye;aksesuar,,,ay_n_gun:05:2:pazar,genel bilgi,hayir,,2026-11-09
+ANNELER_GUNU,Mother's Day,2027,US,2027-05-09,2027-05-09,14,hediye,kadin;hediye;aksesuar,,,ay_n_gun:05:2:pazar,genel bilgi,hayir,,2026-11-09
+KURBAN_BAYRAMI,Kurban Bayrami (yaklasik),2027,TR,2027-05-16,2027-05-19,14,dini,kadin;erkek;cocuk;bayramlik,,,elle,yaklasik; Diyanet takviminden dogrulanmali,hayir,,2026-11-09
+KURBAN_BAYRAMI,Eid al-Adha (yaklasik),2027,MENA,2027-05-16,2027-05-19,14,dini,kadin;erkek;cocuk;bayramlik,,,elle,yaklasik; resmi takvimden dogrulanmali,hayir,,2026-11-09
+MEMORIAL_DAY,Memorial Day,2027,US,2027-05-28,2027-05-31,0,milli,genel;yazlik,yuzde_indirim,,mayis_son_pazartesi,genel bilgi,hayir,,2026-11-09
+BABALAR_GUNU,Babalar Gunu,2027,TR,2027-06-20,2027-06-20,14,hediye,erkek;hediye;aksesuar,,,ay_n_gun:06:3:pazar,genel bilgi,hayir,,2026-11-09
+BABALAR_GUNU,Father's Day,2027,US,2027-06-20,2027-06-20,14,hediye,erkek;hediye;aksesuar,,,ay_n_gun:06:3:pazar,genel bilgi,hayir,,2026-11-09
+SOLDES_YAZ,Soldes d'ete,2027,FR,2027-06-23,2027-07-20,0,sezon_sonu,genel,yuzde_indirim,Fransa: sezon indirimi yalnizca yasal donemde,haziran_son_carsamba_(28den_sonraysa_bir_once),yasal kural (dogrulanmali),hayir,,2026-11-09
+JULY_4,Independence Day,2027,US,2027-07-02,2027-07-05,0,milli,genel;yazlik,yuzde_indirim,,sabit:07-04,genel bilgi,hayir,,2026-11-09
+OKUL_DONEMI,Back to school,2027,US,2027-07-20,2027-08-31,0,okul,cocuk;genc;canta;ayakkabi,,,elle,genel bilgi,hayir,,2026-11-09
+OKUL_DONEMI,Okula donus (yaklasik),2027,TR,2027-08-23,2027-09-13,0,okul,cocuk;genc;canta;ayakkabi,,,elle,MEB takviminden dogrulanmali,hayir,,2026-11-09
+LABOR_DAY,Labor Day,2027,US,2027-09-04,2027-09-06,0,milli,genel,yuzde_indirim,,eylul_1_pazartesi,genel bilgi,hayir,,2026-11-09
+SUUDI_MILLI_GUN,Saudi National Day,2027,SA,2027-09-23,2027-09-23,7,milli,genel,yuzde_indirim,,sabit:09-23,genel bilgi,hayir,,2026-11-09

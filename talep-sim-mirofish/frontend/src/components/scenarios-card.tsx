@@ -5,7 +5,7 @@ import { usd } from "@/lib/api";
 const n = (v: number) => v.toLocaleString("tr-TR");
 const signed = (v: number) => `${v > 0 ? "+" : ""}${v.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}`;
 
-/** Lansman -> ilk kampanya sonrası -> stok eritme fiyat planı ve tek fiyatla karşılaştırma. */
+/** Fiyat planı (takvimden ya da lansman -> kampanya -> eritme) ve tek fiyatla karşılaştırma. */
 export function PricePlanCard({ row }: { row: RegionPredictionResult }) {
   const p = row.price_plan;
   if (!p) return null;
@@ -31,7 +31,7 @@ export function PricePlanCard({ row }: { row: RegionPredictionResult }) {
         </thead>
         <tbody>
           <tr className="border-t font-medium">
-            <td className="py-1">Üç aşamalı fiyat planı</td><td>{n(p.total_units)}</td><td>{n(p.leftover_units)}</td>
+            <td className="py-1">Önerilen fiyat planı</td><td>{n(p.total_units)}</td><td>{n(p.leftover_units)}</td>
             <td>{usd(p.total_revenue)}</td><td>{usd(p.total_net_profit)}</td>
           </tr>
           <tr className="border-t">

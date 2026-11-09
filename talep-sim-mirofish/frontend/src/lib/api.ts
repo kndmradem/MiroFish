@@ -56,6 +56,89 @@ export interface Assumptions {
   conversion_ceiling_pct: number;
   competitor_price_usd: Record<string, number>;
   launch_month?: number;
+  calendar_plan?: boolean;
+  calendar_start?: string;
+  discount_steps?: number[];
+  max_campaigns?: number;
+  min_campaign_gap_days?: number;
+  residual_value_pct?: number;
+}
+
+export interface CalendarEvent {
+  code: string;
+  name: string;
+  scope: string;
+  country_only: boolean;
+  kind: string;
+  kind_label: string;
+  date_from: string;
+  date_to: string;
+  day_from: number;
+  day_to: number;
+  window_from_day: number;
+  fit_pct: number;
+  fit_basis: string;
+  fit_n: number;
+  rule_fit_pct: number;
+  lift_low_pct: number;
+  lift_high_pct: number;
+  verified: boolean;
+  source: string;
+  legal_note: string;
+  comments: string[];
+}
+
+export interface CalendarCampaign {
+  event_code: string;
+  event_name: string;
+  day_from: number;
+  day_to: number;
+  date_from: string;
+  date_to: string;
+  discount_pct: number;
+  price: string;
+  purchase_prob_pct: number;
+  units: number;
+  ref_price: string;
+  advertised_discount_pct: number;
+  price_history_days: number;
+}
+
+export interface CalendarPlanOption {
+  key: string;
+  label: string;
+  campaigns: CalendarCampaign[];
+  units: number;
+  units_low: number;
+  units_high: number;
+  leftover_units: number;
+  sell_through_pct: number;
+  revenue: string;
+  net_profit: string;
+  residual_value: string;
+  total_value: string;
+  total_value_low: string;
+  total_value_high: string;
+  recommended: boolean;
+  note: string;
+}
+
+export interface CalendarPlan {
+  start_date: string;
+  horizon_days: number;
+  events: CalendarEvent[];
+  options: CalendarPlanOption[];
+  verdict: string;
+  wait_event?: string | null;
+  wait_share_pct?: number | null;
+  wait_basis: string;
+  wait_n: number;
+  engine: string;
+  engine_note: string;
+  n_plans_evaluated: number;
+  assumptions: string[];
+  warnings: string[];
+  basis: string;
 }
 
 export interface SensitivityRow {
@@ -288,6 +371,7 @@ export interface RegionPredictionResult {
   forecast?: SalesForecast | null;
   price_plan?: PricePlan | null;
   campaigns?: CampaignScenario[];
+  calendar_plan?: CalendarPlan | null;
   sensitivity?: SensitivityRow[];
   break_even?: BreakEven | null;
   confidence?: Confidence | null;

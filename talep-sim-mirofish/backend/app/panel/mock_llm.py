@@ -39,11 +39,22 @@ def fake_showcase(system: str, user: str) -> dict:
             "comment": "deterministik test cevabı"}
 
 
+def fake_calendar(system: str, user: str) -> dict:
+    """Takvim turu cevabı: kişi x etkinlik deterministik 0-3 puan ve bekleme seçimi (anlamsız, akışı sınar)."""
+    letters = re.findall(r"^([A-H])\) ", user, re.M)
+    out = {"fit": {L: _h(system + L + user[-80:]) % 4 for L in letters}, "comment": "deterministik test cevabı"}
+    if '"wait"' in user:
+        out["wait"] = ("hemen", "bekle", "hemen", "almam")[_h(system + "w") % 4]
+    return out
+
+
 def fake_answer(messages: List[dict]) -> dict:
     system = next((m["content"] for m in messages if m["role"] == "system"), "")
     user = next((m["content"] for m in messages if m["role"] == "user"), "")
     if "VİTRİN TURU" in user:
         return fake_showcase(system, user)
+    if "TAKVİM TURU" in user:
+        return fake_calendar(system, user)
     m = re.search(r"\((\d\.\d+)/1\)", system)
     sens = float(m.group(1)) if m else 0.5
     ladder = [float(x.replace(",", "")) for x in re.findall(r"^\d+\) \$([\d,\.]+)", user, re.M)]
