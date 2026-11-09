@@ -26,7 +26,8 @@ DOWN_COOLDOWN_S = 60.0
 
 
 class HybridEngine:
-    def __init__(self, mirofish, panel, fallback_on_error: bool = True):
+    def __init__(self, mirofish, panel, fallback_on_error: bool = True, mirofish_url: str = ""):
+        self.mirofish_url = mirofish_url
         self.mirofish = mirofish
         self.panel = panel
         self.fallback_on_error = fallback_on_error
@@ -67,6 +68,9 @@ class HybridEngine:
                 raise
             reason = f"{type(e).__name__}: {e}"[:300]
             if isinstance(e, (httpx.ConnectError, ConnectionError)) or isinstance(e.__cause__, (httpx.ConnectError, ConnectionError)):
+                url = self.mirofish_url or "MiroFish adresi"
+                reason = (f"MiroFish servisi kapalı ya da ulaşılamıyor ({url}). MiroFish penceresinin (1-mirofish.sh) "
+                          f"açık ve hatasız çalıştığını kontrol edin. Teknik ayrıntı: {reason}")[:400]
                 self._down_until = time.monotonic() + DOWN_COOLDOWN_S
                 self._down_reason = reason
             log.warning("MiroFish %s bölgesinde düştü, panele geçiliyor: %s", region, reason)

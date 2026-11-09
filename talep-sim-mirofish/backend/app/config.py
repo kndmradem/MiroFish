@@ -46,7 +46,7 @@ class Settings:
     panel_llm_model: Optional[str] = field(default_factory=lambda: _env("PANEL_LLM_MODEL"))
 
     # MiroFish backend'i (kendi .env'inde LLM_* ve ZEP_API_KEY tanımlı olmalı)
-    mirofish_url: str = field(default_factory=lambda: _env("MIROFISH_URL", "http://localhost:5101"))
+    mirofish_url: str = field(default_factory=lambda: _env("MIROFISH_URL", "http://127.0.0.1:5101"))
     mirofish_state_file: str = field(default_factory=lambda: _env("MIROFISH_STATE_FILE", ".mirofish_world.json"))
     mirofish_max_rounds: int = field(default_factory=lambda: int(_env("MIROFISH_MAX_ROUNDS", "3")))
     mirofish_interview_timeout: int = field(default_factory=lambda: int(_env("MIROFISH_INTERVIEW_TIMEOUT", "180")))

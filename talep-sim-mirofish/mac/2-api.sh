@@ -2,7 +2,7 @@
 # Pencere 2: Talep simülasyonu API'si (SIM_ENGINE=hybrid: MiroFish + persona paneli), port 8100
 set -euo pipefail
 source "$(dirname "$0")/ortak.sh"
-curl -fs "http://localhost:$MIROFISH_PORT/health" >/dev/null 2>&1 \
+curl -fs "http://127.0.0.1:$MIROFISH_PORT/health" >/dev/null 2>&1 \
   || echo "! Uyarı: MiroFish ($MIROFISH_PORT) henüz cevap vermiyor. Önce 1-mirofish.sh penceresini kontrol et."
 portu_bosalt "$API_PORT"
 cd "$SIM_KOK/backend"

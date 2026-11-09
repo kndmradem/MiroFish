@@ -37,7 +37,7 @@ if [ ! -f "$API_ENV" ]; then
 fi
 env_yaz "$API_ENV" SIM_ENGINE hybrid
 env_yaz "$API_ENV" HYBRID_FALLBACK true
-env_yaz "$API_ENV" MIROFISH_URL "http://localhost:$MIROFISH_PORT"
+env_yaz "$API_ENV" MIROFISH_URL "http://127.0.0.1:$MIROFISH_PORT"
 env_yaz "$API_ENV" CORS_ORIGINS "http://localhost:$PANEL_PORT,http://127.0.0.1:$PANEL_PORT"
 if [ -z "$(env_oku "$API_ENV" VISION_API_KEY)" ]; then
   env_yaz "$API_ENV" VISION_API_KEY ollama

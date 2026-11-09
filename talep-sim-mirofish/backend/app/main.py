@@ -75,7 +75,7 @@ def build_engine(cfg: Settings) -> SimulationEngine:
     if cfg.sim_engine == "hybrid":
         from .services.hybrid_engine import HybridEngine
         return HybridEngine(build_mirofish_engine(cfg, mock), build_panel_engine(cfg, mock),
-                            fallback_on_error=cfg.hybrid_fallback)
+                            fallback_on_error=cfg.hybrid_fallback, mirofish_url=cfg.mirofish_url)
     if cfg.sim_engine != "mirofish":
         return mock
     return build_mirofish_engine(cfg, mock)
@@ -120,7 +120,14 @@ def get_advisor() -> Advisor:
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok", "engine": settings.sim_engine, "vision": settings.vision_enabled, "llm": settings.llm_enabled}
+    mirofish = None
+    if settings.sim_engine in ("hybrid", "mirofish"):
+        try:
+            async with httpx.AsyncClient(timeout=2) as c:
+                mirofish = (await c.get(settings.mirofish_url.rstrip("/") + "/health")).status_code == 200
+        except httpx.HTTPError:
+            mirofish = False
+    return {"status": "ok", "engine": settings.sim_engine, "mirofish_url": settings.mirofish_url, "mirofish_ok": mirofish, "vision": settings.vision_enabled, "llm": settings.llm_enabled}
 
 
 @app.get("/api/panel/status")
@@ -353,7 +360,7 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
     spent = sum((a.quantity * req.unit_cost for a in allocations.values()), Decimal(0))
     unallocated = Decimal(req.total_production_budget) - spent
     used = {s.meta.get("engine", "mock") for s in sims}
-    engine_name = used.pop() if len(used) == 1 else "hybrid"
+    engine_name = "hybrid" if (len(used) > 1 or any(s.meta.get("fallback_from") for s in sims)) else used.pop()
     notes = methodology_notes(engine_name, brand)
     fell_back = [s for s in sims if s.meta.get("fallback_from")]
     if fell_back:
