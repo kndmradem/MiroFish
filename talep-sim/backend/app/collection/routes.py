@@ -9,7 +9,8 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 
 from ..config import settings
-from .importer import IMAGE_EXT, UNSUPPORTED_IMAGE_EXT, ImageInfo, build_preview, ext, read_workbook, template_bytes
+from .importer import (IMAGE_EXT, UNSUPPORTED_IMAGE_EXT, ImageInfo, build_preview, data_uri_image, embedded_images, ext,
+                       read_workbook, template_bytes)
 from .models import (Collection, CollectionResult, ConfirmRequest, ImportPreview, Issue, MetaUpdate, RunOptions, RunStatus,
                      WhatIf)
 from .runner import CollectionRunner
@@ -71,16 +72,21 @@ async def import_collection(sheet: UploadFile = File(..., description="Excel (.x
                             images: List[UploadFile] = File(default_factory=list, description="Görseller ya da zip"),
                             collection_id: Optional[str] = Form(None),
                             kind: str = Form("koleksiyon", description="koleksiyon ya da bagimsiz (aynı şablon)"),
+                            variants: str = Form("model", description="Aynı SKU'nun renk satırları: model (birleştir) ya da renk (ayrı ürün)"),
                             store: CollectionStore = Depends(get_store)) -> ImportPreview:
     """Excel + görselleri alır, eşleştirir ve önizleme döner. Koleksiyon onaylanana kadar kaydedilmez
     (görseller taslak klasörüne yazılır). collection_id verilirse aynı taslağa yeni dosyalar eklenir."""
     if kind not in ("koleksiyon", "bagimsiz"):
         raise HTTPException(422, "kind koleksiyon ya da bagimsiz olmalı")
+    if variants not in ("model", "renk"):
+        raise HTTPException(422, "variants model ya da renk olmalı")
     name = sheet.filename or "liste.xlsx"
     if not name.lower().endswith((".xlsx", ".xlsm", ".csv")):
         raise HTTPException(422, "Ürün listesi .xlsx ya da .csv olmalı (eski .xls biçimini Excel'de .xlsx olarak kaydedin)")
+    raw = await sheet.read()
     try:
-        book = read_workbook(await sheet.read(), name)
+        book = read_workbook(raw, name)
+        found = embedded_images(raw) if not name.lower().endswith(".csv") else {}
     except Exception as e:
         raise HTTPException(422, f"Excel okunamadı: {type(e).__name__}: {e}")
     cid = collection_id or store.new_id()
@@ -120,11 +126,27 @@ async def import_collection(sheet: UploadFile = File(..., description="Excel (.x
         else:
             add(fname, data)
 
+    # Excel'e gömülü görseller ve hücredeki data URI görseller: satır numarasıyla saklanır, ürüne satırından bağlanır
+    embedded: dict = {}
+    for title, sh in book.items():
+        for rowno, row in sh.rows:
+            for v in row:
+                d = data_uri_image(v)
+                if d:
+                    found.setdefault(title, {}).setdefault(rowno, []).append(d)
+    for ti, (title, rows) in enumerate(found.items()):
+        for rowno, imgs in rows.items():
+            for k, (data, fmt) in enumerate(imgs):
+                rel = f"excel-gorsel/s{ti + 1}-satir{rowno}" + (f"-{k + 1}" if k else "") + f".{fmt if fmt in ('png', 'jpg', 'webp') else 'png'}"
+                if len(data) <= MAX_IMAGE_BYTES:
+                    store.save_image(cid, rel, data)
+                    embedded.setdefault(title, {}).setdefault(rowno, []).append(rel)
+
     infos = []
     for rel in store.list_images(cid):
         d = _dims(store.image_path(cid, rel).read_bytes())
         infos.append(ImageInfo(rel, *(d or (None, None))))
-    prev = build_preview(cid, book, infos, kind)
+    prev = build_preview(cid, book, infos, kind, embedded, variants)
     prev.issues = skipped + prev.issues
     store.save_preview(prev)
     return prev

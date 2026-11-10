@@ -32,13 +32,14 @@ export function ImportStep({ kind, onSaved }: { kind: Kind; onSaved: (c: Collect
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const [variants, setVariants] = useState<"model" | "renk">("model");
 
   async function upload(extraOnly = false) {
     if (!sheet) return;
     setBusy(true);
     setError(null);
     try {
-      setPreview(await importCollection(sheet, images, extraOnly ? preview?.collection_id : undefined, kind));
+      setPreview(await importCollection(sheet, images, extraOnly ? preview?.collection_id : undefined, kind, variants));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -52,7 +53,7 @@ export function ImportStep({ kind, onSaved }: { kind: Kind; onSaved: (c: Collect
         <CardHeader>
           <CardTitle className="text-base">1. {kind === "bagimsiz" ? "Ürünleri yükle" : "Koleksiyonu yükle"}</CardTitle>
           <CardDescription>
-            Ürün bilgilerinin olduğu Excel ile görselleri birlikte yükleyin. Excel&apos;de her ürün için ürün adı, SKU, kategori,
+            Ürün bilgilerinin olduğu Excel ile görselleri birlikte yükleyin. Görseller Excel&apos;in içine gömülüyse (ERP dışa aktarımı gibi) ayrıca yüklemeye gerek yok. Excel&apos;de her ürün için ürün adı, SKU, kategori,
             ürün içeriği (kumaş/kompozisyon) ve maliyet fiyatı olmalı; satış fiyatı yazılmaz, sistem önerir. Görseller dosya adındaki
             SKU ile ya da Excel&apos;deki görsel sütunuyla eşleşir. Hiçbir şey onayınız olmadan kaydedilmez.{" "}
             <a className="inline-flex items-center gap-1 underline" href={templateUrl}><Download className="size-3" />Toplu yükleme şablonu (koleksiyon ve bağımsız ürünler için aynı)</a>
@@ -70,7 +71,7 @@ export function ImportStep({ kind, onSaved }: { kind: Kind; onSaved: (c: Collect
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => { e.preventDefault(); setImages(Array.from(e.dataTransfer.files)); }}>
             <Images className="size-7" />
-            <span>{images.length ? <b className="text-foreground">{images.length} dosya seçildi</b> : "Görseller (JPG, PNG, WEBP ya da zip)"}</span>
+            <span>{images.length ? <b className="text-foreground">{images.length} dosya seçildi</b> : "Görseller (JPG, PNG, WEBP ya da zip). Görseller Excel'e gömülüyse gerek yok."}</span>
             <div className="flex flex-wrap justify-center gap-2">
               <label className="cursor-pointer rounded-md border bg-background px-2 py-1 text-xs text-foreground hover:bg-muted">
                 Dosya seç
@@ -86,6 +87,14 @@ export function ImportStep({ kind, onSaved }: { kind: Kind; onSaved: (c: Collect
               </label>
             </div>
           </div>
+          <label className="flex flex-wrap items-center gap-2 text-sm md:col-span-2">
+            Aynı ürün kodunun renk satırları:
+            <select className="h-8 rounded-md border bg-background px-2 text-sm" value={variants}
+              onChange={(e) => setVariants(e.target.value as "model" | "renk")}>
+              <option value="model">model bazında tek ürün (renkler ürünün altında)</option>
+              <option value="renk">her renk ayrı ürün (renk bazında karar, süre artar)</option>
+            </select>
+          </label>
           <div className="flex items-center gap-3 md:col-span-2">
             <Button onClick={() => upload()} disabled={!sheet || busy}>
               {busy && <Loader2 className="size-4 animate-spin" />}Yükle ve kontrol et

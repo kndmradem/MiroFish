@@ -225,9 +225,11 @@ export const imageUrl = (cid: string, path: string) =>
   `${API_URL}/api/collections/${cid}/images/${path.split("/").map(encodeURIComponent).join("/")}`;
 
 /** Klasörden seçilen dosyalarda göreli yol (klasör/dosya) korunur; böylece SKU adlı klasörler eşleşir. */
-export async function importCollection(sheet: File, images: File[], collectionId?: string, kind: Kind = "koleksiyon"): Promise<ImportPreview> {
+export async function importCollection(sheet: File, images: File[], collectionId?: string, kind: Kind = "koleksiyon",
+  variants: "model" | "renk" = "model"): Promise<ImportPreview> {
   const fd = new FormData();
   fd.append("kind", kind);
+  fd.append("variants", variants);
   fd.append("sheet", sheet, sheet.name);
   for (const f of images) {
     const rel = (f as File & { webkitRelativePath?: string }).webkitRelativePath;

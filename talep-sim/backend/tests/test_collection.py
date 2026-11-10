@@ -540,3 +540,68 @@ def test_api_independent_items_each_get_own_panel(client, monkeypatch):
     assert res["kind"] == "bagimsiz" and all(i["decision"] in ("üret", "azalt", "üretme") for i in res["items"])
     assert all(i["recommended_price"]["value"] for i in res["items"])
     assert client.get(f"/api/collections/{cid}/export.xlsx").status_code == 200
+
+
+# ---------- Excel'e gömülü görseller ve renk satırları ----------
+
+def _xlsx_with_embedded(rows, headers, img_col=8):
+    from openpyxl.drawing.image import Image as XLImage
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Sheet"
+    ws.append(headers)
+    for i, r in enumerate(rows, start=2):
+        ws.append(r)
+        if r[img_col] is None:
+            pic = XLImage(io.BytesIO(png(134, 202, (10 * i, 80, 120))))
+            ws.add_image(pic, f"{chr(65 + img_col)}{i}")
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+ERP_HEADERS = ["Ürün Tipi Açıklması", "Ürün Kodu", "Ürün Adı", None, "Renk Kodu", "Renk Açıklaması", "Beden", "Birim Cinsi (1)",
+               "ColorPhoto_Data Uri", "Model Cinsi Açıklama", "Alt Kategori Açıklama", "Sezon Açıklama", "Yıl Açıklama",
+               "Ürün Cinsi Açıklama", "Kumaş Tipi Açıklama", "Kumaş İçeriği", "Maliyet"]
+
+
+def _erp_rows():
+    import base64 as b64
+    uri = "data:image/png;base64," + b64.b64encode(png(300, 400)).decode()
+    return [
+        ["Ürün", "ST1", "Fine Rib Body", None, "012", "BLACK", "S, M, L", "AD", None, "BODY", "TRENDY", "KIŞ", "2027", "BODY", "ÖRME", "%86 Modal %14 Elastan", 1013],
+        ["Ürün", "ST1", "Fine Rib Body", None, "019", "BROWN", "S, M, L", "AD", None, "BODY", "TRENDY", "KIŞ", "2027", "BODY", "ÖRME", "%86 Modal %14 Elastan", 1013],
+        ["Ürün", "WS2", "Campus Bra", None, "020", "BURGUNDY", "75, 80", "AD", uri, "ÜÇGEN BRA", "TRENDY", "KIŞ", "2027", "SUTYEN", "ÖRME", "%48 Pamuk", 361],
+    ]
+
+
+def test_api_reads_images_embedded_in_excel_and_merges_colors(client):
+    data = _xlsx_with_embedded(_erp_rows(), ERP_HEADERS)
+    r = client.post("/api/collections/import", files=[("sheet", ("CardProduct.xlsx", data, "application/octet-stream"))])
+    assert r.status_code == 200, r.text
+    prev = r.json()
+    items = {p["item"]["sku"]: p for p in prev["items"]}
+    assert set(items) == {"ST1", "WS2"}                                       # renk satırları modelde birleşti
+    st1 = items["ST1"]["item"]
+    assert st1["colors"] == ["BLACK", "BROWN"] and len(st1["images"]) == 2 and items["ST1"]["match_rule"] == "Excel'e gömülü"
+    assert st1["category"] == "BODY" and st1["unit_cost"] == 1013 and st1["technical_specs"].startswith("%86")
+    assert st1["attributes"]["Kumaş tipi"] == "ÖRME" and st1["attributes"]["Alt Kategori"] == "TRENDY"
+    assert items["WS2"]["item"]["images"] and items["WS2"]["item"]["subcategory"] == "ÜÇGEN BRA"   # data URI hücresi
+    assert prev["meta"]["season"] == "KIŞ 2027" and not prev["orphans"]
+    assert any("Görsel küçük" in i["message"] for i in prev["issues"])
+    cid = prev["collection_id"]
+    assert client.get(f"/api/collections/{cid}/images/{st1['images'][0]}").status_code == 200
+    col = client.post(f"/api/collections/{cid}/confirm", json={"meta": prev["meta"], "items": [p["item"] for p in prev["items"]]}).json()
+    assert len(col["items"]) == 2 and all(i["images"] for i in col["items"])
+
+    # her renk ayrı ürün
+    r2 = client.post("/api/collections/import", data={"variants": "renk"},
+                     files=[("sheet", ("CardProduct.xlsx", data, "application/octet-stream"))]).json()
+    assert sorted(p["item"]["sku"] for p in r2["items"]) == ["ST1-012", "ST1-019", "WS2"]
+    assert all(len(p["item"]["images"]) == 1 for p in r2["items"])
+
+    # aynı SKU ile yüklenen büyük görsel gömülü olanın yerine geçer
+    r3 = client.post("/api/collections/import", files=[("sheet", ("CardProduct.xlsx", data, "application/octet-stream")),
+                                                       ("images", ("ST1_on.jpg", png(1200, 1600), "image/jpeg"))]).json()
+    st = next(p for p in r3["items"] if p["item"]["sku"] == "ST1")
+    assert st["item"]["images"] == ["ST1_on.jpg"] and st["match_rule"] == "dosya adı = SKU"
