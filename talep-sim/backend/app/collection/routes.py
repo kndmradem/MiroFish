@@ -309,6 +309,27 @@ async def export(cid: str, store: CollectionStore = Depends(get_store)) -> Respo
             x = reg.get(r)
             row += [x.demand, round(x.optimal_price * rate, 2), x.net_margin_pct, x.return_pct, it.qty_by_region.get(r)] if x else [None] * 5
         ws.append(row)
+    if any(it.colors for it in res.items):
+        cp = res.color_plan
+        rs = wb.create_sheet("Renkler")
+        basis = cp.source if cp else "kural varsayımı"
+        ch = ["SKU", "Ürün", "Model kararı", "Renk", "Renk kodu", "Renk ailesi", f"Pay % ({basis})", "Renk kararı",
+              "Karar kaynağı", "Gerekçe (dayanak)", "Adet"] + [f"{r} adet" for r in res.regions]
+        rs.append(ch)
+        for c in rs[1]:
+            c.font = Font(bold=True)
+        for it in res.items:
+            for c in it.colors:
+                rs.append([it.sku, it.name, it.decision or "", c.color, c.code, c.family_label, c.share.value, c.decision or "",
+                           c.decision_source if c.decision else "", "; ".join(f"{x.text} ({x.basis})" for x in c.reasons), c.qty]
+                          + [c.qty_by_region.get(r) for r in res.regions])
+        if cp:
+            rs.append([])
+            rs.append(["Renk ailesi", "Model", "Renk", "Adet", "Koleksiyon payı %"] + [f"{r} adet" for r in res.regions])
+            for f in cp.families:
+                rs.append([f.label, f.n_models, f.n_colors, f.qty, f.share_pct] + [f.by_region.get(r) for r in res.regions])
+            rs.append([])
+            rs.append([cp.source_note])
     notes = wb.create_sheet("Notlar")
     for a in res.summary.actions:
         notes.append([a.kind, a.text, a.basis])

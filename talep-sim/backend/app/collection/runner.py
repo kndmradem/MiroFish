@@ -64,7 +64,7 @@ def item_specs(it: CollectionItem) -> str:
 
 
 def input_hash(it: CollectionItem, regions, brand: Optional[str], image_digest: str, kind: str = "koleksiyon") -> str:
-    parts = [it.model_dump(exclude={"planned_price", "planned_qty", "declared_role", "moq"}), sorted(regions), brand or "", image_digest]
+    parts = [it.model_dump(exclude={"planned_price", "planned_qty", "declared_role", "moq", "color_images"}), sorted(regions), brand or "", image_digest]
     if kind != "koleksiyon":    # tür değişirse panel değişir (ortak panel / ürün başına panel), ürün yeniden sorulur
         parts.append(kind)
     payload = json.dumps(parts, sort_keys=True, ensure_ascii=False, default=str)

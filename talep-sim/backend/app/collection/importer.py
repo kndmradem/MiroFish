@@ -90,6 +90,7 @@ META_ALIASES: Dict[str, List[str]] = {
     "launch_month": ["lansman ayi", "lansman ayı", "lansman_ayi"],
     "usd_try_rate": ["usd try kuru", "kur", "usd_try", "usd/try"],
     "notes": ["notlar", "not", "notes"],
+    "color_min_qty": ["renk min adet", "renk_min_adet", "renk basina minimum adet", "renk başına minimum adet", "renk minimum adet"],
 }
 ROLE_MAP = {"hero": "hero", "cekirdek": "çekirdek", "core": "çekirdek", "temel": "çekirdek",
             "tamamlayici": "tamamlayıcı", "complement": "tamamlayıcı", "destek": "tamamlayıcı",
@@ -254,6 +255,12 @@ def parse_meta(sheet: Optional[Sheet], issues: List[Issue]) -> CollectionMeta:
     for f in ("brand", "brand_notes", "season", "notes"):
         if _str(vals.get(f)):
             d[f] = _str(vals[f])
+    try:
+        n = _num(vals.get("color_min_qty"))
+        if n is not None and n >= 1:
+            d["color_min_qty"] = int(n)
+    except ValueError:
+        issues.append(Issue(level="uyarı", message=f"Koleksiyon sayfası: renk_min_adet sayı değil ({vals.get('color_min_qty')!r})"))
     for f in ("total_budget", "usd_try_rate"):
         try:
             n = _num(vals.get(f))
@@ -488,6 +495,7 @@ def build_preview(collection_id: str, book: Dict[str, Sheet], images: List[Image
                              issues=issues, counts={"rows": 0, "images": len(images)})
     parsed, colmap, ignored = parse_items(items_sheet, issues)
     row_imgs = (embedded or {}).get(items_sheet.title, {})
+    row_color = {r: ((it.colors[0] if it.colors else "") or it.attributes.get("Renk kodu", "")) for r, it, _ in parsed}
     grouped = group_variants(parsed, variants, issues)
     parsed = [(r, it, p) for r, it, p, _ in grouped]
     rows_of = {id(it): rows for _, it, _, rows in grouped}
@@ -535,8 +543,12 @@ def build_preview(collection_id: str, book: Dict[str, Sheet], images: List[Image
         imgs = matched.get(it.sku, []) if it.sku else []
         rule_it = rule.get(it.sku, "")
         emb = [p for r in rows_of.get(id(it), [rowno]) for p in row_imgs.get(r, [])]
+        cimg: Dict[str, str] = {}
         if emb and not imgs:
             imgs, rule_it = emb, "Excel'e gömülü"
+            for r in rows_of.get(id(it), [rowno]):
+                if row_color.get(r) and row_imgs.get(r):
+                    cimg.setdefault(row_color[r], row_imgs[r][0])
         if it.images and rule.get(it.sku) != "Excel görsel sütunu":
             warns.append("Excel'de yazılı görsel adları yüklenen dosyalarda bulunamadı")
         cands = ambiguous.get(it.sku, []) if it.sku else []
@@ -562,7 +574,7 @@ def build_preview(collection_id: str, book: Dict[str, Sheet], images: List[Image
             d = small[0][1]
             warns.append(f"{len(small)} görsel küçük (ör. {d.width}x{d.height}px); görsel model ayrıntıyı zor seçer, "
                          "büyük görsel aynı SKU adıyla yüklenirse o kullanılır")
-        item = it.model_copy(update={"images": imgs})
+        item = it.model_copy(update={"images": imgs, "color_images": cimg} if cimg else {"images": imgs})
         status = "hata" if errs else "belirsiz" if (cands and not imgs) else "uyarı" if warns else "ok"
         for e in errs:
             issues.append(Issue(level="hata", sku=it.sku or None, row=rowno, message=e))
@@ -649,6 +661,8 @@ def template_bytes() -> bytes:
         "4) Büyük/küçük harf, uzantı ve Türkçe karakter farkı önemsizdir. Başlıklar esnek okunur (ör. 'Model kodu' = sku).",
         "5) Yüklemeden sonra önizleme ekranı eşleşmeyen satırları ve görselleri gösterir; onaysız hiçbir şey kaydedilmez.",
         "Para birimi TRY ya da USD.",
+        "renk_min_adet (isteğe bağlı): renk başına en az üretim adedi (boya partisi). Boşsa 300 varsayılır (kural varsayımı).",
+        "renkler: modelin renkleri virgülle (ör. siyah, pembe) ya da ERP çıktısındaki gibi her renk ayrı satırda aynı SKU ile.",
         "hedef_rol (koleksiyon): hero / çekirdek / tamamlayıcı / deneme. Tasarımcının niyetidir; panel sonucuyla karşılaştırılır.",
         "kombin_grubu (koleksiyon): birlikte satılması düşünülen ürünler için aynı ad.",
         "ek_ozellikler: anahtar=değer; ile ayırarak (ör. yaka=klasik; kol=uzun).",
@@ -659,7 +673,7 @@ def template_bytes() -> bytes:
 
     meta = wb.create_sheet("Genel bilgi")
     header(meta, ["koleksiyon_adi", "marka", "sezon", "toplam_butce", "para_birimi", "hedef_bolgeler", "kanal",
-                  "lansman_ayi", "notlar"],
+                  "lansman_ayi", "notlar", "renk_min_adet"],
            {"para_birimi", "hedef_bolgeler"}, {"koleksiyon_adi"})
     meta.append(["SS27 Ana Koleksiyon", "Örnek Marka", "İlkbahar-Yaz 2027", 2500000, "TRY", "TR, EU", "online", 3, "örnek satır"])
     dv = DataValidation(type="list", formula1='"online,mağaza"')

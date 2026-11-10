@@ -605,3 +605,88 @@ def test_api_reads_images_embedded_in_excel_and_merges_colors(client):
                                                        ("images", ("ST1_on.jpg", png(1200, 1600), "image/jpeg"))]).json()
     st = next(p for p in r3["items"] if p["item"]["sku"] == "ST1")
     assert st["item"]["images"] == ["ST1_on.jpg"] and st["match_rule"] == "dosya adı = SKU"
+
+
+# ---------- renk bazlı plan ----------
+
+def _color_col(budget=100_000.0):
+    col = _col(3, budget)
+    col.items[0].colors = ["BLACK", "PINK"]
+    col.items[0].attributes["Renk kodu"] = "001, 045"
+    col.items[1].colors = ["Pembe"]
+    col.items[2].colors = ["siyah", "lacivert", "lila"]
+    return col
+
+
+def _same_results(n=3):
+    return {f"S{i}": _resp({"TR": [60 + i, 61, 62]}, demand=65, demand_units=800) for i in range(n)}
+
+
+def test_color_shares_follow_rule_weights_and_keep_model_total():
+    from app.collection import colors as cl
+    t = cl.family_table()
+    assert t.family("BLACK") == "siyah" and t.family("Off White") == "beyaz" and t.family("Kırmızı") == "kirmizi"
+    assert t.family("NAVY BLUE") == "lacivert" and t.family("XYZ-12") == "diger"
+    res = summarize(_color_col(), _same_results(), 42.0, whatif=WhatIf(color_min_qty=1))
+    s0 = next(i for i in res.items if i.sku == "S0")
+    black, pink = s0.colors
+    assert black.code == "001" and black.share.basis == "kural varsayımı"
+    assert black.share.value > pink.share.value and abs(black.share.value + pink.share.value - 100) < 0.2
+    assert black.qty + pink.qty == int(s0.recommended_qty.value)          # model adedi renklere eksiksiz bölünür
+    assert res.color_plan and res.color_plan.source == "kural varsayımı" and {"siyah", "pembe", "lacivert", "mor"} == {f.family for f in res.color_plan.families}
+    assert sum(f.qty for f in res.color_plan.families) == res.summary.total_qty
+
+
+def test_color_mix_moves_model_qty_and_can_be_turned_off():
+    col = _color_col()
+    on = summarize(col, _same_results(), 42.0)
+    off = summarize(col, _same_results(), 42.0, whatif=WhatIf(color_mix=False))
+    q = lambda r, s: next(i for i in r.items if i.sku == s).recommended_qty.value
+    s1 = next(i for i in on.items if i.sku == "S1")
+    assert s1.color_mix and s1.color_mix.value < 1                         # yalnız pembe: zayıf renk karışımı
+    assert q(on, "S1") < q(off, "S1")
+    assert all(i.color_mix is None for i in off.items) and not off.color_plan.mix_effect
+
+
+def test_color_below_min_qty_is_dropped_and_qty_moves_to_other_colors():
+    res = summarize(_color_col(budget=30_000.0), _same_results(), 42.0, whatif=WhatIf(color_min_qty=400))
+    s2 = next(i for i in res.items if i.sku == "S2")
+    by = {c.color: c for c in s2.colors}
+    assert by["lila"].decision == "üretme" and by["lila"].qty == 0
+    assert any("minimum 400" in r.text for r in by["lila"].reasons)
+    assert sum(c.qty for c in s2.colors) == int(s2.recommended_qty.value)
+    assert any(a.kind == "renk" and "lila" in a.text for a in res.summary.actions)
+    # kullanıcı rengi elle tutabilir
+    kept = summarize(_color_col(budget=30_000.0), _same_results(), 42.0,
+                     whatif=WhatIf(color_min_qty=400, color_decisions={"S2::lila": "üret"}))
+    lila = next(c for c in next(i for i in kept.items if i.sku == "S2").colors if c.color == "lila")
+    assert lila.decision == "üret" and lila.decision_source == "kullanıcı" and lila.qty > 0
+
+
+def test_color_shares_come_from_erp_when_file_is_given(tmp_path, monkeypatch):
+    p = tmp_path / "renk.csv"
+    p.write_text("kategori;renk;adet\nElbise;PEMBE;900\nElbise;SİYAH;100\n", encoding="utf-8")
+    monkeypatch.setenv("RENK_ERP_DOSYASI", str(p))
+    res = summarize(_color_col(), _same_results(), 42.0, whatif=WhatIf(color_min_qty=1))
+    s0 = next(i for i in res.items if i.sku == "S0")
+    black, pink = s0.colors
+    assert black.share.basis == "ERP" and pink.share.value > black.share.value   # geçmişte pembe daha çok satmış
+    assert res.color_plan.source == "ERP"
+
+
+def test_import_keeps_color_image_per_color_row(client):
+    data = _xlsx_with_embedded(_erp_rows(), ERP_HEADERS)
+    prev = client.post("/api/collections/import", files=[("sheet", ("CardProduct.xlsx", data, "application/octet-stream"))]).json()
+    st1 = next(p["item"] for p in prev["items"] if p["item"]["sku"] == "ST1")
+    assert set(st1["color_images"]) == {"BLACK", "BROWN"} and st1["color_images"]["BLACK"] != st1["color_images"]["BROWN"]
+    cid = prev["collection_id"]
+    meta = dict(prev["meta"], total_budget=2_000_000, currency="TRY", target_regions=["TR"], color_min_qty=50)
+    client.post(f"/api/collections/{cid}/confirm", json={"meta": meta, "items": [p["item"] for p in prev["items"]]})
+    assert client.post(f"/api/collections/{cid}/run", json={"showcase": False}).status_code == 200
+    assert not _wait(client, cid)["failed"]
+    res = client.get(f"/api/collections/{cid}/result").json()
+    st = next(i for i in res["items"] if i["sku"] == "ST1")
+    assert [c["color"] for c in st["colors"]] == ["BLACK", "BROWN"] and st["colors"][0]["image"]
+    assert res["color_plan"]["min_qty"] == 50 and res["color_plan"]["min_qty_basis"] == "kullanıcı girdisi"
+    wb = load_workbook(io.BytesIO(client.get(f"/api/collections/{cid}/export.xlsx").content))
+    assert wb["Renkler"]["D2"].value == "BLACK"

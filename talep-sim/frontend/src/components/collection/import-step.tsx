@@ -188,6 +188,9 @@ function PreviewStep({ kind, preview, onSaved }: { kind: Kind; preview: ImportPr
               onChange={(e) => setMeta({ ...meta, channel: e.target.value as "online" | "store" })}>
               <option value="online">Online</option><option value="store">Mağaza</option>
             </select></div>
+          <div className="grid gap-1"><Label>Renk başına minimum adet</Label>
+            <Input type="number" min={1} placeholder="300 (varsayım)" value={meta.color_min_qty ?? ""}
+              onChange={(e) => setMeta({ ...meta, color_min_qty: e.target.value ? Math.max(1, Number(e.target.value)) : null })} /></div>
           <div className="md:col-span-4">
             <BrandPanel brand={meta.brand ?? ""} notes={meta.brand_notes ?? ""} profile={meta.brand_profile ?? null}
               onBrand={(v) => setMeta((m) => ({ ...m, brand: v || null }))}

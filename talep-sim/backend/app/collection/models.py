@@ -11,6 +11,7 @@ DeclaredRole = Literal["hero", "çekirdek", "tamamlayıcı", "deneme"]
 Currency = Literal["TRY", "USD"]
 Kind = Literal["koleksiyon", "bagimsiz"]
 Decision = Literal["üret", "azalt", "üretme"]
+ColorDecision = Literal["üret", "üretme"]
 
 
 class CollectionItem(BaseModel):
@@ -30,6 +31,7 @@ class CollectionItem(BaseModel):
     launch_month: Optional[int] = Field(None, ge=1, le=12)
     moq: Optional[int] = None
     attributes: Dict[str, str] = Field(default_factory=dict)
+    color_images: Dict[str, str] = Field(default_factory=dict, description="Renk -> o rengin görseli (Excel'de renk satırına gömülü)")
 
 
 class CollectionMeta(BaseModel):
@@ -47,6 +49,7 @@ class CollectionMeta(BaseModel):
     launch_month: Optional[int] = Field(None, ge=1, le=12)
     usd_try_rate: Optional[float] = Field(None, gt=0)
     notes: str = ""
+    color_min_qty: Optional[int] = Field(None, ge=1, description="Renk başına minimum üretim adedi (boş: kural varsayımı)")
 
 
 class Issue(BaseModel):
@@ -146,6 +149,9 @@ class WhatIf(BaseModel):
     total_budget: Optional[float] = None
     allocation_objective: Optional[Literal["balanced", "profit", "blended"]] = None
     decisions: Dict[str, Decision] = Field(default_factory=dict, description="SKU -> kullanıcının elle verdiği üretim kararı")
+    color_min_qty: Optional[int] = Field(None, ge=1, description="Renk başına minimum adet denemesi")
+    color_mix: Optional[bool] = Field(None, description="Renk karışımının model adedine etkisi açık/kapalı (varsayılan açık)")
+    color_decisions: Dict[str, ColorDecision] = Field(default_factory=dict, description="'SKU::renk' -> elle verilen renk kararı")
 
 
 # ---------- Sonuç ----------
@@ -221,6 +227,44 @@ class Reason(BaseModel):
     basis: Basis
 
 
+class ColorLine(BaseModel):
+    """Modelin bir rengi: talep payı, adet ve renk kararı."""
+    color: str
+    code: str = ""
+    family: str
+    family_label: str
+    image: Optional[str] = None
+    share: Metric = Field(..., description="Modelin adedi içindeki pay (%)")
+    qty: Optional[int] = None
+    qty_by_region: Dict[str, int] = Field(default_factory=dict)
+    decision: Optional[ColorDecision] = None
+    decision_source: Literal["sistem", "kullanıcı"] = "sistem"
+    reasons: List[Reason] = Field(default_factory=list)
+
+
+class ColorFamilySummary(BaseModel):
+    family: str
+    label: str
+    n_models: int
+    n_colors: int
+    qty: int
+    share_pct: float
+    by_region: Dict[str, int] = Field(default_factory=dict)
+    skus: List[str] = Field(default_factory=list)
+
+
+class ColorPlan(BaseModel):
+    source: Basis
+    source_note: str
+    min_qty: int
+    min_qty_basis: Basis
+    mix_effect: bool
+    n_colors: int
+    n_dropped: int
+    families: List[ColorFamilySummary] = Field(default_factory=list)
+    weights: Dict[str, float] = Field(default_factory=dict, description="Renk ailesi -> kural ağırlığı ya da ERP payı")
+
+
 class ItemResult(BaseModel):
     sku: str
     name: str
@@ -248,6 +292,8 @@ class ItemResult(BaseModel):
     flags: List[str] = Field(default_factory=list)
     failed_regions: List[str] = Field(default_factory=list)
     showcase: Optional[ShowcaseItem] = None
+    colors: List[ColorLine] = Field(default_factory=list)
+    color_mix: Optional[Metric] = Field(None, description="Renk karışımının model adedine çarpanı")
 
 
 class ReachPoint(BaseModel):
@@ -278,7 +324,7 @@ class CategorySummary(BaseModel):
 
 
 class Action(BaseModel):
-    kind: Literal["üretme", "azalt", "çıkar", "fiyat", "kanibalizasyon", "derinlik", "eksik", "veri", "kombin", "vitrin"]
+    kind: Literal["üretme", "azalt", "çıkar", "renk", "fiyat", "kanibalizasyon", "derinlik", "eksik", "veri", "kombin", "vitrin"]
     text: str
     skus: List[str] = Field(default_factory=list)
     basis: Basis
@@ -318,3 +364,4 @@ class CollectionResult(BaseModel):
     brand_profile: Optional[BrandProfile] = None
     brand_effect: Optional[BrandEffect] = None
     showcase: Optional[ShowcaseSummary] = None
+    color_plan: Optional[ColorPlan] = None
