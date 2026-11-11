@@ -28,6 +28,7 @@ export interface CollectionItem {
   launch_month: number | null;
   moq: number | null;
   attributes: Record<string, string>;
+  color_images?: Record<string, string>;
 }
 
 export interface CollectionMeta {
@@ -44,6 +45,7 @@ export interface CollectionMeta {
   launch_month: number | null;
   usd_try_rate: number | null;
   notes: string;
+  color_min_qty?: number | null;
 }
 
 export interface Issue { level: "hata" | "uyarı" | "bilgi"; sku: string | null; row: number | null; message: string }
@@ -125,6 +127,20 @@ export interface ItemResult {
   flags: string[];
   failed_regions: string[];
   showcase: ShowcaseItem | null;
+  colors: ColorLine[];
+  color_mix: Metric | null;
+}
+
+export type ColorDecision = "üret" | "üretme";
+export interface ColorLine {
+  color: string; code: string; family: string; family_label: string; image: string | null;
+  share: Metric; qty: number | null; qty_by_region: Record<string, number>;
+  decision: ColorDecision | null; decision_source: "sistem" | "kullanıcı"; reasons: Reason[];
+}
+export interface ColorFamilySummary { family: string; label: string; n_models: number; n_colors: number; qty: number; share_pct: number; by_region: Record<string, number>; skus: string[] }
+export interface ColorPlan {
+  source: Basis; source_note: string; min_qty: number; min_qty_basis: Basis; mix_effect: boolean;
+  n_colors: number; n_dropped: number; families: ColorFamilySummary[]; weights: Record<string, number>;
 }
 
 export interface ShowcaseItem { shown: number; best: number; worst: number; score: number; best_pct: number; worst_pct: number; rank: number; single_rank: number | null; together: number }
@@ -201,6 +217,7 @@ export interface CollectionResult {
   panel_shared: boolean;
   brand_effect: BrandEffect | null;
   showcase: ShowcaseSummary | null;
+  color_plan: ColorPlan | null;
 }
 
 export interface WhatIf {
@@ -209,6 +226,9 @@ export interface WhatIf {
   total_budget?: number | null;
   allocation_objective?: "balanced" | "profit" | "blended";
   decisions?: Record<string, Decision>;
+  color_min_qty?: number | null;
+  color_mix?: boolean | null;
+  color_decisions?: Record<string, ColorDecision>;
 }
 
 async function json<T>(res: Response): Promise<T> {
@@ -226,9 +246,11 @@ export const imageUrl = (cid: string, path: string) =>
   `${API_URL}/api/collections/${cid}/images/${path.split("/").map(encodeURIComponent).join("/")}`;
 
 /** Klasörden seçilen dosyalarda göreli yol (klasör/dosya) korunur; böylece SKU adlı klasörler eşleşir. */
-export async function importCollection(sheet: File, images: File[], collectionId?: string, kind: Kind = "koleksiyon"): Promise<ImportPreview> {
+export async function importCollection(sheet: File, images: File[], collectionId?: string, kind: Kind = "koleksiyon",
+  variants: "model" | "renk" = "model"): Promise<ImportPreview> {
   const fd = new FormData();
   fd.append("kind", kind);
+  fd.append("variants", variants);
   fd.append("sheet", sheet, sheet.name);
   for (const f of images) {
     const rel = (f as File & { webkitRelativePath?: string }).webkitRelativePath;

@@ -14,9 +14,10 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   DECISION_CLASS, DECISION_LABEL, exportUrl, imageUrl, money, ROLE_CLASS, ROLE_LABEL, whatIf,
-  type Basis, type CollectionResult, type Decision, type ItemResult, type Metric, type WhatIf,
+  type Basis, type CollectionResult, type ColorDecision, type Decision, type ItemResult, type Metric, type WhatIf,
 } from "@/lib/collection-api";
 import { cn } from "@/lib/utils";
+import { ColorStrip, ColorsTab, ColorTable } from "./colors";
 
 const ReactECharts = dynamic(() => import("echarts-for-react"), { ssr: false });
 
@@ -42,7 +43,7 @@ function Tile({ label, value, sub, m }: { label: string; value: string; sub?: st
   );
 }
 
-const TABS = ["Özet", "Ürünler", "Vitrin", "Bölgeler", "Fiyat", "Bütçe"] as const;
+const TABS = ["Özet", "Ürünler", "Renkler", "Vitrin", "Bölgeler", "Fiyat", "Bütçe"] as const;
 type Tab = (typeof TABS)[number];
 const DECISIONS: Decision[] = ["üret", "azalt", "üretme"];
 
@@ -62,9 +63,10 @@ export function CollectionResults({ base }: { base: CollectionResult }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const active = !!(scenario.exclude?.length || Object.keys(scenario.planned_prices ?? {}).length || scenario.total_budget != null
-    || scenario.allocation_objective || Object.keys(scenario.decisions ?? {}).length);
+    || scenario.allocation_objective || Object.keys(scenario.decisions ?? {}).length
+    || scenario.color_min_qty != null || scenario.color_mix != null || Object.keys(scenario.color_decisions ?? {}).length);
   const indep = base.kind === "bagimsiz";
-  const tabs = TABS.filter((t) => !(indep && t === "Vitrin"));
+  const tabs = TABS.filter((t) => !(indep && t === "Vitrin") && !(t === "Renkler" && !base.color_plan));
 
   useEffect(() => { setRes(base); setScenario({}); }, [base]);
   useEffect(() => {
@@ -85,6 +87,12 @@ export function CollectionResults({ base }: { base: CollectionResult }) {
       const ds = { ...(x.decisions ?? {}) };
       if (d) ds[sku] = d; else delete ds[sku];
       return { ...x, decisions: ds };
+    });
+  const setColor = (key: string, d: ColorDecision | "") =>
+    setScenario((x) => {
+      const ds = { ...(x.color_decisions ?? {}) };
+      if (d) ds[key] = d; else delete ds[key];
+      return { ...x, color_decisions: ds };
     });
   const toggleExclude = (sku: string, on: boolean) =>
     setScenario((s) => ({ ...s, exclude: on ? [...(s.exclude ?? []), sku] : (s.exclude ?? []).filter((x) => x !== sku) }));
@@ -120,7 +128,8 @@ export function CollectionResults({ base }: { base: CollectionResult }) {
         {active && (
           <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
             Ne olur senaryosu açık{excluded.size ? `: ${excluded.size} ürün çıkarıldı` : ""}{Object.keys(scenario.planned_prices ?? {}).length ? `, ${Object.keys(scenario.planned_prices ?? {}).length} fiyat değişti` : ""}
-            {scenario.total_budget != null ? ", bütçe değişti" : ""}{Object.keys(scenario.decisions ?? {}).length ? `, ${Object.keys(scenario.decisions ?? {}).length} karar elle değişti` : ""}. Panel yeniden sorulmadı; sonuçlar kayıtlı cevaplardan yeniden hesaplandı.
+            {scenario.total_budget != null ? ", bütçe değişti" : ""}{Object.keys(scenario.decisions ?? {}).length ? `, ${Object.keys(scenario.decisions ?? {}).length} karar elle değişti` : ""}
+            {scenario.color_min_qty != null || scenario.color_mix != null || Object.keys(scenario.color_decisions ?? {}).length ? ", renk ayarı değişti" : ""}. Panel yeniden sorulmadı; sonuçlar kayıtlı cevaplardan yeniden hesaplandı.
             <Button size="sm" variant="outline" onClick={() => setScenario({})}><RotateCcw className="size-3" />Geri al</Button>
             {busy && <span className="text-xs">hesaplanıyor…</span>}
           </div>
@@ -136,7 +145,8 @@ export function CollectionResults({ base }: { base: CollectionResult }) {
       <CardContent>
         {tab === "Özet" && <Summary res={res} m={m} />}
         {tab === "Ürünler" && <Items res={res} items={allItems} excluded={excluded} onExclude={toggleExclude} m={m}
-          overrides={scenario.decisions ?? {}} onDecision={setDecision} />}
+          overrides={scenario.decisions ?? {}} onDecision={setDecision} colorOverrides={scenario.color_decisions ?? {}} onColor={setColor} />}
+        {tab === "Renkler" && <ColorsTab res={res} scenario={scenario} setScenario={setScenario} BasisChip={BasisChip} />}
         {tab === "Vitrin" && <Showcase res={res} />}
         {tab === "Bölgeler" && <Heatmap res={res} />}
         {tab === "Fiyat" && <Prices res={res} m={m} scenario={scenario} setScenario={setScenario} />}
@@ -283,9 +293,10 @@ function BrandEffectCard({ b, regions }: { b: NonNullable<CollectionResult["bran
   );
 }
 
-function Items({ res, items, excluded, onExclude, m, overrides, onDecision }: {
+function Items({ res, items, excluded, onExclude, m, overrides, onDecision, colorOverrides, onColor }: {
   res: CollectionResult; items: ItemResult[]; excluded: Set<string>; onExclude: (sku: string, on: boolean) => void;
   m: (v: number | null | undefined) => string; overrides: Record<string, Decision>; onDecision: (sku: string, d: Decision | "") => void;
+  colorOverrides: Record<string, ColorDecision>; onColor: (key: string, d: ColorDecision | "") => void;
 }) {
   const [open, setOpen] = useState<string | null>(null);
   const n = res.summary.n_evaluated;
@@ -327,7 +338,7 @@ function Items({ res, items, excluded, onExclude, m, overrides, onDecision }: {
                     <div className="flex items-center gap-2">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       {it.image && <img src={imageUrl(res.collection_id, it.image)} alt="" className="size-11 rounded object-cover" />}
-                      <div className="min-w-40 whitespace-normal"><div className="font-medium">{it.name}</div><div className="font-mono text-[11px] text-muted-foreground">{it.sku} · {it.category || "kategorisiz"}</div></div>
+                      <div className="min-w-40 whitespace-normal"><div className="font-medium">{it.name}</div><div className="font-mono text-[11px] text-muted-foreground">{it.sku} · {it.category || "kategorisiz"}</div><ColorStrip it={it} /></div>
                     </div>
                   </TableCell>
                   <TableCell className="min-w-44 whitespace-normal">
@@ -399,6 +410,7 @@ function Items({ res, items, excluded, onExclude, m, overrides, onDecision }: {
                           </div>
                         )}
                         {!indep && <div className="text-xs text-muted-foreground">Rol: {it.role_why}</div>}
+                        <ColorTable res={res} it={it} overrides={colorOverrides} onColor={onColor} BasisChip={BasisChip} />
                         <Table>
                           <TableHeader><TableRow>
                             <TableHead>Bölge</TableHead><TableHead className="text-right">Talep</TableHead><TableHead className="text-right">Hevesli</TableHead>

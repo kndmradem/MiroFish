@@ -219,8 +219,9 @@ def anchor_note(vw: VanWestendorpResult, reference: float | None, price_source: 
     ratio = float(vw.optimal_price_point) / reference
     if abs(ratio - 1) > ANCHOR_BAND:
         return vw
+    ratio_txt = f"{ratio:.2f}".replace(".", ",")
     note = (f" Panelin en uygun fiyatı, sorulan fiyat merdiveninin merkezine (maliyet × marka çarpanı, ${reference:,.0f}) çok yakın "
-            f"(oran {f"{ratio:.2f}".replace(".", ",")}). Bu fiyat panelin bağımsız görüşünden çok kurulumun merkezini yansıtıyor olabilir; rakip ya da "
+            f"(oran {ratio_txt}). Bu fiyat panelin bağımsız görüşünden çok kurulumun merkezini yansıtıyor olabilir; rakip ya da "
             "geçmiş satış fiyatıyla karşılaştırın.")
     return vw.model_copy(update={"quality": "medium" if vw.quality == "high" else vw.quality,
                                  "quality_note": vw.quality_note + note})

@@ -7,15 +7,18 @@ erişim (TURF) ve kanibalizasyon bu ortak panele dayanır. Mock/MiroFish motorun
 göstergeler talep skorundan kaba olarak hesaplanır ya da boş bırakılır ve bu not edilir.
 """
 import math
+import os
 import random
 import statistics
+from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
 from .. import brand as brandlib
 from ..allocation import DEMAND_SCENARIOS, STOP_P, p_sells
 from ..models import BrandProfile
+from . import colors as colorlib
 from .importer import norm
-from .models import (Action, Reason, BrandEffect, PairCount, PositionBias, ShowcaseItem, ShowcaseSummary, CannibalPair, CategorySummary, Collection, CollectionResult, CollectionSummary,
+from .models import (Action, ColorFamilySummary, ColorLine, ColorPlan, Reason, BrandEffect, PairCount, PositionBias, ShowcaseItem, ShowcaseSummary, CannibalPair, CategorySummary, Collection, CollectionResult, CollectionSummary,
                      ItemRegion, ItemResult, Metric, ReachPoint, WhatIf)
 
 ENTHUSIAST = 70          # ilgi puanı bu ve üstü: "hevesli" (prompttaki ölçek: hevesli 70-95)
@@ -50,6 +53,56 @@ def _net_margin(price: float, return_pct: float, cost: Optional[float]) -> Optio
 
 
 PANEL_FALLBACK_OFFSET = 100_000
+
+
+# Güven kontrolleri: çıktının ajandan mı yoksa kurulumdan (maliyet çarpanı, kitle varsayımı) mı geldiğini ölçer
+ANCHOR_CV = 0.06         # ürünlerin "önerilen fiyat / maliyet" oranlarının değişim katsayısı bunun altındaysa fiyat maliyetten türemiş sayılır
+UNITS_CV = 0.05          # ürünlerin bölge talep adetleri bu kadar az değişiyorsa adetler ürünü ayırt etmiyor
+MIN_CHECK_ITEMS = 3
+
+
+def _cv(vals: List[float]) -> Optional[float]:
+    vals = [v for v in vals if v and v > 0]
+    if len(vals) < MIN_CHECK_ITEMS:
+        return None
+    m = statistics.fmean(vals)
+    return statistics.pstdev(vals) / m if m else None
+
+
+def trust_checks(per_item_regions: Dict[str, List["ItemRegion"]], cost_usd: Dict[str, float]) -> List[Tuple[str, str]]:
+    """Fiyat ve adet çıktılarının ürünleri gerçekten ayırt edip etmediğini ölçer. (anahtar, metin) listesi döner.
+
+    - Fiyat çapası: fiyat merdiveni maliyet x marka çarpanı etrafında kurulur. Bütün ürünlerde önerilen fiyat / maliyet
+      oranı neredeyse aynıysa önerilen fiyat panelin bağımsız görüşü değil, maliyet artı sabit kârdır.
+    - Adet ölçeği: bölge talep adedi erişilebilir kitle (varsayım) x ilgi x dönüşüm tavanından gelir. Ürünler arasında
+      neredeyse aynıysa önerilen adetler ürünü ayırt etmiyor, yalnızca varsayılan kitle büyüklüğünü yansıtıyor.
+    """
+    out: List[Tuple[str, str]] = []
+    regions = sorted({r.region for rs in per_item_regions.values() for r in rs})
+    for reg in regions:
+        ratios, units = [], []
+        for s, rs in per_item_regions.items():
+            r = next((x for x in rs if x.region == reg), None)
+            if r is None:
+                continue
+            if cost_usd.get(s):
+                ratios.append(r.optimal_price / cost_usd[s])
+            units.append(float(r.demand_units))
+        cv = _cv(ratios)
+        if cv is not None and cv < ANCHOR_CV:
+            k = statistics.fmean(ratios)
+            k_txt = f"{k:.2f}".replace(".", ",")
+            out.append(("fiyat", f"{reg}: önerilen fiyat bütün ürünlerde maliyetin yaklaşık {k_txt} katı (ürünler arası fark %{cv * 100:.0f}). "
+                                 "Fiyat merdiveni maliyet × marka çarpanı etrafında kurulduğu için bu fiyat panelin bağımsız görüşü değil, "
+                                 "maliyet artı sabit kârdır; marj eşiği de bu yüzden hiçbir ürünü elemez. Fiyatı karar olarak sunmayın; "
+                                 "rakip/ERP fiyatıyla karşılaştırın."))
+        ucv = _cv(units)
+        if ucv is not None and ucv < UNITS_CV:
+            u_txt = f"{statistics.fmean(units):,.0f}".replace(",", ".")
+            out.append(("adet", f"{reg}: ürünlerin talep adedi neredeyse aynı (ortalama {u_txt}, fark %{ucv * 100:.0f}). "
+                                "Adetler ürünü ayırt etmiyor; erişilebilir kitle varsayımından geliyor. Adetleri ERP'deki benzer ürün "
+                                "satışlarıyla ölçeklemeden üretim adedi olarak sunmayın."))
+    return out
 
 
 def _item_regions(resp: dict, planned_usd: Optional[float], cost_usd: Optional[float] = None
@@ -320,6 +373,120 @@ def summarize_showcase(records: Dict[str, list], skus: List[str], single_ranks: 
     return items, summ
 
 
+def _color_lines(it, decision: Optional[str], qty_reg: Dict[str, int], info, min_qty: int, min_basis: str,
+                 user: Dict[str, str], table, has_qty: bool) -> Tuple[List[ColorLine], List[str]]:
+    """Modelin adedini renklere böler; minimum adedin altında kalan en zayıf rengi eler ve adedini diğerlerine aktarır."""
+    fams, shares, basis = info
+    flags: List[str] = []
+    first = next(iter(shares.values()))
+    forced = {c: user.get(f"{it.sku}::{c}") for c, _, _ in fams}
+    keep = [c for c, _, _ in fams if forced[c] != "üretme"]
+    dropped: Dict[str, int] = {}
+    total = sum(qty_reg.values())
+    split: Dict[str, Dict[str, int]] = {c: {} for c in keep}
+    if has_qty and total > 0 and decision != "üretme" and keep:
+        while True:
+            split = colorlib.split_qty(qty_reg, shares, keep)
+            below = [c for c in keep if sum(split[c].values()) < min_qty and forced[c] != "üret"]
+            if not below or len(keep) == 1:
+                break
+            weakest = min(below, key=lambda c: (sum(split[c].values()), first[c]))
+            dropped[weakest] = sum(split[weakest].values())
+            keep.remove(weakest)
+        if len(keep) == 1 and sum(split[keep[0]].values()) < min_qty:
+            flags.append(f"renk minimumu altında ({sum(split[keep[0]].values())} < {min_qty})")
+    lines = []
+    for c, code, fam in fams:
+        vals = [shares[r][c] * 100 for r in shares]
+        lo, hi = min(vals), max(vals)
+        how = (f"{table.label(fam)} ailesinin geçmiş satış payından (ERP), modelin renkleri arasında normalize edildi."
+               if basis == "ERP" else
+               f"{table.label(fam)} ailesinin kural ağırlığı ({table.weight(fam, it.category):g}), modelin renkleri arasında "
+               "normalize edildi. Ağırlıklar doğrulanmamış taslaktır; canlıda ERP satış payı kullanılır.")
+        share = Metric(value=round(first[c] * 100, 1), low=round(lo, 1) if hi - lo >= 0.5 else None,
+                       high=round(hi, 1) if hi - lo >= 0.5 else None, basis=basis, how=how)
+        reasons: List[Reason] = []
+        dec, src, q, qr = None, "sistem", None, {}
+        if decision == "üretme":
+            dec, q = "üretme", 0
+            reasons.append(Reason(text="Model üretilmiyor", basis="kural varsayımı"))
+        elif forced[c] == "üretme":
+            dec, src, q = "üretme", "kullanıcı", 0
+            reasons.append(Reason(text="Renk elle çıkarıldı; adedi diğer renklere aktarıldı", basis="kullanıcı girdisi"))
+        elif c in dropped:
+            dec, q = "üretme", 0
+            reasons.append(Reason(text=f"Payına göre {dropped[c]} adet düşüyordu; renk başına minimum {min_qty} adedin altında. "
+                                       "Adedi modelin diğer renklerine aktarıldı", basis=min_basis))
+        elif has_qty and total > 0:
+            qr = split.get(c, {})
+            q = sum(qr.values())
+            dec = "üret"
+            if forced[c] == "üret":
+                src = "kullanıcı"
+                if q < min_qty:
+                    reasons.append(Reason(text=f"Elle tutuldu; adet ({q}) renk minimumunun ({min_qty}) altında", basis="kullanıcı girdisi"))
+        lines.append(ColorLine(color=c, code=code, family=fam, family_label=table.label(fam), image=it.color_images.get(c),
+                               share=share, qty=q, qty_by_region=qr, decision=dec, decision_source=src, reasons=reasons))
+    return lines, flags
+
+
+def _color_plan(out_items: List[ItemResult], cinfo, table, any_erp: bool, erp, min_qty: int, min_basis: str, mix_on: bool,
+                indep: bool, actions: List[Action], notes: List[str]) -> Optional[ColorPlan]:
+    """Koleksiyonun renk dağılımı, elenen renkler, yoğunlaşma ve aynı kategoride renk çakışması."""
+    if not cinfo:
+        return None
+    basis = "ERP" if any_erp else "kural varsayımı"
+    fam: Dict[str, dict] = {}
+    total = 0
+    dropped = []
+    for r in out_items:
+        for c in r.colors:
+            d = fam.setdefault(c.family, {"skus": set(), "n": 0, "qty": 0, "reg": {}})
+            d["skus"].add(r.sku)
+            d["n"] += 1
+            d["qty"] += c.qty or 0
+            total += c.qty or 0
+            for g, q in c.qty_by_region.items():
+                d["reg"][g] = d["reg"].get(g, 0) + q
+            if c.decision == "üretme" and r.decision != "üretme" and c.decision_source == "sistem":
+                dropped.append((r, c))
+    fams = sorted((ColorFamilySummary(family=f, label=table.label(f), n_models=len(d["skus"]), n_colors=d["n"], qty=d["qty"],
+                                      share_pct=round(100 * d["qty"] / total, 1) if total else 0.0, by_region=d["reg"],
+                                      skus=sorted(d["skus"])) for f, d in fam.items()), key=lambda x: (-x.qty, -x.n_colors))
+    if dropped:
+        txt = "; ".join(f"{r.name}: {c.color}" for r, c in dropped[:8]) + (f" ve {len(dropped) - 8} renk daha" if len(dropped) > 8 else "")
+        actions.append(Action(kind="renk", skus=sorted({r.sku for r, _ in dropped}), basis=min_basis,
+                              text=f"Renk başına minimum {min_qty} adedin altında kalan {len(dropped)} renk üretilmesin, adedi "
+                                   f"aynı modelin diğer renklerine aktarıldı ({txt})."))
+    if total and fams and fams[0].share_pct > colorlib.CONCENTRATION_PCT and len(fams) > 1:
+        actions.append(Action(kind="renk", skus=fams[0].skus, basis=basis,
+                              text=f"Koleksiyon adedinin %{fams[0].share_pct:g}'i {fams[0].label.lower()} renkte. Temel renk "
+                                   "güvenli ama vitrinde çeşitlilik düşük kalabilir; renk payı " + basis + " dayanaklı."))
+    if not indep:
+        by_cat: Dict[Tuple[str, str], List[str]] = {}
+        for r in out_items:
+            live = [c for c in r.colors if c.decision != "üretme" and c.qty]
+            if live and r.category:
+                top = max(live, key=lambda c: c.qty or 0)
+                by_cat.setdefault((r.category, top.family), []).append(r.sku)
+        for (cat, f), skus in by_cat.items():
+            if len(skus) >= colorlib.OVERLAP_MODELS:
+                actions.append(Action(kind="renk", skus=skus, basis="kural varsayımı",
+                                      text=f"{cat} kategorisinde {len(skus)} modelin en çok üretilen rengi {table.label(f).lower()}; "
+                                           "aynı renkte benzer modeller birbirinin satışını bölebilir."))
+    if any_erp:
+        src = f"Renk payları geçmiş satışlardan (ERP: {Path(erp.path).name}); verisi az olan kategoride kural ağırlığı kullanıldı."
+    else:
+        src = ("Renk payları kural varsayımıdır (renk ailesi ağırlıkları, doğrulanmamış taslak: panel_data/renk/renk_aileleri.csv). "
+               "Canlı kullanımda ERP'deki geçmiş renk satışları (RENK_ERP_DOSYASI) kullanılır; ekran aynı kalır.")
+    notes.append(src + f" Renk başına minimum adet {min_qty} ({min_basis})."
+                 + (" Renk karışımı model adedini en fazla ±%15 değiştirir; panel renkleri yalnızca yazı olarak gördüğü için "
+                    "bu etki ayrıca eklenir." if mix_on else " Renk karışımının model adedine etkisi kapalı."))
+    weights = {f: round(table.weight(f, ""), 2) for f in table.labels}
+    return ColorPlan(source=basis, source_note=src, min_qty=min_qty, min_qty_basis=min_basis, mix_effect=mix_on,
+                     n_colors=sum(len(r.colors) for r in out_items), n_dropped=len(dropped), families=fams, weights=weights)
+
+
 def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif: Optional[WhatIf] = None,
               objective: str = "balanced", showcase: Optional[Dict[str, list]] = None) -> CollectionResult:
     w = whatif or WhatIf()
@@ -583,6 +750,34 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
         else:
             decision[s], source[s] = sys_dec, "sistem"
 
+    # renk payları ve renk karışımının model adedine etkisi (kural varsayımı ya da ERP)
+    ctable = colorlib.family_table()
+    cerp = colorlib.erp_source()
+    regions_all = list(col.meta.target_regions)
+    cinfo: Dict[str, tuple] = {}
+    strength: Dict[str, float] = {}
+    for it in items:
+        fams, shares, cbasis = colorlib.color_weights(it, [r.region for r in per_item_regions.get(it.sku, [])] or regions_all, ctable, cerp)
+        if fams:
+            cinfo[it.sku] = (fams, shares, cbasis)
+            st = colorlib.mix_strength(fams, shares, ctable, cerp, it.category)
+            if st is not None and it.sku in per_item_regions:
+                strength[it.sku] = st
+    mix_on = w.color_mix if w.color_mix is not None else True
+    mix_coef: Dict[str, float] = {}
+    if mix_on and len(strength) >= 2:
+        mean_st = statistics.fmean(strength.values())
+        lo, hi = colorlib.MIX_CLIP
+        for s, st in strength.items():
+            mix_coef[s] = round(min(hi, max(lo, 1 + colorlib.MIX_SLOPE * (st / mean_st - 1))), 3)
+    any_erp = any(v[2] == "ERP" for v in cinfo.values())
+    if w.color_min_qty:
+        min_qty, min_basis = w.color_min_qty, "kullanıcı girdisi"
+    elif col.meta.color_min_qty:
+        min_qty, min_basis = col.meta.color_min_qty, "kullanıcı girdisi"
+    else:
+        min_qty, min_basis = int(os.getenv("RENK_MIN_ADET", colorlib.DEFAULT_MIN_QTY)), "kural varsayımı"
+
     # bütçe dağıtımı (kural varsayımı)
     budget_total = w.total_budget if w.total_budget is not None else col.meta.total_budget
     budget_usd = to_usd(budget_total) if budget_total else None
@@ -597,7 +792,8 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
                 continue
             price = to_usd(w.planned_prices.get(it.sku, it.planned_price)) if (w.planned_prices.get(it.sku, it.planned_price)) else r.optimal_price
             net = price * (1 - r.return_pct / 100 * (1 + REVERSE_LOGISTICS_PCT / 100))
-            signals.append({"sku": it.sku, "region": r.region, "demand": r.demand_units * factor, "net": net, "cost": cost})
+            signals.append({"sku": it.sku, "region": r.region, "demand": r.demand_units * factor * mix_coef.get(it.sku, 1.0),
+                            "net": net, "cost": cost})
     alloc = allocate_items(signals, budget_usd or 0, objective) if budget_usd else {}
     if not budget_usd:
         notes.append("Toplam bütçe girilmedi; bütçe dağıtımı yapılmadı.")
@@ -662,6 +858,17 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
         nm_metric = Metric(value=net_margin.get(s), basis="kural varsayımı",
                            how=f"Fiyattan iade (ve %{REVERSE_LOGISTICS_PCT:g} ters lojistik) ile maliyet düşülerek; bölgelerin "
                                "beklenen satışına göre ağırlıklı. Fiyat panelden, iade oranı kural varsayımı.")
+        clines, cflags = ([], [])
+        if s in cinfo:
+            clines, cflags = _color_lines(it, decision[s], qty_item.get(s, {}), cinfo[s], min_qty, min_basis,
+                                          w.color_decisions, ctable, bool(it.unit_cost and budget_usd))
+        flags += cflags
+        cmix = None
+        if s in mix_coef:
+            cmix = Metric(value=mix_coef[s], basis="ERP" if cinfo[s][2] == "ERP" else "kural varsayımı",
+                          how=f"Renk karışımının gücü koleksiyon ortalamasına göre {strength[s] / statistics.fmean(strength.values()):.2f} kat; "
+                              f"bunun %{int(colorlib.MIX_SLOPE * 100)}'ı model talebine yansıtıldı "
+                              f"({colorlib.MIX_CLIP[0]:g}-{colorlib.MIX_CLIP[1]:g} arası).")
         if decision[s] == "üretme":
             qty_metric = Metric(value=0, basis="kural varsayımı", how="Üretme kararı: bütçe dağıtımına alınmadı.")
         else:
@@ -682,7 +889,7 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
             decision_reasons=decisive[s] + context[s], recommended_price=rec_price, net_margin=nm_metric,
             recommended_qty=qty_metric,
             qty_by_region=qty_item.get(s, {}), planned_qty=it.planned_qty, flags=flags, failed_regions=failed,
-            showcase=sc_items.get(s)))
+            showcase=sc_items.get(s), colors=clines, color_mix=cmix))
 
     # kategori özeti
     cats: Dict[str, List[ItemResult]] = {}
@@ -701,6 +908,13 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
 
     # öneriler
     actions: List[Action] = []
+    checks = trust_checks({s: per_item_regions[s] for s in skus},
+                          {it.sku: to_usd(it.unit_cost) for it in evaluated if it.unit_cost})
+    for key, text in checks:
+        actions.append(Action(kind="veri", skus=[], basis="kural varsayımı", text="Güven kontrolü: " + text))
+    if checks:
+        notes.insert(0, "Güven kontrolü uyarısı var (öneriler listesinin başında). Bu koşudaki fiyat ve/veya adetler ürünleri "
+                        "ayırt etmiyor; demoda karar olarak değil, kurulumun sonucu olarak anlatılmalı.")
     for r in out_items:
         if r.decision in ("üretme", "azalt") and r.sku in decisive:
             why_ = "; ".join(x.text for x in decisive[r.sku][:3])
@@ -759,6 +973,8 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
             actions.append(Action(kind="eksik", basis="kural varsayımı",
                                   text=f"{c.category} kategorisinde öne çıkan (hero) ürün yok ve ilgi koleksiyon ortalamasının altında."))
 
+    color_plan = _color_plan(out_items, cinfo, ctable, any_erp, cerp, min_qty, min_basis, mix_on, indep, actions, notes)
+
     if flat:
         spread = (max(raw_mean.values()) - min(raw_mean.values())) if raw_mean else 0
         notes.append(f"Panel ürünleri tek tek bakarken birbirinden ayırt etmedi, neredeyse aynı ilgi puanını verdi (ürün ortalamaları arasındaki fark "
@@ -776,9 +992,12 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
     if not indep:
         notes.append("Roller, erişim ve kanibalizasyon eşikleri kural varsayımıdır (hevesli = 70+ ilgi; örtüşme %60+, fiyat farkı %25 içinde).")
     notes += [
-        "Önerilen satış fiyatı panelin fiyat cevaplarından (Van Westendorp) gelir; Excel'den satış fiyatı okunmaz. Fiyat sekmesinde "
+        "Önerilen satış fiyatı panelin fiyat cevaplarından (Van Westendorp) gelir; ancak panele sorulan fiyat merdiveni maliyet × marka "
+        "çarpanı etrafında kurulur, bu yüzden fiyat bu merkeze çekilir (bkz. güven kontrolü). Excel'den satış fiyatı okunmaz. Fiyat sekmesinde "
         "denenen fiyat yalnızca fiyat uyumunu, marjı ve kararı yeniden hesaplar, panel cevaplarını değiştirmez.",
-        "Önerilen adetler ERP ile kalibre edilene kadar varsayımdır.",
+        "Önerilen adetlerin mutlak büyüklüğü varsayımdır: bölge başına 120 günde erişilebilir kitle (ör. EU 100.000, TR 50.000 kişi, "
+        "marka bilinirliğiyle ölçeklenir) × ilgi × %2 dönüşüm tavanı × fiyat kabulü. ERP'deki benzer ürün satışlarıyla kalibre edilene "
+        "kadar adetler yalnızca ürünler arası oran olarak okunmalı.",
     ]
     summary = CollectionSummary(
         n_items=len(items), n_evaluated=len(evaluated), n_failed=sum(1 for i in items if i.sku in results and not results[i.sku].get("response")),
@@ -795,4 +1014,5 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
     regions = sorted({r.region for rs in per_item_regions.values() for r in rs}) or list(col.meta.target_regions)
     return CollectionResult(collection_id=col.id, name=col.meta.name, kind=col.meta.kind, currency=cur, fx_rate=fx_rate, regions=regions,
                             items=out_items, summary=summary, notes=notes, data_basis=data_basis, panel_shared=shared,
-                            brand_profile=brand, brand_effect=brand_effect(brand, col, regions), showcase=sc_summary)
+                            brand_profile=brand, brand_effect=brand_effect(brand, col, regions), showcase=sc_summary,
+                            color_plan=color_plan)

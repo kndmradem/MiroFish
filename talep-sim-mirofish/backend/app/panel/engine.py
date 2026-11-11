@@ -166,7 +166,7 @@ class DirectPanelEngine:
             "n_extracted": sum(r.status == "repaired" for r in replies.values()),
             "n_estimated": sum(1 for a in valid if a.get("estimated")), "price_source": price_source,
             "raw_answers": raw_answers, "mean_interest": round(mean_interest),
-            "ladder": [p * ps for p in ladder],
+            "ladder": [p * ps for p in ladder], "ladder_reference": reference * ps,
             "ladder_votes": [a["ranks"] for a in priced if a.get("ranks")] if price_source == "agents" else [],
             "objection_counts": counts.most_common(3),
             "persona_version": lib.version, "persona_as_of": lib.as_of.isoformat(),

@@ -119,3 +119,32 @@ kalır. Excel çıktısında karar, kaynak ve gerekçe sütunları vardır.
 
 ERP'den beden/renk kırılımı, vitrin sonucunun bütçe dağılımına katılması. Tasarım: proje dosyalarında
 `talep-sim/koleksiyon/koleksiyon-degerlendirme-tasarimi.md`.
+
+## Renk bazlı plan
+
+Renk varyantları tek model altında kalır (panel modeli bir kez değerlendirir). Modelin önerilen adedi renklere
+bölünür; sonuç ürün satırında (renk şeridi ve açılan renk tablosu) ve **Renkler** sekmesinde görünür.
+
+**Renk payının kaynağı** değiştirilebilir, ekran ve alanlar aynı kalır:
+
+| Kaynak | Ne zaman | Dayanak etiketi |
+|---|---|---|
+| ERP geçmiş satışları | `RENK_ERP_DOSYASI` verilmiş ve kategoride en az `RENK_ERP_MIN_ADET` (200) satış varsa | ERP |
+| Renk ailesi ağırlıkları | ERP yoksa (şimdilik) | kural varsayımı |
+
+- Kural dosyası: `backend/panel_data/renk/renk_aileleri.csv` (aile, eşleşen renk adları, ağırlık, isteğe bağlı kategori).
+  Değerler doğrulanmamış taslaktır; marka ya da kategoriye göre düzenlenebilir. Renk adları Türkçe ve İngilizce eşleşir
+  (BLACK = siyah, NUDE = bej/ten, GRAY MELANGE = gri...). Tanınmayan renk "Diğer" (nötr ağırlık) olur.
+- ERP dosyası (CSV, `,` ya da `;`): `kategori, renk, adet` sütunları, isteğe bağlı `bolge`. Bölge sütunu varsa renk
+  payı bölgeye göre ayrı hesaplanır. Ortam değişkeni `RENK_DIR` kural klasörünü değiştirir.
+
+**Kurallar** (kural varsayımı):
+- Renk başına minimum adet varsayılan 300 (boya partisi). Excel'de Genel bilgi sayfasında `renk_min_adet`,
+  içe aktarma ekranında "Renk başına minimum adet", Renkler sekmesinde deneme alanı ya da `RENK_MIN_ADET` ile değişir.
+- Payına düşen adet minimumun altında kalan en zayıf renk "üretme" olur, adedi aynı modelin diğer renklerine aktarılır;
+  tek renk kalana kadar tekrarlanır. Model toplamı değişmez. Rengin kararı ürün ayrıntısından elle değiştirilebilir.
+- Renk karışımı çarpanı: güçlü renklerden oluşan model bütçeden biraz daha çok, zayıf renklerden oluşan model biraz daha
+  az pay alır (renk gücünün koleksiyon ortalamasına oranının yarısı, ×0,85-1,15). Renkler sekmesinden kapatılabilir.
+- Uyarılar: bir renk ailesi koleksiyon adedinin %50'sini geçerse; aynı kategoride 3+ modelin en çok üretilen rengi aynıysa.
+
+Excel çıktısında "Renkler" sayfası model x renk adetlerini, kararları ve renk ailesi özetini taşır.

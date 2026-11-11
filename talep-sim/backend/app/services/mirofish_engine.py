@@ -48,7 +48,7 @@ def build_interview_prompt(card: dict, region: str, brand: Optional[BrandProfile
     features = ", ".join(k for k, v in card.get("features", {}).items() if v) or "belirtilmemiş"
     brand_block = ""
     if brand is not None:
-        ref = f" Bu marka bu tür ürünleri genelde yaklaşık ${brandlib.reference_price(brand, unit_cost):.0f} civarında satar." if unit_cost else ""
+        ref = ""   # "marka genelde ~$X satar" verilmez: X = maliyet x çarpan, ajanlara beklenen fiyatı söylüyordu
         brand_block = (
             f"Marka: {brand.name} ({brandlib.TIER_LABEL[brand.price_tier]} segment). {brand.positioning} "
             f"Tipik müşteri: {brand.typical_customer or '-'}.{ref} "

@@ -88,13 +88,15 @@ def trust_checks(per_item_regions: Dict[str, List["ItemRegion"]], cost_usd: Dict
         cv = _cv(ratios)
         if cv is not None and cv < ANCHOR_CV:
             k = statistics.fmean(ratios)
-            out.append(("fiyat", f"{reg}: önerilen fiyat bütün ürünlerde maliyetin yaklaşık {f"{k:.2f}".replace(".", ",")} katı (ürünler arası fark %{cv * 100:.0f}). "
+            k_txt = f"{k:.2f}".replace(".", ",")
+            out.append(("fiyat", f"{reg}: önerilen fiyat bütün ürünlerde maliyetin yaklaşık {k_txt} katı (ürünler arası fark %{cv * 100:.0f}). "
                                  "Fiyat merdiveni maliyet × marka çarpanı etrafında kurulduğu için bu fiyat panelin bağımsız görüşü değil, "
                                  "maliyet artı sabit kârdır; marj eşiği de bu yüzden hiçbir ürünü elemez. Fiyatı karar olarak sunmayın; "
                                  "rakip/ERP fiyatıyla karşılaştırın."))
         ucv = _cv(units)
         if ucv is not None and ucv < UNITS_CV:
-            out.append(("adet", f"{reg}: ürünlerin talep adedi neredeyse aynı (ortalama {f"{statistics.fmean(units):,.0f}".replace(",", ".")}, fark %{ucv * 100:.0f}). "
+            u_txt = f"{statistics.fmean(units):,.0f}".replace(",", ".")
+            out.append(("adet", f"{reg}: ürünlerin talep adedi neredeyse aynı (ortalama {u_txt}, fark %{ucv * 100:.0f}). "
                                 "Adetler ürünü ayırt etmiyor; erişilebilir kitle varsayımından geliyor. Adetleri ERP'deki benzer ürün "
                                 "satışlarıyla ölçeklemeden üretim adedi olarak sunmayın."))
     return out
