@@ -264,6 +264,8 @@ export async function importCollection(sheet: File, images: File[], collectionId
 
 export const listCollections = async (kind?: Kind): Promise<CollectionListRow[]> =>
   json(await fetch(`${API_URL}/api/collections${kind ? `?kind=${kind}` : ""}`));
+export const deleteCollection = async (cid: string): Promise<{ deleted: string }> =>
+  json(await fetch(`${API_URL}/api/collections/${cid}`, { method: "DELETE" }));
 export const getCollection = async (cid: string): Promise<Collection> => json(await fetch(`${API_URL}/api/collections/${cid}`));
 export const getPreview = async (cid: string): Promise<ImportPreview> => json(await fetch(`${API_URL}/api/collections/${cid}/preview`));
 

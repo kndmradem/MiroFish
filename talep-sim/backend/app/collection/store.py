@@ -9,6 +9,7 @@ collections/<id>/preview.json      son içe aktarma önizlemesi
 import hashlib
 import json
 import re
+import shutil
 import time
 import uuid
 from pathlib import Path
@@ -85,6 +86,13 @@ class CollectionStore:
         if not p.exists():
             raise KeyError(cid)
         return Collection.model_validate_json(p.read_text(encoding="utf-8"))
+
+    def delete(self, cid: str) -> None:
+        """Koleksiyonu bütün dosyalarıyla (önizleme, ürün kartları, sonuçlar, ajan cevapları, görseller) siler."""
+        d = self.dir(cid)
+        if not d.is_dir():
+            raise KeyError(cid)
+        shutil.rmtree(d)
 
     def list(self) -> List[Collection]:
         if not self.root.exists():

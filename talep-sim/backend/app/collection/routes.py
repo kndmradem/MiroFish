@@ -61,6 +61,19 @@ async def list_collections(kind: Optional[str] = None, store: CollectionStore = 
             for c in store.list() if not kind or c.meta.kind == kind]
 
 
+@router.delete("/{cid}")
+async def delete_collection(cid: str, store: CollectionStore = Depends(get_store)) -> dict:
+    """Koleksiyonu ve ona ait her şeyi (sonuçlar, ajan cevapları, görseller) kalıcı olarak siler."""
+    if runner.running(cid):
+        raise HTTPException(409, "Koleksiyon şu an çalışıyor; önce durdurun, sonra silin.")
+    try:
+        store.delete(cid)
+    except KeyError:
+        raise HTTPException(404, "Koleksiyon bulunamadı")
+    runner.tasks.pop(cid, None)
+    return {"deleted": cid}
+
+
 @router.get("/template.xlsx")
 async def template() -> Response:
     return Response(template_bytes(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
