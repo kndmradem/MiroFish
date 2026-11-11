@@ -103,6 +103,21 @@ else:
         print(f"已加载环境配置: {_backend_env}")
 
 
+def busiest_start_minutes(config: dict, truncated: bool) -> int:
+    """Turlar kısaltıldıysa simülasyon saatini gece 00:00 yerine ajanların en aktif olduğu saatten başlatır.
+    (Kısa koşuda turlar 00:00-01:00 off-peak saatlerine denk geliyor ve hiçbir ajan aktif olmuyordu.)"""
+    if not truncated:
+        return 0
+    score = [0.0] * 24
+    for cfg in config.get("agent_configs", []):
+        for h in cfg.get("active_hours", list(range(8, 23))):
+            if 0 <= int(h) < 24:
+                score[int(h)] += float(cfg.get("activity_level", 0.5))
+    peak = set(config.get("time_config", {}).get("peak_hours", [9, 10, 11, 14, 15, 20, 21, 22]))
+    best = max(range(24), key=lambda h: (score[h], h in peak, -h))
+    return best * 60 if score[best] > 0 else 20 * 60
+
+
 class MaxTokensWarningFilter(logging.Filter):
     """过滤掉 camel-ai 关于 max_tokens 的警告（我们故意不设置 max_tokens，让模型自行决定）"""
     
@@ -1225,6 +1240,9 @@ async def run_twitter_simulation(
     
     start_time = datetime.now()
     
+    start_offset_minutes = busiest_start_minutes(config, total_rounds < (total_hours * 60) // minutes_per_round)
+    if start_offset_minutes:
+        print(f"Kısa koşu: simülasyon saati {start_offset_minutes // 60:02d}:00'dan başlıyor (ajanların en aktif saati)")
     for round_num in range(total_rounds):
         # 检查是否收到退出信号
         if _shutdown_event and _shutdown_event.is_set():
@@ -1232,7 +1250,7 @@ async def run_twitter_simulation(
                 main_logger.info(f"收到退出信号，在第 {round_num + 1} 轮停止模拟")
             break
         
-        simulated_minutes = round_num * minutes_per_round
+        simulated_minutes = start_offset_minutes + round_num * minutes_per_round
         simulated_hour = (simulated_minutes // 60) % 24
         simulated_day = simulated_minutes // (60 * 24) + 1
         
@@ -1424,6 +1442,9 @@ async def run_reddit_simulation(
     
     start_time = datetime.now()
     
+    start_offset_minutes = busiest_start_minutes(config, total_rounds < (total_hours * 60) // minutes_per_round)
+    if start_offset_minutes:
+        print(f"Kısa koşu: simülasyon saati {start_offset_minutes // 60:02d}:00'dan başlıyor (ajanların en aktif saati)")
     for round_num in range(total_rounds):
         # 检查是否收到退出信号
         if _shutdown_event and _shutdown_event.is_set():
@@ -1431,7 +1452,7 @@ async def run_reddit_simulation(
                 main_logger.info(f"收到退出信号，在第 {round_num + 1} 轮停止模拟")
             break
         
-        simulated_minutes = round_num * minutes_per_round
+        simulated_minutes = start_offset_minutes + round_num * minutes_per_round
         simulated_hour = (simulated_minutes // 60) % 24
         simulated_day = simulated_minutes // (60 * 24) + 1
         

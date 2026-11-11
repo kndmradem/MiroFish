@@ -1,0 +1,16 @@
+aile,etiket,eslesme,agirlik,kategori,kaynak,dogrulandi,aciklama
+siyah,Siyah,siyah|black|noir|schwarz|antrasit|anthracite|jet,1.6,,kural varsayımı,hayir,Temel renk; çoğu kategoride en çok satan renk varsayımı
+lacivert,Lacivert,lacivert|navy|marine|indigo|gece mavisi,1.2,,kural varsayımı,hayir,Temel koyu renk
+beyaz,Beyaz / ekru,beyaz|white|ekru|ecru|krem|cream|kirik beyaz|off white|ivory|fildisi|optik,1.2,,kural varsayımı,hayir,Temel açık renk
+bej,Bej / ten,bej|beige|ten|nude|skin|camel|kum|sand|taupe|vizon|mink|stone|tas,1.1,,kural varsayımı,hayir,Nötr renk; iç giyimde ten rengi temel sayılır
+gri,Gri,gri|grey|gray|melanj|melange|füme|fume|silver|gumus,1.0,,kural varsayımı,hayir,Nötr renk
+kahve,Kahverengi,kahve|brown|choco|cikolata|chocolate|mocha|toprak|tarcin|cinnamon|bronz|bronze,1.0,,kural varsayımı,hayir,Nötr koyu renk
+bordo,Bordo / şarap,bordo|burgundy|bordeaux|sarap|wine|merlot|plum|murdum,0.9,,kural varsayımı,hayir,Sezon rengi; kışın daha güçlü olabilir
+kirmizi,Kırmızı,kirmizi|red|nar|cherry|kiraz,0.8,,kural varsayımı,hayir,Canlı renk
+pembe,Pembe,pembe|pink|rose|gul|pudra|powder|fuchsia|fusya|blush|somon|salmon,0.75,,kural varsayımı,hayir,Canlı/pastel renk
+mavi,Mavi,mavi|blue|indigo blue|bebe mavi|baby blue|sky|turkuaz|turquoise|petrol|petrol mavi,0.85,,kural varsayımı,hayir,Renkli
+yesil,Yeşil / haki,yesil|green|haki|khaki|olive|zeytin|mint|nane|zumrut|emerald,0.8,,kural varsayımı,hayir,Renkli
+mor,Mor / lila,mor|purple|lila|lilac|lavanta|lavender|violet|menekse,0.7,,kural varsayımı,hayir,Renkli
+sari,Sarı / turuncu,sari|yellow|hardal|mustard|turuncu|orange|limon|lemon|mercan|coral,0.65,,kural varsayımı,hayir,Canlı renk
+desenli,Desenli / çok renk,desen|desenli|print|baskili|multi|cok renkli|leopar|leopard|zebra|cicek|floral|cizgili|stripe|ekose|check,0.8,,kural varsayımı,hayir,Desenli varyant
+diger,Diğer,,1.0,,kural varsayımı,hayir,Ailesi tanınmayan renk; nötr ağırlık
