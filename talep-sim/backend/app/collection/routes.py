@@ -271,7 +271,21 @@ async def item_prediction(cid: str, sku: str, store: CollectionStore = Depends(g
         r = None
     if not r or not r.get("response"):
         raise HTTPException(404, (r or {}).get("error") or "Bu ürünün sonucu yok")
-    return r["response"]
+    out = dict(r["response"])
+    # Bu ekrandaki adet, satış ve stok hesabı ürünün koşudaki eşit bütçe payıyla yapıldı; koleksiyonun asıl kararı ve
+    # adedi (bütçenin ürünler arasında talebe göre dağıtımı, renk payları) ayrıca verilir ki iki ekran karıştırılmasın.
+    try:
+        res = _result(cid, store, None)
+        it = next((i for i in res.items if i.sku == sku), None)
+    except Exception:
+        it = None
+    if it is not None:
+        out["collection_context"] = {
+            "decision": it.decision, "qty": it.recommended_qty.value, "qty_by_region": it.qty_by_region,
+            "colors": [{"color": c.color, "qty": c.qty, "decision": c.decision} for c in it.colors],
+            "detail_qty": sum(int(x.get("recommended_production_qty") or 0) for x in out.get("regional_breakdown", [])),
+        }
+    return out
 
 
 @router.get("/{cid}/export.xlsx")

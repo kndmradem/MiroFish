@@ -35,6 +35,7 @@ DEMAND_REDUCE = 50       # bunun altındaysa: azalt
 MARGIN_DROP = 15.0       # önerilen fiyatta iade sonrası net marj (%) bunun altındaysa: üretme
 MARGIN_REDUCE = 30.0     # bunun altındaysa: azalt
 REDUCE_FACTOR = 0.6      # "azalt" kararında bütçe dağıtımına giren talep oranı
+ENTHUSIAST_MIN = 0.05    # hevesli (70+) kişi oranı bunun altındaysa: azalt (kimse gerçekten istemiyorsa tam üretim yok)
 
 Person = Tuple[str, int]  # (bölge, kişi no)
 
@@ -633,6 +634,10 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
             red.append(Reason(text=f"Talep skoru {a:.0f}/100, temkinli üretim eşiği {DEMAND_REDUCE}'nin altında", basis="ajan"))
         else:
             ctx.append(Reason(text=f"Talep skoru {a:.0f}/100", basis="ajan"))
+        ep = ent_pct.get(s)
+        if ep is not None and len(per_item_int.get(s, {})) >= 6 and ep < ENTHUSIAST_MIN and a >= DEMAND_DROP:
+            red.append(Reason(text=f"Panelde ürüne hevesli kişi yok denecek kadar az ({ENTHUSIAST}+ puan veren %{_pct(ep):g}); "
+                                   "ortalama ilgi kararsız düzeyde", basis="ajan"))
         price_word = "denenen fiyatta" if w.planned_prices.get(s, it.planned_price) else "önerilen fiyatta"
         if nm is None:
             ctx.append(Reason(text="Maliyet fiyatı yok: marj hesaplanamadı, karar yalnızca talebe dayanıyor", basis="kullanıcı girdisi"))

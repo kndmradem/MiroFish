@@ -80,14 +80,15 @@ def _answer_format(ladder: Optional[List[float]], try_rate: Optional[float]) -> 
     if not ladder:
         return ("Sadece şu JSON ile cevap ver: "
                 '{"interest": 0-100 arası SAYI, "too_cheap": USD sayı, "cheap": USD sayı, '
-                '"expensive": USD sayı, "too_expensive": USD sayı, "objection": "tek kısa cümle"}')
+                '"expensive": USD sayı, "too_expensive": USD sayı, "objection": "<en büyük itirazın>"}')
     return (
         "Ürün şu fiyatlardan biriyle satılsa ne düşünürsün? Her fiyat için TEK etiket seç:\n"
         f"{ladder_text(ladder, try_rate if try_rate and (try_rate > 0) else None)}\n"
         'Etiketler: "supheli" (bu kadar ucuzsa kaliteden şüphelenirim), "uygun" (makul, alırım), '
         '"pahali" (pahalı ama düşünürüm), "cok_pahali" (asla almam).\n'
         "Sadece şu JSON ile cevap ver, başka metin yazma. interest 0-100 arası TEK BİR SAYI olmalı, cümle yazma:\n"
-        f'{{"interest": 65, "ladder": {example_ladder(len(ladder))}, "objection": "tek kısa cümle"}}'
+        "<...> yerlerine kendi cevabını yaz, yer tutucuları kopyalama:\n"
+        f'{{"interest": <0-100 sayı>, "ladder": {example_ladder(len(ladder))}, "objection": "<en büyük itirazın>"}}'
     )
 
 

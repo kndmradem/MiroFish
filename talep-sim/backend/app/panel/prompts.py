@@ -64,7 +64,8 @@ def context_text(ctx: Optional[ContextPack]) -> str:
 SYSTEM_SUFFIX = (
     "Moda, trend ve ekonomi hakkındaki kendi bilgin eğitim verinden gelir ve eskidir. Güncel durum için yalnızca "
     "kullanıcı mesajındaki GÜNCEL BAĞLAM bölümüne güven; orada olmayan bir trendi ya da fiyatı varsayma. "
-    "Kendi persona özelliklerine sadık kal; herkes her ürünü beğenmez. Sadece istenen JSON'u yaz."
+    "Kendi persona özelliklerine sadık kal; herkes her ürünü beğenmez. Metin alanlarını yalnızca Türkçe yaz. "
+    "Sadece istenen JSON'u yaz."
 )
 
 

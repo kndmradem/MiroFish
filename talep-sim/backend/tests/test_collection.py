@@ -733,3 +733,21 @@ def test_single_weak_but_showcase_strong_is_not_risky():
     res = summarize(col, results, 42.0, showcase=_showcase_recs(6, best="S5", worst="S1"))
     s5 = next(i for i in res.items if i.sku == "S5")
     assert s5.role != "riskli" and "çelişiyor" in s5.role_why
+
+
+def test_no_enthusiast_means_reduce_and_template_objection_is_dropped():
+    from app.services.answer_extractor import clean_objection
+    assert clean_objection("<en büyük itirazın, tek kısa cümle>") == "" and clean_objection("Asla almam.") == ""
+    assert clean_objection("Kumaş ince görünüyor") == "Kumaş ince görünüyor"
+    col = _col(3)
+    results = {"S0": _resp({"TR": [60, 62, 58, 61, 63, 59]}, demand=60), "S1": _resp({"TR": [80, 75, 90, 72, 70, 85]}, demand=80),
+               "S2": _resp({"TR": [40, 45, 42, 41, 44, 43]}, demand=55)}
+    res = summarize(col, results, 42.0)
+    s0 = next(i for i in res.items if i.sku == "S0")
+    assert s0.decision == "azalt" and any("hevesli" in r.text for r in s0.decision_reasons)
+
+
+def test_identical_price_answers_lower_quality():
+    from app.pricing import AgentPriceAnswer as A, analyze
+    r, _ = analyze([A(10, 20, 40, 60)] * 11 + [A(12, 22, 44, 70)], 15)
+    assert r.quality == "low" and "aynı fiyat" in r.quality_note

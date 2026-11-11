@@ -24,7 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { itemPrediction } from "@/lib/collection-api";
+import { itemPrediction, type CollectionContext } from "@/lib/collection-api";
 import { predictStream, REGIONS, resumeRun, savedRun, type StreamHandlers, TIER_LABEL, try_, usd, type BrandProfile, type PredictionResponse, type RegionCode } from "@/lib/api";
 
 function demandTone(score: number) {
@@ -98,6 +98,7 @@ export default function Dashboard() {
 
   // Koleksiyon ekranından "Tekli ürün ekranında ayrıntı" ile gelindiyse kayıtlı sonucu göster
   const [fromCollection, setFromCollection] = useState<string | null>(null);
+  const [collectionCtx, setCollectionCtx] = useState<CollectionContext | null>(null);
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     const cid = q.get("koleksiyon"), sku = q.get("sku");
@@ -109,6 +110,7 @@ export default function Dashboard() {
         if (res.brand_profile) setProfile(res.brand_profile);
         setChartRegion((res.regional_breakdown[0]?.region as RegionCode) ?? null);
         setFromCollection(`${sku} (koleksiyon ${cid})`);
+        setCollectionCtx(res.collection_context ?? null);
       })
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
   }, []);
@@ -355,6 +357,14 @@ export default function Dashboard() {
               <div className="rounded-md border border-sky-300 bg-sky-50 p-3 text-sm text-sky-900">
                 Koleksiyon sonucundan açıldı: {fromCollection}. Bu kayıtlı bir sonuçtur; soldaki formla yeni simülasyon çalıştırırsanız yerine geçer.{" "}
                 <Link className="underline" href="/koleksiyon">Koleksiyona dön</Link>
+                {collectionCtx && (
+                  <div className="mt-2 rounded border border-sky-200 bg-white/70 p-2">
+                    <b>Koleksiyondaki karar ve adet:</b> {collectionCtx.decision ?? "–"}, {collectionCtx.qty != null ? collectionCtx.qty.toLocaleString("tr-TR") : "–"} adet
+                    {Object.keys(collectionCtx.qty_by_region).length > 0 && <> ({Object.entries(collectionCtx.qty_by_region).map(([r, q]) => `${r} ${q.toLocaleString("tr-TR")}`).join(", ")})</>}
+                    {collectionCtx.colors.length > 0 && <> · renkler: {collectionCtx.colors.map((c) => `${c.color} ${c.decision === "üretme" ? "üretilmez" : (c.qty ?? 0).toLocaleString("tr-TR")}`).join(", ")}</>}.
+                    <div className="mt-1 text-xs">Aşağıdaki adet ({collectionCtx.detail_qty.toLocaleString("tr-TR")}), satış ve stok hesapları bu ürünün tek başına, koleksiyon bütçesinin eşit payıyla yapılmış görünümüdür. Üretim için koleksiyondaki adeti esas alın: orada bütçe ürünler arasında talebe göre dağıtılır ve renklere bölünür.</div>
+                  </div>
+                )}
               </div>
             )}
             <SummaryCard result={result} productName={productName} />

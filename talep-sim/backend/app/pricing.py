@@ -32,7 +32,26 @@ def bandwidth(n: int) -> float:
     return 0.0 if n >= 30 else 0.18 if n < 6 else 0.14 if n < 12 else 0.10
 
 
-def quality_of(n: int) -> Tuple[str, str]:
+SAME_ANSWER_LOW = 0.7      # cevapların bu kadarı birebir aynıysa fiyat bölgeleri güvenilmez
+SAME_ANSWER_MEDIUM = 0.5
+
+
+def same_answer_share(answers: Sequence[AgentPriceAnswer]) -> float:
+    """Birebir aynı dört eşiği veren en kalabalık grubun payı (kopyalanmış cevap belirtisi)."""
+    if not answers:
+        return 0.0
+    from collections import Counter
+    c = Counter(tuple(round(x, 2) for x in (a.too_cheap, a.cheap, a.expensive, a.too_expensive)) for a in answers)
+    return c.most_common(1)[0][1] / len(answers)
+
+
+def quality_of(n: int, same_share: float = 0.0) -> Tuple[str, str]:
+    if n >= 6 and same_share >= SAME_ANSWER_LOW:
+        return "low", (f"Birebir aynı fiyat cevabını veren ajanların payı %{round(same_share * 100)}; cevaplar kopya ya da "
+                       "ezber olabilir. Fiyat bölgeleri güvenilir değil, aralık olarak bile dikkatli okuyun.")
+    if n >= 12 and same_share >= SAME_ANSWER_MEDIUM:
+        return "medium", (f"{n} ajan var ama aynı fiyat cevabını verenlerin payı %{round(same_share * 100)}; görüş çeşitliliği düşük, "
+                          "bölge sınırları oynayabilir.")
     if n < 6:
         return "low", f"Yalnızca {n} ajan: eğriler yumuşatıldı, bölgeler yaklaşık değerdir (aralık olarak okuyun)."
     if n < 12:
@@ -108,7 +127,7 @@ def analyze(answers: Sequence[AgentPriceAnswer], unit_cost: float, steps: int = 
         for p in grid
         for a, b, c, d in [_curves(answers, p)]
     ]
-    quality, quality_note = quality_of(len(answers))
+    quality, quality_note = quality_of(len(answers), same_answer_share(answers))
     result = VanWestendorpResult(
         zones=price_zones(pmc, opp, ipp, pme),
         quality=quality,
