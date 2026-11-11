@@ -206,3 +206,21 @@ def purchase_probability(answers: Sequence[AgentPriceAnswer], p: float) -> float
     """Fiyatta satın alma olasılığı: çok ucuz/çok pahalı bulan almaz, pahalı bulan yarı olasılıkla alır."""
     tc, _, ex, te = _curves(answers, p)
     return max(0.0, min(1.0, 1 - tc - te - 0.5 * (ex - te)))
+
+
+ANCHOR_BAND = 0.12   # en uygun fiyat merdiven merkezinin ±%12'si içindeyse panel merkezden ayrılmadı sayılır
+
+
+def anchor_note(vw: VanWestendorpResult, reference: float | None, price_source: str | None) -> VanWestendorpResult:
+    """Fiyat merdiveni maliyet x marka çarpanı (referans) etrafında kurulur. Panelin en uygun fiyatı bu merkeze çok
+    yakınsa sonuç kurulumun merkezini yansıtıyor olabilir; kalite notuna eklenir ve 'yüksek' kalite 'orta'ya iner."""
+    if not reference or price_source != "agents":
+        return vw
+    ratio = float(vw.optimal_price_point) / reference
+    if abs(ratio - 1) > ANCHOR_BAND:
+        return vw
+    note = (f" Panelin en uygun fiyatı, sorulan fiyat merdiveninin merkezine (maliyet × marka çarpanı, ${reference:,.0f}) çok yakın "
+            f"(oran {f"{ratio:.2f}".replace(".", ",")}). Bu fiyat panelin bağımsız görüşünden çok kurulumun merkezini yansıtıyor olabilir; rakip ya da "
+            "geçmiş satış fiyatıyla karşılaştırın.")
+    return vw.model_copy(update={"quality": "medium" if vw.quality == "high" else vw.quality,
+                                 "quality_note": vw.quality_note + note})

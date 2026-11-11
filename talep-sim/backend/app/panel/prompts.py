@@ -79,8 +79,9 @@ def user_prompt(card: dict, ctx: Optional[ContextPack], ladder: List[float], bra
     features = ", ".join(k for k, v in card.get("features", {}).items() if v) or "belirtilmemiş"
     brand_block = ""
     if brand is not None:
-        ref = (f" Bu marka bu tür ürünleri genelde yaklaşık ${brandlib.reference_price(brand, unit_cost):.0f} civarında satar."
-               if unit_cost else "")
+        # Markanın "genelde şu fiyata satar" bilgisi burada verilmez: maliyet x çarpandan hesaplanan bu sayı panele
+        # cevabı söylüyordu (önerilen fiyat bütün ürünlerde maliyetin sabit katı çıkıyordu). Segment ve bilinirlik yeter.
+        ref = ""
         brand_block = (f"Marka: {brand.name} ({brandlib.TIER_LABEL[brand.price_tier]} segment). {brand.positioning} "
                        f"Bu bölgedeki bilinirliği: {brandlib.region_strength(brand, region)}/100.{ref}\n")
     peer = (f"\nDiğer tüketicilerin bu ürün hakkındaki yorumlarının özeti (katılmak zorunda değilsin):\n{peer_summary}\n"

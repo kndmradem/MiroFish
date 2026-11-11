@@ -24,7 +24,7 @@ from .forecast import DemandModel, forecast_sales
 from .extras import break_even, confidence, seasonal_factor, sensitivity, size_curve
 from .scenarios import build_campaigns, build_price_plan
 from .returns import estimate_returns
-from .pricing import analyze, purchase_probability, steps_from_answers, steps_from_votes
+from .pricing import analyze, anchor_note, purchase_probability, steps_from_answers, steps_from_votes
 from .config import Settings, settings
 from .services.brand_profiler import BrandProfiler
 from .services.llm import LLMClient, LLMError
@@ -262,7 +262,10 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
         raise HTTPException(status_code=502, detail=f"Hiçbir bölge hesaplanamadı. {detail}")
     await emit({"stage": "finalize", "detail": "Fiyat analizi, bütçe dağıtımı ve öneriler hazırlanıyor"})
 
-    priced = {s.region: (s, *analyze(s.price_answers, unit_cost)) for s in sims}
+    priced = {}
+    for s in sims:
+        vw0, best0 = analyze(s.price_answers, unit_cost)
+        priced[s.region] = (s, anchor_note(vw0, s.meta.get("ladder_reference"), s.meta.get("price_source")), best0)
     fx = req.assumptions
     pre = {}
     for r, (s_, vw_, best_) in priced.items():
