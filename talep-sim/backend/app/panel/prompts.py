@@ -7,7 +7,7 @@ from typing import Dict, List, Optional
 
 from .. import brand as brandlib
 from ..models import BrandProfile
-from ..services.answer_extractor import LABELS, example_ladder, ladder_text
+from ..services.answer_extractor import LABELS, ladder_text
 from .library import ContextPack, PanelMember
 
 _INCOME = {"düşük": "düşük gelirli", "orta-alt": "orta-alt gelirli", "orta": "orta gelirli",
@@ -99,10 +99,16 @@ def user_prompt(card: dict, ctx: Optional[ContextPack], ladder: List[float], bra
         'Etiketler: "supheli" (bu kadar ucuzsa kaliteden şüphelenirim), "uygun" (makul, alırım), '
         '"pahali" (pahalı ama düşünürüm), "cok_pahali" (asla almam).\n'
         "interest: bu ürünü satın alma isteğin, 0-100 arası TEK SAYI (isteksiz 10-30, kararsız 40-60, hevesli 70-95).\n"
-        "Sadece şu biçimde JSON yaz:\n"
-        f'{{"interest": 55, "ladder": {example_ladder(len(ladder))}, "objection": "en büyük itirazın, tek kısa cümle", '
-        '"reason": "kararının kısa nedeni"}'
+        "Sadece şu biçimde JSON yaz; <...> yerlerine KENDİ cevabını koy (biçimdeki yer tutucuları kopyalama, puanı bu "
+        "ürüne ve kendi zevkine göre ver; ürünler arasında puanın farklı olması beklenir):\n"
+        f'{{"interest": <0-100 sayı>, "ladder": {ladder_template(len(ladder))}, "objection": "<en büyük itirazın, tek kısa cümle>", '
+        '"reason": "<kararının kısa nedeni>"}'
     )
+
+
+def ladder_template(n: int) -> str:
+    """Örnek değer içermeyen merdiven kalıbı: küçük modeller örnekteki etiketleri ve puanı aynen kopyalıyordu."""
+    return "{" + ", ".join(f'"{i + 1}": "<etiket>"' for i in range(n)) + "}"
 
 
 def answer_schema(n_steps: int) -> Dict:

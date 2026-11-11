@@ -690,3 +690,46 @@ def test_import_keeps_color_image_per_color_row(client):
     assert res["color_plan"]["min_qty"] == 50 and res["color_plan"]["min_qty_basis"] == "kullanıcı girdisi"
     wb = load_workbook(io.BytesIO(client.get(f"/api/collections/{cid}/export.xlsx").content))
     assert wb["Renkler"]["D2"].value == "BLACK"
+
+
+# ---------- panel ayırt etmediğinde (herkes aynı puanı verirse) ----------
+
+def _showcase_recs(n, best, worst, persons=24):
+    recs = []
+    for p in range(persons):
+        order = [f"S{(p + i) % n}" for i in range(n)]
+        letters = dict(zip("ABCDEFGH", order))
+        inv = {v: k for k, v in letters.items()}
+        recs.append({"region": "TR", "person": p, "order": order, "letters": letters,
+                     "answer": {"best": [inv[best]], "worst": [inv[worst]], "together": [], "substitutes": [], "n_buy": 1, "comment": ""}})
+    return {"TR": recs}
+
+
+def test_flat_scores_do_not_create_fake_risk_and_roles_come_from_showcase():
+    col = _col(6)
+    # küçük modelde herkes 55 diyor; tek bir kişinin S5'e 50 demesi ürünü "riskli" yapmamalı
+    results = {f"S{i}": _resp({"TR": [55] * 12}, demand=55) for i in range(5)}
+    results["S5"] = _resp({"TR": [55] * 11 + [50]}, demand=55)
+    res = summarize(col, results, 42.0, showcase=_showcase_recs(6, best="S5", worst="S0"))
+    by = {i.sku: i for i in res.items}
+    assert by["S5"].role != "riskli" and by["S5"].rank.value == 1          # vitrinde en çok seçilen
+    assert by["S0"].role == "riskli" and "vitrin turundan" in by["S0"].role_why
+    assert not any("vitrinde daha" in f for i in res.items for f in i.flags)   # eşit puanlardan sahte karşılaştırma yok
+    assert any("ayırt etmedi" in n and "vitrin turundaki" in n for n in res.notes)
+
+
+def test_one_deviant_answer_is_not_blown_up_by_normalization():
+    col = _col(5)
+    results = {f"S{i}": _resp({"TR": [55] * 12}, demand=55) for i in range(4)}
+    results["S4"] = _resp({"TR": [55] * 11 + [50]}, demand=55)
+    res = summarize(col, results, 42.0)
+    assert abs(next(i for i in res.items if i.sku == "S4").relative.value) < 0.1
+    assert {i.role for i in res.items} == {"belirsiz"}
+
+
+def test_single_weak_but_showcase_strong_is_not_risky():
+    col = _col(6)
+    results = {f"S{i}": _resp({"TR": [70 - 3 * i + (k % 3) for k in range(12)]}, demand=70 - 3 * i) for i in range(6)}
+    res = summarize(col, results, 42.0, showcase=_showcase_recs(6, best="S5", worst="S1"))
+    s5 = next(i for i in res.items if i.sku == "S5")
+    assert s5.role != "riskli" and "çelişiyor" in s5.role_why
