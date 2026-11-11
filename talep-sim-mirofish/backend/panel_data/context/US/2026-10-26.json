@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "region": "US",
+  "version": "2026-10-taslak",
+  "as_of": "2026-10-26",
+  "valid_days": 45,
+  "source": "Taslak: doldurulmamış şablon. Sayısal alanlar bilerek boş; güncel resmi istatistik ve kendi saha notlarınla doldur.",
+  "owner": "talep-sim varsayılanı (müşteri kendi sahibini yazmalı)",
+  "verified": false,
+  "macro": {
+    "inflation_yoy_pct": null,
+    "consumer_confidence": null,
+    "purchasing_power": null,
+    "fx_note": null
+  },
+  "season_notes": "Sonbahar; kuzeyde kışlık, güneyde hafif katman.",
+  "trends": [],
+  "competitor_prices": [],
+  "shopping_notes": "Kasım sonu Black Friday / Cyber Monday; tatil sezonu alışverişi."
+}

@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { MallCard } from "@/components/mall-card";
 import { estimateNewStore, fetchLocations, type LocationProfile, type NewStoreCandidate, type NewStoreEstimate } from "@/lib/api";
 
 const usd0 = (v: number) => `$${Math.round(v).toLocaleString("tr-TR")}`;
@@ -90,6 +91,7 @@ export default function NewStorePage() {
           </div>
         </CardContent>
       </Card>
+      {cand.lokasyon_tipi === "avm" && <MallCard ulke={cand.ulke} sehir={cand.sehir} />}
       {error && <p className="rounded-md border border-red-500/40 bg-red-500/10 p-2 text-sm">{error}</p>}
       {result && (
         <Card>
@@ -102,6 +104,12 @@ export default function NewStorePage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 text-sm">
+            {result.synthetic_data && (
+              <p className="rounded-md border-2 border-red-600 bg-red-500/10 p-2 font-semibold text-red-700">
+                SENTETİK ÖRNEK VERİ: Bu sonuç uydurma deneme mağazalarından (ORNEK-*) hesaplandı, gerçek ERP satışı değildir.
+                Yalnızca ekranı denemek içindir; müşteriye gerçek sonuç olarak gösterilmemeli.
+              </p>
+            )}
             <div className="flex flex-wrap gap-2">
               <Badge variant={result.confidence === "düşük" ? "destructive" : "secondary"}>Güven: {result.confidence}</Badge>
               <Badge variant={noOwn ? "destructive" : "outline"}>{OWN_LABEL[result.own_data]}</Badge>

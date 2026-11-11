@@ -531,6 +531,7 @@ export interface NewStoreEstimate {
   features_used: string[];
   profile_source: string;
   assumptions: string[];
+  synthetic_data?: boolean;
   basis: string;
 }
 
