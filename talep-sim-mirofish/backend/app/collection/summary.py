@@ -261,7 +261,7 @@ def brand_effect(used: Optional[dict], col: Collection, regions: List[str]) -> O
     basis = "kullanıcı girdisi" if b.edited else "LLM tahmini" if b.source == "llm_knowledge" else \
         "kullanıcı girdisi" if b.source == "user_notes" else "kural varsayımı"
     lines = [
-        f"Fiyat merdiveni ve panele söylenen 'bu marka genelde şu fiyata satar' bilgisi maliyet × {b.price_multiple:g} "
+        f"Panele sorulan fiyat merdiveni maliyet × {b.price_multiple:g} "
         f"üzerinden kuruldu. Marka yokken kullanılan × {neutral:g}'e göre fiyat seviyesi %{level:+g}.",
         f"Panel her üründe markayı '{brandlib.TIER_LABEL[b.price_tier]}' segment ve bölgedeki bilinirliğiyle "
         f"({', '.join(f'{r} {brandlib.region_strength(b, r)}/100' for r in regions)}) görerek cevap verdi; marka değeri "

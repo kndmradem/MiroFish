@@ -157,17 +157,63 @@ export function CollectionResults({ base }: { base: CollectionResult }) {
   );
 }
 
-function DecisionTile({ res }: { res: CollectionResult }) {
-  const d = res.summary.decisions ?? {};
+function DecisionTile({ res, counts, scope }: { res: CollectionResult; counts?: Record<string, number>; scope?: string }) {
+  const d = counts ?? res.summary.decisions ?? {};
   return (
     <div className="grid gap-1 rounded-lg border p-3">
-      <div className="flex items-center justify-between text-xs text-muted-foreground">Üretim kararı
+      <div className="flex items-center justify-between text-xs text-muted-foreground">Üretim kararı{scope ? ` (${scope})` : ""}
         <BasisChip basis="kural varsayımı" how="Talep (ajan) ve önerilen fiyattaki net marj eşiklerinden; koleksiyonda iç sıra ve kanibalizasyon da hesaba katılır" /></div>
       <div className="flex flex-wrap content-start items-start gap-1.5 pt-1">
         {DECISIONS.map((k) => <span key={k} className={cn("rounded-full border px-2 py-0.5 text-xs", DECISION_CLASS[k])}>{DECISION_LABEL[k]} {d[k] ?? 0}</span>)}
       </div>
     </div>
   );
+}
+
+const r1 = (x: number) => Math.round(x * 10) / 10;
+const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+
+/** Özet kutuları için seçilen bölgenin (ya da hepsinin) sayıları; hepsi ürün x bölge sonuçlarından türetilir. */
+function regionView(res: CollectionResult, region: string | null) {
+  const s = res.summary;
+  const items = res.items.filter((i) => i.regions.length);
+  const rows = items.flatMap((i) => i.regions.filter((r) => !region || r.region === region).map((r) => ({ i, r })));
+  const appeal = region ? avg(rows.map((x) => x.r.demand)) : s.mean_appeal.value;
+  const ent = rows.map((x) => x.r.enthusiast_pct).filter((x): x is number => x != null);
+  const enthusiast = ent.length ? r1(avg(ent)!) : null;
+  const decisions: Record<string, number> = { "üret": 0, azalt: 0, "üretme": 0 };
+  let qty = 0, cost = 0;
+  for (const it of items) {
+    if (!it.decision) continue;
+    if (!region) { decisions[it.decision] += 1; qty += it.recommended_qty.value ?? 0; continue; }
+    if (!it.regions.some((r) => r.region === region)) continue;
+    const q = it.qty_by_region[region] ?? 0;
+    const anyQty = Object.values(it.qty_by_region).some((x) => x > 0);
+    decisions[it.decision !== "üretme" && anyQty && q === 0 ? "üretme" : it.decision] += 1;
+    qty += q;
+    cost += q * (it.unit_cost_usd ?? 0);
+  }
+  if (!region) qty = s.total_qty;
+  const byRegion = res.regions.length > 1
+    ? res.regions.map((rg) => `${rg} ${Math.round(avg(items.flatMap((i) => i.regions.filter((r) => r.region === rg).map((r) => r.demand))) ?? 0)}`).join(" · ")
+    : "";
+  const vals = rows.map((x) => x.r.demand);
+  const spread = vals.length ? Math.max(...vals) - Math.min(...vals) : 0;
+  const interestNote = vals.length
+    ? (spread < 5 ? `ürünler arası fark ${spread} puan: panel ürünleri ayırt etmedi` : `ürün talepleri ${Math.min(...vals)}–${Math.max(...vals)} arası`)
+    : "veri yok";
+  return {
+    appeal: appeal != null ? r1(appeal) : null, enthusiast, decisions, qty, cost,
+    reach: region ? (s.reach_by_region[region] ?? null) : s.reach.value, byRegion, interestNote,
+  };
+}
+
+function catStats(res: CollectionResult, category: string, region: string) {
+  const regs = res.items.filter((i) => (i.category || "(kategorisiz)") === category)
+    .flatMap((i) => i.regions.filter((r) => r.region === region));
+  if (!regs.length) return { min: null, max: null, demand: null };
+  const prices = regs.map((r) => r.optimal_price);
+  return { min: Math.min(...prices), max: Math.max(...prices), demand: Math.round(avg(regs.map((r) => r.demand))!) };
 }
 
 function Summary({ res, m }: { res: CollectionResult; m: (v: number | null | undefined) => string }) {
@@ -184,23 +230,46 @@ function Summary({ res, m }: { res: CollectionResult; m: (v: number | null | und
     ],
   };
   const sat = s.reach_curve.length;
+  const [view, setView] = useState<string>("genel");
+  const one = view !== "genel" ? view : null;
+  const scope = one ?? "tüm bölgeler";
+  const v = regionView(res, one);
   return (
     <div className="grid gap-5">
-      <div className={cn("grid gap-3 sm:grid-cols-2", indep ? "lg:grid-cols-3" : "lg:grid-cols-5")}>
-        <DecisionTile res={res} />
-        {!indep && <Tile label="Koleksiyon erişimi" m={s.reach} value={s.reach.value != null ? `%${s.reach.value}` : "–"}
-          sub={s.reach.value != null ? "panelin en az bir ürünü çok beğenen kısmı" : "kişi bazlı puan yok"} />}
-        <Tile label="Ortalama talep skoru" m={s.mean_appeal} value={s.mean_appeal.value != null ? String(s.mean_appeal.value) : "–"} sub="0-100" />
+      {res.regions.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-xs text-muted-foreground">Gösterilen:</span>
+          {["genel", ...res.regions].map((r) => (
+            <button key={r} type="button" onClick={() => setView(r)}
+              className={cn("rounded-full border px-3 py-1 text-xs", view === r ? "border-foreground bg-foreground text-background" : "hover:bg-muted")}>
+              {r === "genel" ? "Genel (tüm bölgeler)" : r}
+            </button>
+          ))}
+          <span className="text-xs text-muted-foreground">
+            {one ? `Kutulardaki sayılar yalnızca ${one} bölgesinin.` : "Genel: bölgelerin ortalaması / toplamı; bölgeler birbirinden çok farklı olabilir, ayrıntı için bölge seçin."}
+          </span>
+        </div>
+      )}
+      <div className={cn("grid gap-3 sm:grid-cols-2", indep ? "lg:grid-cols-4" : "lg:grid-cols-6")}>
+        <DecisionTile res={res} counts={v.decisions} scope={res.regions.length > 1 ? scope : undefined} />
+        {!indep && <Tile label={`Koleksiyon erişimi (${scope})`} m={s.reach} value={v.reach != null ? `%${v.reach}` : "–"}
+          sub={v.reach != null ? "panelin en az bir ürünü çok beğenen kısmı" : "kişi bazlı puan yok"} />}
+        <Tile label={`Ortalama talep skoru (${scope})`} m={s.mean_appeal} value={v.appeal != null ? String(v.appeal) : "–"}
+          sub={one ? "0-100, bu bölgedeki ürünlerin ortalaması" : `0-100${v.byRegion ? ` · ${v.byRegion}` : ""}`} />
+        <Tile label={`İlgi durumu (${scope})`} m={{ value: v.enthusiast, basis: "ajan", how: "Ürünlere 70+ ilgi puanı veren kişilerin oranı, ürün ortalaması." }}
+          value={v.enthusiast != null ? `%${v.enthusiast}` : "–"}
+          sub={v.interestNote} />
         {!indep && <div className="grid gap-1 rounded-lg border p-3">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">Ürün rolleri<BasisChip basis="kural varsayımı" how="Koleksiyon içi sıra, hevesli kişi oranı ve görüş ayrılığından kurallarla" /></div>
+          <div className="flex items-center justify-between text-xs text-muted-foreground">Ürün rolleri (tüm bölgeler)<BasisChip basis="kural varsayımı" how="Koleksiyon içi sıra, hevesli kişi oranı ve görüş ayrılığından kurallarla" /></div>
           <div className="flex flex-wrap gap-1.5 pt-1">
             {(["hero", "çekirdek", "tamamlayıcı", "destek", "riskli"] as const).filter((r) => r !== "tamamlayıcı" || s.roles[r]).map((r) => (
               <span key={r} className={cn("rounded-full border px-2 py-0.5 text-xs", ROLE_CLASS[r])}>{ROLE_LABEL[r]} {s.roles[r] ?? 0}</span>
             ))}
           </div>
         </div>}
-        <Tile label="Önerilen üretim" m={s.expected_units} value={`${s.total_qty.toLocaleString("tr-TR")} adet`}
-          sub={s.budget_total_usd ? `${m(s.budget_used_usd)} / ${m(s.budget_total_usd)} bütçe · 120 günde ~${(s.expected_units.value ?? 0).toLocaleString("tr-TR")} satış` : "bütçe girilmedi"} />
+        <Tile label={`Önerilen üretim (${scope})`} m={s.expected_units} value={`${v.qty.toLocaleString("tr-TR")} adet`}
+          sub={one ? `${m(v.cost)} bütçe bu bölgeye · toplam ${s.total_qty.toLocaleString("tr-TR")} adet`
+            : s.budget_total_usd ? `${m(s.budget_used_usd)} / ${m(s.budget_total_usd)} bütçe · 120 günde ~${(s.expected_units.value ?? 0).toLocaleString("tr-TR")} satış` : "bütçe girilmedi"} />
       </div>
 
       {res.brand_effect && <BrandEffectCard b={res.brand_effect} regions={res.regions} />}
@@ -244,22 +313,30 @@ function Summary({ res, m }: { res: CollectionResult; m: (v: number | null | und
       )}
 
       <div className="grid gap-2">
-        <h3 className="text-sm font-medium">Kategoriler</h3>
+        <h3 className="text-sm font-medium">Kategoriler ({scope})</h3>
         <Table>
           <TableHeader><TableRow>
-            <TableHead>Kategori</TableHead><TableHead className="text-right">Ürün</TableHead>{!indep && <TableHead>Roller</TableHead>}
+            <TableHead>Kategori</TableHead><TableHead className="text-right">Ürün</TableHead>{!indep && <TableHead>Roller (tüm bölgeler)</TableHead>}
             <TableHead className="text-right">Önerilen fiyat aralığı</TableHead><TableHead className="text-right">Ort. talep</TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {s.categories.map((c) => (
-              <TableRow key={c.category}>
-                <TableCell>{c.category}</TableCell>
-                <TableCell className="text-right">{c.count}</TableCell>
-                {!indep && <TableCell className="text-xs">{Object.entries(c.roles).filter(([, v]) => v).map(([k, v]) => `${ROLE_LABEL[k as keyof typeof ROLE_LABEL]} ${v}`).join(" · ")}</TableCell>}
-                <TableCell className="text-right">{c.price_min != null ? `${m(c.price_min)} – ${m(c.price_max)}` : "–"}</TableCell>
-                <TableCell className="text-right">{c.mean_appeal}</TableCell>
-              </TableRow>
-            ))}
+            {s.categories.map((c) => {
+              const regs = one ? [one] : res.regions;
+              const stats = regs.map((r) => ({ r, ...catStats(res, c.category, r) }));
+              return (
+                <TableRow key={c.category}>
+                  <TableCell>{c.category}</TableCell>
+                  <TableCell className="text-right">{c.count}</TableCell>
+                  {!indep && <TableCell className="text-xs">{Object.entries(c.roles).filter(([, v]) => v).map(([k, v]) => `${ROLE_LABEL[k as keyof typeof ROLE_LABEL]} ${v}`).join(" · ")}</TableCell>}
+                  <TableCell className="text-right text-xs">
+                    {stats.map((x) => <div key={x.r} className="whitespace-nowrap">{!one && <span className="mr-1 font-mono text-muted-foreground">{x.r}</span>}{x.min != null ? `${m(x.min)} – ${m(x.max)}` : "–"}</div>)}
+                  </TableCell>
+                  <TableCell className="text-right text-xs">
+                    {stats.map((x) => <div key={x.r} className="whitespace-nowrap">{!one && <span className="mr-1 font-mono text-muted-foreground">{x.r}</span>}{x.demand ?? "–"}</div>)}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>
