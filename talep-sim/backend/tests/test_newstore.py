@@ -88,5 +88,13 @@ def test_api_endpoint(data, monkeypatch):
     assert r.status_code == 200, r.text
     assert r.json()["own_data"] == "ülke" and r.json()["analogs"]
     assert len(c.get("/api/new-store/locations").json()) == len(PROFILES)
-    monkeypatch.setattr(main, "settings", Settings(newstore_erp_dir=None))
-    assert c.post("/api/new-store/estimate", json={"ulke": "SA", "sehir": "Jeddah", "metrekare": 400}).status_code == 400
+    assert r.json()["synthetic_data"] is False
+
+
+def test_api_falls_back_to_labeled_synthetic_sample(monkeypatch):
+    monkeypatch.setattr(main, "settings", Settings(newstore_erp_dir=None, newstore_profiles=None))
+    r = TestClient(main.app).post("/api/new-store/estimate", json={"ulke": "TR", "sehir": "İstanbul", "metrekare": 150})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["synthetic_data"] is True and body["warnings"][0].startswith("SENTETİK ÖRNEK VERİ")
+    assert body["own_data"] == "şehir" and all(a["magaza"].startswith("ORNEK-") for a in body["analogs"])

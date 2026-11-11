@@ -52,6 +52,56 @@ def _net_margin(price: float, return_pct: float, cost: Optional[float]) -> Optio
     return round(100 * (net - cost) / price, 1)
 
 
+# Güven kontrolleri: çıktının ajandan mı yoksa kurulumdan (maliyet çarpanı, kitle varsayımı) mı geldiğini ölçer
+ANCHOR_CV = 0.06         # ürünlerin "önerilen fiyat / maliyet" oranlarının değişim katsayısı bunun altındaysa fiyat maliyetten türemiş sayılır
+UNITS_CV = 0.05          # ürünlerin bölge talep adetleri bu kadar az değişiyorsa adetler ürünü ayırt etmiyor
+MIN_CHECK_ITEMS = 3
+
+
+def _cv(vals: List[float]) -> Optional[float]:
+    vals = [v for v in vals if v and v > 0]
+    if len(vals) < MIN_CHECK_ITEMS:
+        return None
+    m = statistics.fmean(vals)
+    return statistics.pstdev(vals) / m if m else None
+
+
+def trust_checks(per_item_regions: Dict[str, List["ItemRegion"]], cost_usd: Dict[str, float]) -> List[Tuple[str, str]]:
+    """Fiyat ve adet çıktılarının ürünleri gerçekten ayırt edip etmediğini ölçer. (anahtar, metin) listesi döner.
+
+    - Fiyat çapası: fiyat merdiveni maliyet x marka çarpanı etrafında kurulur. Bütün ürünlerde önerilen fiyat / maliyet
+      oranı neredeyse aynıysa önerilen fiyat panelin bağımsız görüşü değil, maliyet artı sabit kârdır.
+    - Adet ölçeği: bölge talep adedi erişilebilir kitle (varsayım) x ilgi x dönüşüm tavanından gelir. Ürünler arasında
+      neredeyse aynıysa önerilen adetler ürünü ayırt etmiyor, yalnızca varsayılan kitle büyüklüğünü yansıtıyor.
+    """
+    out: List[Tuple[str, str]] = []
+    regions = sorted({r.region for rs in per_item_regions.values() for r in rs})
+    for reg in regions:
+        ratios, units = [], []
+        for s, rs in per_item_regions.items():
+            r = next((x for x in rs if x.region == reg), None)
+            if r is None:
+                continue
+            if cost_usd.get(s):
+                ratios.append(r.optimal_price / cost_usd[s])
+            units.append(float(r.demand_units))
+        cv = _cv(ratios)
+        if cv is not None and cv < ANCHOR_CV:
+            k = statistics.fmean(ratios)
+            k_txt = f"{k:.2f}".replace(".", ",")
+            out.append(("fiyat", f"{reg}: önerilen fiyat bütün ürünlerde maliyetin yaklaşık {k_txt} katı (ürünler arası fark %{cv * 100:.0f}). "
+                                 "Fiyat merdiveni maliyet × marka çarpanı etrafında kurulduğu için bu fiyat panelin bağımsız görüşü değil, "
+                                 "maliyet artı sabit kârdır; marj eşiği de bu yüzden hiçbir ürünü elemez. Fiyatı karar olarak sunmayın; "
+                                 "rakip/ERP fiyatıyla karşılaştırın."))
+        ucv = _cv(units)
+        if ucv is not None and ucv < UNITS_CV:
+            u_txt = f"{statistics.fmean(units):,.0f}".replace(",", ".")
+            out.append(("adet", f"{reg}: ürünlerin talep adedi neredeyse aynı (ortalama {u_txt}, fark %{ucv * 100:.0f}). "
+                                "Adetler ürünü ayırt etmiyor; erişilebilir kitle varsayımından geliyor. Adetleri ERP'deki benzer ürün "
+                                "satışlarıyla ölçeklemeden üretim adedi olarak sunmayın."))
+    return out
+
+
 def _item_regions(resp: dict, planned_usd: Optional[float], cost_usd: Optional[float] = None
                   ) -> Tuple[List[ItemRegion], Dict[Person, float], dict]:
     regions, interests, basis = [], {}, None
@@ -205,7 +255,7 @@ def brand_effect(used: Optional[dict], col: Collection, regions: List[str]) -> O
     basis = "kullanıcı girdisi" if b.edited else "LLM tahmini" if b.source == "llm_knowledge" else \
         "kullanıcı girdisi" if b.source == "user_notes" else "kural varsayımı"
     lines = [
-        f"Fiyat merdiveni ve panele söylenen 'bu marka genelde şu fiyata satar' bilgisi maliyet × {b.price_multiple:g} "
+        f"Panele sorulan fiyat merdiveni maliyet × {b.price_multiple:g} "
         f"üzerinden kuruldu. Marka yokken kullanılan × {neutral:g}'e göre fiyat seviyesi %{level:+g}.",
         f"Panel her üründe markayı '{brandlib.TIER_LABEL[b.price_tier]}' segment ve bölgedeki bilinirliğiyle "
         f"({', '.join(f'{r} {brandlib.region_strength(b, r)}/100' for r in regions)}) görerek cevap verdi; marka değeri "
@@ -847,6 +897,13 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
 
     # öneriler
     actions: List[Action] = []
+    checks = trust_checks({s: per_item_regions[s] for s in skus},
+                          {it.sku: to_usd(it.unit_cost) for it in evaluated if it.unit_cost})
+    for key, text in checks:
+        actions.append(Action(kind="veri", skus=[], basis="kural varsayımı", text="Güven kontrolü: " + text))
+    if checks:
+        notes.insert(0, "Güven kontrolü uyarısı var (öneriler listesinin başında). Bu koşudaki fiyat ve/veya adetler ürünleri "
+                        "ayırt etmiyor; demoda karar olarak değil, kurulumun sonucu olarak anlatılmalı.")
     for r in out_items:
         if r.decision in ("üretme", "azalt") and r.sku in decisive:
             why_ = "; ".join(x.text for x in decisive[r.sku][:3])
@@ -924,9 +981,12 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
     if not indep:
         notes.append("Roller, erişim ve kanibalizasyon eşikleri kural varsayımıdır (hevesli = 70+ ilgi; örtüşme %60+, fiyat farkı %25 içinde).")
     notes += [
-        "Önerilen satış fiyatı panelin fiyat cevaplarından (Van Westendorp) gelir; Excel'den satış fiyatı okunmaz. Fiyat sekmesinde "
+        "Önerilen satış fiyatı panelin fiyat cevaplarından (Van Westendorp) gelir; ancak panele sorulan fiyat merdiveni maliyet × marka "
+        "çarpanı etrafında kurulur, bu yüzden fiyat bu merkeze çekilir (bkz. güven kontrolü). Excel'den satış fiyatı okunmaz. Fiyat sekmesinde "
         "denenen fiyat yalnızca fiyat uyumunu, marjı ve kararı yeniden hesaplar, panel cevaplarını değiştirmez.",
-        "Önerilen adetler ERP ile kalibre edilene kadar varsayımdır.",
+        "Önerilen adetlerin mutlak büyüklüğü varsayımdır: bölge başına 120 günde erişilebilir kitle (ör. EU 100.000, TR 50.000 kişi, "
+        "marka bilinirliğiyle ölçeklenir) × ilgi × %2 dönüşüm tavanı × fiyat kabulü. ERP'deki benzer ürün satışlarıyla kalibre edilene "
+        "kadar adetler yalnızca ürünler arası oran olarak okunmalı.",
     ]
     summary = CollectionSummary(
         n_items=len(items), n_evaluated=len(evaluated), n_failed=sum(1 for i in items if i.sku in results and not results[i.sku].get("response")),

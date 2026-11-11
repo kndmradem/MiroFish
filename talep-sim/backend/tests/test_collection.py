@@ -751,3 +751,16 @@ def test_identical_price_answers_lower_quality():
     from app.pricing import AgentPriceAnswer as A, analyze
     r, _ = analyze([A(10, 20, 40, 60)] * 11 + [A(12, 22, 44, 70)], 15)
     assert r.quality == "low" and "aynı fiyat" in r.quality_note
+
+
+def test_delete_collection_removes_everything(client):
+    prev = _upload(client).json()
+    cid = prev["collection_id"]
+    client.post(f"/api/collections/{cid}/confirm", json={"meta": prev["meta"], "items": [p["item"] for p in prev["items"]]})
+    assert any(c["id"] == cid for c in client.get("/api/collections").json())
+    r = client.delete(f"/api/collections/{cid}")
+    assert r.status_code == 200 and r.json() == {"deleted": cid}
+    assert all(c["id"] != cid for c in client.get("/api/collections").json())
+    assert client.get(f"/api/collections/{cid}").status_code == 404
+    assert client.delete(f"/api/collections/{cid}").status_code == 404
+    assert client.delete("/api/collections/../etc").status_code in (404, 405)

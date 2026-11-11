@@ -58,7 +58,8 @@ class Settings:
     mirofish_min_valid: int = field(default_factory=lambda: int(_env("MIROFISH_MIN_VALID", "2")))
 
     # --- Yeni mağaza öngörüsü ---
-    # ERP veri sözleşmesi CSV klasörü (magazalar, satislar, doviz_kurlari) ve lokasyon profilleri dosyası
+    # ERP veri sözleşmesi CSV klasörü (magazalar, satislar, doviz_kurlari) ve lokasyon profilleri dosyası.
+    # Boşsa panel_data/ornek_erp (SENTETİK örnek veri) kullanılır ve sonuç ekranda öyle etiketlenir.
     newstore_erp_dir: Optional[str] = field(default_factory=lambda: _env("NEWSTORE_ERP_DIR"))
     newstore_profiles: Optional[str] = field(default_factory=lambda: _env("NEWSTORE_PROFILES"))
     # doviz_kurlari.csv'de olmayan para birimleri için sabit kur, 1 birim = ? TRY (ör. "USD=42,EUR=48")

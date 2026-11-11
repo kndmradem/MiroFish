@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { BrandCard } from "@/components/collection/brand-card";
@@ -9,7 +9,7 @@ import { ImportStep } from "@/components/collection/import-step";
 import { CollectionResults } from "@/components/collection/results";
 import { RunPanel } from "@/components/collection/run-panel";
 import {
-  getCollection, getResult, listCollections,
+  deleteCollection, getCollection, getResult, listCollections,
   type Collection, type CollectionListRow, type CollectionResult, type Kind,
 } from "@/lib/collection-api";
 
@@ -54,7 +54,9 @@ export function BulkPage({ kind }: { kind: Kind }) {
     } catch (e) {
       setCol(null);
       remember(null);
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      // tarayıcının hatırladığı koleksiyon silinmişse sessizce boş ekrana dön
+      if (!msg.includes("bulunamadı")) setError(msg);
     }
   }, [kind, remember]);
 
@@ -76,6 +78,22 @@ export function BulkPage({ kind }: { kind: Kind }) {
     }
   }, [col, kind]);
 
+  const remove = useCallback(async () => {
+    if (!col) return;
+    const ok = window.confirm(`"${col.meta.name}" ve ona ait bütün sonuçlar, ajan cevapları ve görseller kalıcı olarak silinecek. Emin misiniz?`);
+    if (!ok) return;
+    setError(null);
+    try {
+      await deleteCollection(col.id);
+      setCol(null);
+      setResult(null);
+      remember(null);
+      setList(await listCollections(kind));
+    } catch (e) {
+      setError(`Silinemedi: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }, [col, kind, remember]);
+
   return (
     <main className="mx-auto grid max-w-7xl gap-4 p-4 md:p-8">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -93,6 +111,11 @@ export function BulkPage({ kind }: { kind: Kind }) {
             </select>
           )}
           {col && <Button variant="outline" onClick={() => open(null)}><Plus className="size-4" />{t.fresh}</Button>}
+          {col && (
+            <Button variant="outline" className="text-rose-700 hover:bg-rose-50 hover:text-rose-800" onClick={remove}>
+              <Trash2 className="size-4" />Sil
+            </Button>
+          )}
         </div>
       </div>
       {error && <div className="rounded-md border border-rose-300 bg-rose-50 p-3 text-sm text-rose-800">{error}</div>}

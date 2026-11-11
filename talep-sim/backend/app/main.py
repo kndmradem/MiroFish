@@ -24,7 +24,7 @@ from .forecast import DemandModel, forecast_sales
 from .extras import break_even, confidence, seasonal_factor, sensitivity, size_curve
 from .scenarios import build_campaigns, build_price_plan
 from .returns import estimate_returns
-from .pricing import analyze, purchase_probability, steps_from_answers, steps_from_votes
+from .pricing import analyze, anchor_note, purchase_probability, steps_from_answers, steps_from_votes
 from .config import Settings, settings
 from .services.brand_profiler import BrandProfiler
 from .services.llm import LLMClient, LLMError
@@ -140,10 +140,10 @@ def _newstore_data(cfg: Settings):
     """(mağaza istatistikleri, veri notları, profiller); ERP dosyaları değişmedikçe önbellekten."""
     from pathlib import Path
     from . import newstore
-    if not cfg.newstore_erp_dir:
-        raise HTTPException(status_code=400, detail="NEWSTORE_ERP_DIR ayarlı değil: ERP veri sözleşmesi CSV klasörünü ver.")
-    erp = Path(cfg.newstore_erp_dir)
     default = Path(__file__).resolve().parents[1] / "panel_data"
+    # NEWSTORE_ERP_DIR yoksa SENTETİK örnek klasör kullanılır (ekranda açıkça etiketlenir); gerçek veri gelince ayarla
+    synthetic = not cfg.newstore_erp_dir
+    erp = default / "ornek_erp" if synthetic else Path(cfg.newstore_erp_dir)
     prof_path = Path(cfg.newstore_profiles) if cfg.newstore_profiles else (
         default / "lokasyon_profilleri.csv" if (default / "lokasyon_profilleri.csv").exists()
         else default / "lokasyon_profilleri.ornek.csv")
@@ -156,16 +156,19 @@ def _newstore_data(cfg: Settings):
     hit = _NEWSTORE_CACHE.get(key)
     if hit is None or hit[0] != stamp:
         stats, notes = newstore.store_stats(erp, rates)
+        if synthetic:
+            notes.insert(0, "SENTETİK ÖRNEK VERİ: mağaza satışları uydurma deneme verisidir (ORNEK-* mağazaları), gerçek "
+                            "ERP'den gelmiyor. Sonuçlar yalnızca ekranı denemek içindir; gerçek veri için NEWSTORE_ERP_DIR ayarla.")
         if prof_path.name.endswith(".ornek.csv"):
             notes.append("Lokasyon profilleri ÖRNEK dosyadan geldi (yaklaşık, kaynaksız değerler); gerçek dış veriyle değiştir.")
-        hit = (stamp, stats, notes, newstore.load_profiles(prof_path))
+        hit = (stamp, stats, notes, newstore.load_profiles(prof_path), synthetic)
         _NEWSTORE_CACHE[key] = hit
-    return hit[1], hit[2], hit[3]
+    return hit[1], hit[2], hit[3], hit[4]
 
 
 @app.get("/api/new-store/locations")
 async def new_store_locations() -> list:
-    _, _, profiles = _newstore_data(settings)
+    _, _, profiles, _ = _newstore_data(settings)
     return [p.model_dump(mode="json") for p in profiles.values()]
 
 
@@ -173,9 +176,11 @@ async def new_store_locations() -> list:
 async def new_store_estimate(cand: NewStoreCandidate) -> NewStoreEstimate:
     """Aday lokasyon için yıllık ciro aralığı, benzer mağazalar ve uyarılar."""
     from . import newstore
-    stats, notes, profiles = _newstore_data(settings)
+    stats, notes, profiles, synthetic = _newstore_data(settings)
     try:
-        return newstore.estimate(cand, stats, profiles, data_notes=notes)
+        est = newstore.estimate(cand, stats, profiles, data_notes=notes)
+        est.synthetic_data = synthetic
+        return est
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
@@ -262,7 +267,10 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
         raise HTTPException(status_code=502, detail=f"Hiçbir bölge hesaplanamadı. {detail}")
     await emit({"stage": "finalize", "detail": "Fiyat analizi, bütçe dağıtımı ve öneriler hazırlanıyor"})
 
-    priced = {s.region: (s, *analyze(s.price_answers, unit_cost)) for s in sims}
+    priced = {}
+    for s in sims:
+        vw0, best0 = analyze(s.price_answers, unit_cost)
+        priced[s.region] = (s, anchor_note(vw0, s.meta.get("ladder_reference"), s.meta.get("price_source")), best0)
     fx = req.assumptions
     pre = {}
     for r, (s_, vw_, best_) in priced.items():
@@ -456,3 +464,7 @@ async def run_events(run_id: str, start: int = 0) -> StreamingResponse:
 from .collection.routes import router as collection_router  # noqa: E402
 
 app.include_router(collection_router)
+
+from .mallprofile.routes import router as mall_router  # noqa: E402
+
+app.include_router(mall_router)

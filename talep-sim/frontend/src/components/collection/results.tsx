@@ -58,6 +58,7 @@ export function DecisionChip({ d, user }: { d: Decision | null; user?: boolean }
 
 export function CollectionResults({ base }: { base: CollectionResult }) {
   const [tab, setTab] = useState<Tab>("Özet");
+  const [view, setView] = useState<string>("genel");
   const [scenario, setScenario] = useState<WhatIf>({});
   const [res, setRes] = useState<CollectionResult>(base);
   const [busy, setBusy] = useState(false);
@@ -68,7 +69,8 @@ export function CollectionResults({ base }: { base: CollectionResult }) {
   const indep = base.kind === "bagimsiz";
   const tabs = TABS.filter((t) => !(indep && t === "Vitrin") && !(t === "Renkler" && !base.color_plan));
 
-  useEffect(() => { setRes(base); setScenario({}); }, [base]);
+  useEffect(() => { setRes(base); setScenario({}); setView("genel"); }, [base]);
+  const one = view !== "genel" && base.regions.includes(view) ? view : null;
   useEffect(() => {
     if (!active) { setRes(base); return; }
     const t = setTimeout(() => {
@@ -141,27 +143,59 @@ export function CollectionResults({ base }: { base: CollectionResult }) {
               className={cn("-mb-px border-b-2 px-3 py-1.5 text-sm", tab === t ? "border-primary font-medium" : "border-transparent text-muted-foreground")}>{t}</button>
           ))}
         </div>
+        {res.regions.length > 1 && <RegionBar regions={res.regions} view={view} setView={setView} tab={tab} />}
       </CardHeader>
       <CardContent>
-        {tab === "Özet" && <Summary res={res} m={m} />}
-        {tab === "Ürünler" && <Items res={res} items={allItems} excluded={excluded} onExclude={toggleExclude} m={m}
+        {tab === "Özet" && <Summary res={res} m={m} one={one} />}
+        {tab === "Ürünler" && <Items res={res} items={one ? allItems.filter((i) => !i.regions.length || i.regions.some((r) => r.region === one)) : allItems}
+          excluded={excluded} onExclude={toggleExclude} m={m} one={one}
           overrides={scenario.decisions ?? {}} onDecision={setDecision} colorOverrides={scenario.color_decisions ?? {}} onColor={setColor} />}
-        {tab === "Renkler" && <ColorsTab res={res} scenario={scenario} setScenario={setScenario} BasisChip={BasisChip} />}
-        {tab === "Vitrin" && <Showcase res={res} />}
-        {tab === "Bölgeler" && <Heatmap res={res} />}
-        {tab === "Fiyat" && <Prices res={res} m={m} scenario={scenario} setScenario={setScenario} />}
-        {tab === "Bütçe" && <Budget res={res} m={m} scenario={scenario} setScenario={setScenario} />}
+        {tab === "Renkler" && <ColorsTab res={res} scenario={scenario} setScenario={setScenario} BasisChip={BasisChip} one={one} />}
+        {tab === "Vitrin" && <Showcase res={res} one={one} />}
+        {tab === "Bölgeler" && <Heatmap res={res} one={one} />}
+        {tab === "Fiyat" && <Prices res={res} m={m} scenario={scenario} setScenario={setScenario} one={one} />}
+        {tab === "Bütçe" && <Budget res={res} m={m} scenario={scenario} setScenario={setScenario} one={one} />}
         {tab === "Özet" && <p className="mt-4 text-xs text-muted-foreground">Bir ürünün kararını değiştirmek için Ürünler sekmesinde &quot;Karar&quot; sütununu kullanın; bütçe dağıtımı anında yeniden hesaplanır.</p>}
       </CardContent>
     </Card>
   );
 }
 
-function DecisionTile({ res }: { res: CollectionResult }) {
-  const d = res.summary.decisions ?? {};
+const TAB_SCOPE_NOTE: Partial<Record<Tab, string>> = {
+  Vitrin: "Vitrin turunun sonuçları bölgeler birlikte toplanıyor; bu sekmede bölge kırılımı yok.",
+};
+
+/** Bütün sekmelere uygulanan bölge seçici. */
+function RegionBar({ regions, view, setView, tab }: { regions: string[]; view: string; setView: (v: string) => void; tab: Tab }) {
+  const one = view !== "genel" ? view : null;
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-md bg-muted/40 px-3 py-2 text-sm">
+      <span className="text-xs font-medium">Bölge:</span>
+      {["genel", ...regions].map((r) => (
+        <button key={r} type="button" onClick={() => setView(r)}
+          className={cn("rounded-full border px-3 py-1 text-xs", view === r ? "border-foreground bg-foreground text-background" : "bg-background hover:bg-muted")}>
+          {r === "genel" ? "Genel (tüm bölgeler)" : r}
+        </button>
+      ))}
+      <span className="text-xs text-muted-foreground">
+        {TAB_SCOPE_NOTE[tab] ?? (one ? `Bu sekmedeki sayılar yalnızca ${one} bölgesinin.` : "Genel: bölgelerin toplamı / ortalaması; bölgeler birbirinden çok farklı olabilir, ayrıntı için bölge seçin.")}
+      </span>
+    </div>
+  );
+}
+
+/** Ürünün seçilen bölgedeki kararı: diğer bölgelerde üretilip bu bölgeye adet düşmüyorsa bu bölge için "üretme". */
+export function regionDecision(it: ItemResult, region: string | null): Decision | null {
+  if (!region || !it.decision || it.decision === "üretme") return it.decision;
+  const anyQty = Object.values(it.qty_by_region).some((x) => x > 0);
+  return anyQty && !(it.qty_by_region[region] > 0) ? "üretme" : it.decision;
+}
+
+function DecisionTile({ res, counts, scope }: { res: CollectionResult; counts?: Record<string, number>; scope?: string }) {
+  const d = counts ?? res.summary.decisions ?? {};
   return (
     <div className="grid gap-1 rounded-lg border p-3">
-      <div className="flex items-center justify-between text-xs text-muted-foreground">Üretim kararı
+      <div className="flex items-center justify-between text-xs text-muted-foreground">Üretim kararı{scope ? ` (${scope})` : ""}
         <BasisChip basis="kural varsayımı" how="Talep (ajan) ve önerilen fiyattaki net marj eşiklerinden; koleksiyonda iç sıra ve kanibalizasyon da hesaba katılır" /></div>
       <div className="flex flex-wrap content-start items-start gap-1.5 pt-1">
         {DECISIONS.map((k) => <span key={k} className={cn("rounded-full border px-2 py-0.5 text-xs", DECISION_CLASS[k])}>{DECISION_LABEL[k]} {d[k] ?? 0}</span>)}
@@ -170,7 +204,52 @@ function DecisionTile({ res }: { res: CollectionResult }) {
   );
 }
 
-function Summary({ res, m }: { res: CollectionResult; m: (v: number | null | undefined) => string }) {
+const r1 = (x: number) => Math.round(x * 10) / 10;
+const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+
+/** Özet kutuları için seçilen bölgenin (ya da hepsinin) sayıları; hepsi ürün x bölge sonuçlarından türetilir. */
+function regionView(res: CollectionResult, region: string | null) {
+  const s = res.summary;
+  const items = res.items.filter((i) => i.regions.length);
+  const rows = items.flatMap((i) => i.regions.filter((r) => !region || r.region === region).map((r) => ({ i, r })));
+  const appeal = region ? avg(rows.map((x) => x.r.demand)) : s.mean_appeal.value;
+  const ent = rows.map((x) => x.r.enthusiast_pct).filter((x): x is number => x != null);
+  const enthusiast = ent.length ? r1(avg(ent)!) : null;
+  const decisions: Record<string, number> = { "üret": 0, azalt: 0, "üretme": 0 };
+  let qty = 0, cost = 0;
+  for (const it of items) {
+    if (!it.decision) continue;
+    if (!region) { decisions[it.decision] += 1; qty += it.recommended_qty.value ?? 0; continue; }
+    if (!it.regions.some((r) => r.region === region)) continue;
+    const q = it.qty_by_region[region] ?? 0;
+    decisions[regionDecision(it, region)!] += 1;
+    qty += q;
+    cost += q * (it.unit_cost_usd ?? 0);
+  }
+  if (!region) qty = s.total_qty;
+  const byRegion = res.regions.length > 1
+    ? res.regions.map((rg) => `${rg} ${Math.round(avg(items.flatMap((i) => i.regions.filter((r) => r.region === rg).map((r) => r.demand))) ?? 0)}`).join(" · ")
+    : "";
+  const vals = rows.map((x) => x.r.demand);
+  const spread = vals.length ? Math.max(...vals) - Math.min(...vals) : 0;
+  const interestNote = vals.length
+    ? (spread < 5 ? `ürünler arası fark ${spread} puan: panel ürünleri ayırt etmedi` : `ürün talepleri ${Math.min(...vals)}–${Math.max(...vals)} arası`)
+    : "veri yok";
+  return {
+    appeal: appeal != null ? r1(appeal) : null, enthusiast, decisions, qty, cost,
+    reach: region ? (s.reach_by_region[region] ?? null) : s.reach.value, byRegion, interestNote,
+  };
+}
+
+function catStats(res: CollectionResult, category: string, region: string) {
+  const regs = res.items.filter((i) => (i.category || "(kategorisiz)") === category)
+    .flatMap((i) => i.regions.filter((r) => r.region === region));
+  if (!regs.length) return { min: null, max: null, demand: null };
+  const prices = regs.map((r) => r.optimal_price);
+  return { min: Math.min(...prices), max: Math.max(...prices), demand: Math.round(avg(regs.map((r) => r.demand))!) };
+}
+
+function Summary({ res, m, one }: { res: CollectionResult; m: (v: number | null | undefined) => string; one: string | null }) {
   const s = res.summary;
   const indep = res.kind === "bagimsiz";
   const curve: EChartsOption = {
@@ -184,23 +263,30 @@ function Summary({ res, m }: { res: CollectionResult; m: (v: number | null | und
     ],
   };
   const sat = s.reach_curve.length;
+  const scope = one ?? "tüm bölgeler";
+  const v = regionView(res, one);
   return (
     <div className="grid gap-5">
-      <div className={cn("grid gap-3 sm:grid-cols-2", indep ? "lg:grid-cols-3" : "lg:grid-cols-5")}>
-        <DecisionTile res={res} />
-        {!indep && <Tile label="Koleksiyon erişimi" m={s.reach} value={s.reach.value != null ? `%${s.reach.value}` : "–"}
-          sub={s.reach.value != null ? "panelin en az bir ürünü çok beğenen kısmı" : "kişi bazlı puan yok"} />}
-        <Tile label="Ortalama talep skoru" m={s.mean_appeal} value={s.mean_appeal.value != null ? String(s.mean_appeal.value) : "–"} sub="0-100" />
+      <div className={cn("grid gap-3 sm:grid-cols-2", indep ? "lg:grid-cols-4" : "lg:grid-cols-6")}>
+        <DecisionTile res={res} counts={v.decisions} scope={res.regions.length > 1 ? scope : undefined} />
+        {!indep && <Tile label={`Koleksiyon erişimi (${scope})`} m={s.reach} value={v.reach != null ? `%${v.reach}` : "–"}
+          sub={v.reach != null ? "panelin en az bir ürünü çok beğenen kısmı" : "kişi bazlı puan yok"} />}
+        <Tile label={`Ortalama talep skoru (${scope})`} m={s.mean_appeal} value={v.appeal != null ? String(v.appeal) : "–"}
+          sub={one ? "0-100, bu bölgedeki ürünlerin ortalaması" : `0-100${v.byRegion ? ` · ${v.byRegion}` : ""}`} />
+        <Tile label={`İlgi durumu (${scope})`} m={{ value: v.enthusiast, basis: "ajan", how: "Ürünlere 70+ ilgi puanı veren kişilerin oranı, ürün ortalaması." }}
+          value={v.enthusiast != null ? `%${v.enthusiast}` : "–"}
+          sub={v.interestNote} />
         {!indep && <div className="grid gap-1 rounded-lg border p-3">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">Ürün rolleri<BasisChip basis="kural varsayımı" how="Koleksiyon içi sıra, hevesli kişi oranı ve görüş ayrılığından kurallarla" /></div>
+          <div className="flex items-center justify-between text-xs text-muted-foreground">Ürün rolleri (tüm bölgeler)<BasisChip basis="kural varsayımı" how="Koleksiyon içi sıra, hevesli kişi oranı ve görüş ayrılığından kurallarla" /></div>
           <div className="flex flex-wrap gap-1.5 pt-1">
             {(["hero", "çekirdek", "tamamlayıcı", "destek", "riskli"] as const).filter((r) => r !== "tamamlayıcı" || s.roles[r]).map((r) => (
               <span key={r} className={cn("rounded-full border px-2 py-0.5 text-xs", ROLE_CLASS[r])}>{ROLE_LABEL[r]} {s.roles[r] ?? 0}</span>
             ))}
           </div>
         </div>}
-        <Tile label="Önerilen üretim" m={s.expected_units} value={`${s.total_qty.toLocaleString("tr-TR")} adet`}
-          sub={s.budget_total_usd ? `${m(s.budget_used_usd)} / ${m(s.budget_total_usd)} bütçe · 120 günde ~${(s.expected_units.value ?? 0).toLocaleString("tr-TR")} satış` : "bütçe girilmedi"} />
+        <Tile label={`Önerilen üretim (${scope})`} m={s.expected_units} value={`${v.qty.toLocaleString("tr-TR")} adet`}
+          sub={one ? `${m(v.cost)} bütçe bu bölgeye · toplam ${s.total_qty.toLocaleString("tr-TR")} adet`
+            : s.budget_total_usd ? `${m(s.budget_used_usd)} / ${m(s.budget_total_usd)} bütçe · 120 günde ~${(s.expected_units.value ?? 0).toLocaleString("tr-TR")} satış` : "bütçe girilmedi"} />
       </div>
 
       {res.brand_effect && <BrandEffectCard b={res.brand_effect} regions={res.regions} />}
@@ -244,22 +330,30 @@ function Summary({ res, m }: { res: CollectionResult; m: (v: number | null | und
       )}
 
       <div className="grid gap-2">
-        <h3 className="text-sm font-medium">Kategoriler</h3>
+        <h3 className="text-sm font-medium">Kategoriler ({scope})</h3>
         <Table>
           <TableHeader><TableRow>
-            <TableHead>Kategori</TableHead><TableHead className="text-right">Ürün</TableHead>{!indep && <TableHead>Roller</TableHead>}
+            <TableHead>Kategori</TableHead><TableHead className="text-right">Ürün</TableHead>{!indep && <TableHead>Roller (tüm bölgeler)</TableHead>}
             <TableHead className="text-right">Önerilen fiyat aralığı</TableHead><TableHead className="text-right">Ort. talep</TableHead>
           </TableRow></TableHeader>
           <TableBody>
-            {s.categories.map((c) => (
-              <TableRow key={c.category}>
-                <TableCell>{c.category}</TableCell>
-                <TableCell className="text-right">{c.count}</TableCell>
-                {!indep && <TableCell className="text-xs">{Object.entries(c.roles).filter(([, v]) => v).map(([k, v]) => `${ROLE_LABEL[k as keyof typeof ROLE_LABEL]} ${v}`).join(" · ")}</TableCell>}
-                <TableCell className="text-right">{c.price_min != null ? `${m(c.price_min)} – ${m(c.price_max)}` : "–"}</TableCell>
-                <TableCell className="text-right">{c.mean_appeal}</TableCell>
-              </TableRow>
-            ))}
+            {s.categories.map((c) => {
+              const regs = one ? [one] : res.regions;
+              const stats = regs.map((r) => ({ r, ...catStats(res, c.category, r) }));
+              return (
+                <TableRow key={c.category}>
+                  <TableCell>{c.category}</TableCell>
+                  <TableCell className="text-right">{c.count}</TableCell>
+                  {!indep && <TableCell className="text-xs">{Object.entries(c.roles).filter(([, v]) => v).map(([k, v]) => `${ROLE_LABEL[k as keyof typeof ROLE_LABEL]} ${v}`).join(" · ")}</TableCell>}
+                  <TableCell className="text-right text-xs">
+                    {stats.map((x) => <div key={x.r} className="whitespace-nowrap">{!one && <span className="mr-1 font-mono text-muted-foreground">{x.r}</span>}{x.min != null ? `${m(x.min)} – ${m(x.max)}` : "–"}</div>)}
+                  </TableCell>
+                  <TableCell className="text-right text-xs">
+                    {stats.map((x) => <div key={x.r} className="whitespace-nowrap">{!one && <span className="mr-1 font-mono text-muted-foreground">{x.r}</span>}{x.demand ?? "–"}</div>)}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>
@@ -293,8 +387,8 @@ function BrandEffectCard({ b, regions }: { b: NonNullable<CollectionResult["bran
   );
 }
 
-function Items({ res, items, excluded, onExclude, m, overrides, onDecision, colorOverrides, onColor }: {
-  res: CollectionResult; items: ItemResult[]; excluded: Set<string>; onExclude: (sku: string, on: boolean) => void;
+function Items({ res, items, excluded, onExclude, m, overrides, onDecision, colorOverrides, onColor, one }: {
+  res: CollectionResult; items: ItemResult[]; excluded: Set<string>; onExclude: (sku: string, on: boolean) => void; one: string | null;
   m: (v: number | null | undefined) => string; overrides: Record<string, Decision>; onDecision: (sku: string, d: Decision | "") => void;
   colorOverrides: Record<string, ColorDecision>; onColor: (key: string, d: ColorDecision | "") => void;
 }) {
@@ -302,8 +396,13 @@ function Items({ res, items, excluded, onExclude, m, overrides, onDecision, colo
   const n = res.summary.n_evaluated;
   const indep = res.kind === "bagimsiz";
   const cols = indep ? 8 : 12;
+  const rs = one ? ` (${one})` : "";
+  const all = one ? " (tüm bölgeler)" : "";
   return (
     <div className="overflow-x-auto">
+      {one && <p className="mb-2 rounded-md border border-sky-200 bg-sky-50 px-2 py-1 text-xs text-sky-900">
+        Talep, karar, önerilen fiyat, net marj ve adet {one} bölgesine göre. Sıra, koleksiyona göre konum, vitrin sırası ve rol bütün bölgelerin birlikte sonucu.
+        Bir ürünün kararı başka bölgede &quot;üret&quot; olsa da {one}&apos;e adet düşmüyorsa burada &quot;üretme&quot; görünür.</p>}
       <p className="mb-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
         Kaynaklar: talep, önerilen fiyat ve kabul aralığı <BasisChip basis="ajan" />, net marj, karar eşikleri ve adet <BasisChip basis="kural varsayımı" />,
         maliyet{indep ? "" : " ve hedef rol"} <BasisChip basis="kullanıcı girdisi" />. Satıra tıklayınca kararın gerekçesi ve bölge ayrıntısı açılır.
@@ -312,12 +411,12 @@ function Items({ res, items, excluded, onExclude, m, overrides, onDecision, colo
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-6" /><TableHead>Ürün</TableHead><TableHead>Karar</TableHead>
-            {!indep && <TableHead>Sıra</TableHead>}
-            <TableHead className="text-right">Talep</TableHead>
-            {!indep && <><TableHead>Koleksiyona göre</TableHead><TableHead className="text-right">Vitrin sırası</TableHead><TableHead>Rol (hedef → panel)</TableHead></>}
-            <TableHead className="text-right">Önerilen fiyat</TableHead><TableHead className="text-right">Net marj</TableHead>
-            <TableHead className="text-right">Önerilen adet</TableHead><TableHead>Bayraklar</TableHead>
+            <TableHead className="w-6" /><TableHead>Ürün</TableHead><TableHead>Karar{rs}</TableHead>
+            {!indep && <TableHead>Sıra{all}</TableHead>}
+            <TableHead className="text-right">Talep{rs}</TableHead>
+            {!indep && <><TableHead>Koleksiyona göre{all}</TableHead><TableHead className="text-right">Vitrin sırası{all}</TableHead><TableHead>Rol (hedef → panel){all}</TableHead></>}
+            <TableHead className="text-right">Önerilen fiyat{rs}</TableHead><TableHead className="text-right">Net marj{rs}</TableHead>
+            <TableHead className="text-right">Önerilen adet{rs}</TableHead><TableHead>Bayraklar</TableHead>
             {!indep && <TableHead>Çıkar</TableHead>}
           </TableRow>
         </TableHeader>
@@ -325,10 +424,14 @@ function Items({ res, items, excluded, onExclude, m, overrides, onDecision, colo
           {items.map((it) => {
             const ex = excluded.has(it.sku);
             const rel = it.relative.value ?? 0;
-            const rp = it.recommended_price;
+            const rr = one ? it.regions.find((x) => x.region === one) : undefined;
+            const rp = rr ? { ...it.recommended_price, value: rr.optimal_price, low: rr.range_low, high: rr.range_high, how: `${one} paneli` } : it.recommended_price;
+            const dec = regionDecision(it, one);
+            const nm = rr ? rr.net_margin_pct : it.net_margin.value;
+            const qty = one ? (it.decision ? (it.qty_by_region[one] ?? 0) : null) : it.recommended_qty.value;
             return (
               <Fragment key={it.sku}>
-                <TableRow className={cn(ex && "opacity-40", it.decision === "üretme" && !ex && "bg-rose-50/40")}>
+                <TableRow className={cn(ex && "opacity-40", dec === "üretme" && !ex && "bg-rose-50/40")}>
                   <TableCell>
                     <button onClick={() => setOpen(open === it.sku ? null : it.sku)} disabled={!it.regions.length} aria-label="Ayrıntı">
                       {open === it.sku ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
@@ -338,12 +441,12 @@ function Items({ res, items, excluded, onExclude, m, overrides, onDecision, colo
                     <div className="flex items-center gap-2">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       {it.image && <img src={imageUrl(res.collection_id, it.image)} alt="" className="size-11 rounded object-cover" />}
-                      <div className="min-w-40 whitespace-normal"><div className="font-medium">{it.name}</div><div className="font-mono text-[11px] text-muted-foreground">{it.sku} · {it.category || "kategorisiz"}</div><ColorStrip it={it} /></div>
+                      <div className="min-w-40 whitespace-normal"><div className="font-medium">{it.name}</div><div className="font-mono text-[11px] text-muted-foreground">{it.sku} · {it.category || "kategorisiz"}</div><ColorStrip it={it} region={one} /></div>
                     </div>
                   </TableCell>
                   <TableCell className="min-w-44 whitespace-normal">
                     <div className="flex items-center gap-1.5">
-                      <DecisionChip d={it.decision} user={it.decision_source === "kullanıcı"} />
+                      <DecisionChip d={dec} user={it.decision_source === "kullanıcı"} />
                       {it.decision && (
                         <select className="h-6 rounded border bg-background px-1 text-[11px]" value={overrides[it.sku] ?? ""} title="Kararı elle değiştir"
                           onChange={(e) => onDecision(it.sku, e.target.value as Decision | "")}>
@@ -352,6 +455,7 @@ function Items({ res, items, excluded, onExclude, m, overrides, onDecision, colo
                         </select>
                       )}
                     </div>
+                    {dec !== it.decision && <div className="mt-1 text-[11px] leading-snug text-muted-foreground">Genel karar: {it.decision ? DECISION_LABEL[it.decision] : "–"}; {one}&apos;e adet düşmedi.</div>}
                     {it.decision_reasons[0] && <div className="mt-1 text-[11px] leading-snug text-muted-foreground">{it.decision_reasons[0].text}</div>}
                     {!it.decision && <div className="mt-1 text-[11px] text-muted-foreground">{it.role_why}</div>}
                   </TableCell>
@@ -360,7 +464,7 @@ function Items({ res, items, excluded, onExclude, m, overrides, onDecision, colo
                       {it.rank.value != null ? <><b>{it.rank.value}</b><span className="text-muted-foreground">/{n}</span>{it.rank.low != null && <span className="text-xs text-muted-foreground"> ({it.rank.low}-{it.rank.high})</span>}</> : "–"}
                     </TableCell>
                   )}
-                  <TableCell className="text-right">{it.appeal.value ?? "–"}</TableCell>
+                  <TableCell className="text-right">{rr ? rr.demand : (it.appeal.value ?? "–")}</TableCell>
                   {!indep && (
                     <>
                       <TableCell title={it.relative.how}>
@@ -387,11 +491,12 @@ function Items({ res, items, excluded, onExclude, m, overrides, onDecision, colo
                     {rp.value != null ? <><b>{m(rp.value)}</b>
                       {rp.low != null && <div className="text-[11px] text-muted-foreground">kabul {m(rp.low)} – {m(rp.high)}</div>}</> : "–"}
                   </TableCell>
-                  <TableCell className={cn("text-right", it.net_margin.value != null && it.net_margin.value < 15 && "text-rose-700")} title={it.net_margin.how}>
-                    {it.net_margin.value != null ? `%${it.net_margin.value}` : "–"}
+                  <TableCell className={cn("text-right", nm != null && nm < 15 && "text-rose-700")} title={it.net_margin.how}>
+                    {nm != null ? `%${nm}` : "–"}
                   </TableCell>
-                  <TableCell className="text-right" title={it.recommended_qty.how}>{it.recommended_qty.value != null ? it.recommended_qty.value.toLocaleString("tr-TR") : "–"}
-                    {it.planned_qty != null && <div className="text-[11px] text-muted-foreground">plan {it.planned_qty.toLocaleString("tr-TR")}</div>}</TableCell>
+                  <TableCell className="text-right" title={it.recommended_qty.how}>{qty != null ? qty.toLocaleString("tr-TR") : "–"}
+                    {one && it.recommended_qty.value != null && <div className="text-[11px] text-muted-foreground">toplam {it.recommended_qty.value.toLocaleString("tr-TR")}</div>}
+                    {it.planned_qty != null && !one && <div className="text-[11px] text-muted-foreground">plan {it.planned_qty.toLocaleString("tr-TR")}</div>}</TableCell>
                   <TableCell className="max-w-48 text-xs whitespace-normal">{it.flags.join(", ")}</TableCell>
                   {!indep && <TableCell><Checkbox checked={ex} onCheckedChange={(v) => onExclude(it.sku, v === true)} /></TableCell>}
                 </TableRow>
@@ -410,7 +515,7 @@ function Items({ res, items, excluded, onExclude, m, overrides, onDecision, colo
                           </div>
                         )}
                         {!indep && <div className="text-xs text-muted-foreground">Rol: {it.role_why}</div>}
-                        <ColorTable res={res} it={it} overrides={colorOverrides} onColor={onColor} BasisChip={BasisChip} />
+                        <ColorTable res={res} it={it} overrides={colorOverrides} onColor={onColor} BasisChip={BasisChip} region={one} />
                         <Table>
                           <TableHeader><TableRow>
                             <TableHead>Bölge</TableHead><TableHead className="text-right">Talep</TableHead><TableHead className="text-right">Hevesli</TableHead>
@@ -419,7 +524,7 @@ function Items({ res, items, excluded, onExclude, m, overrides, onDecision, colo
                             <TableHead>En sık itirazlar</TableHead><TableHead>Güven</TableHead>
                           </TableRow></TableHeader>
                           <TableBody>
-                            {it.regions.map((r) => (
+                            {it.regions.filter((r) => !one || r.region === one).map((r) => (
                               <TableRow key={r.region}>
                                 <TableCell>{r.region}</TableCell><TableCell className="text-right">{r.demand}</TableCell>
                                 <TableCell className="text-right">{r.enthusiast_pct != null ? `%${r.enthusiast_pct}` : "–"}</TableCell>
@@ -451,7 +556,7 @@ function Items({ res, items, excluded, onExclude, m, overrides, onDecision, colo
   );
 }
 
-function Showcase({ res }: { res: CollectionResult }) {
+function Showcase({ res, one }: { res: CollectionResult; one: string | null }) {
   const v = res.showcase;
   if (!v) {
     return (
@@ -466,6 +571,8 @@ function Showcase({ res }: { res: CollectionResult }) {
   const bar = (p: number, cls: string) => <div className="h-2 rounded bg-muted"><div className={cn("h-2 rounded", cls)} style={{ width: `${Math.min(100, p)}%` }} /></div>;
   return (
     <div className="grid gap-5">
+      {one && <p className="rounded-md border border-sky-200 bg-sky-50 px-2 py-1 text-xs text-sky-900">
+        {one} seçili, ama vitrin turu sonuçları bütün bölgelerin panelinden birlikte toplanıyor. Bu sekmedeki sayılar tüm bölgelerin.</p>}
       <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
         Panel ürünleri en fazla {v.block_size} ürünlük gruplar halinde, her kişide farklı karıştırılmış sırayla bir arada gördü ve seçti
         <BasisChip basis="ajan" />. {v.n_persons} kişi, {v.n_answers} grup cevabı{v.n_failed ? `, ${v.n_failed} okunamadı` : ""}
@@ -532,21 +639,24 @@ function Showcase({ res }: { res: CollectionResult }) {
   );
 }
 
-function Heatmap({ res }: { res: CollectionResult }) {
-  const items = res.items.filter((i) => i.regions.length).sort((a, b) => (a.rank.value ?? 0) - (b.rank.value ?? 0));
-  const data = items.flatMap((it, y) => it.regions.map((r) => [res.regions.indexOf(r.region), y, r.demand]));
+function Heatmap({ res, one }: { res: CollectionResult; one: string | null }) {
+  const regs = one ? [one] : res.regions;
+  const dOf = (i: ItemResult) => i.regions.find((r) => r.region === one)?.demand ?? -1;
+  const items = res.items.filter((i) => i.regions.some((r) => regs.includes(r.region)))
+    .sort((a, b) => (one ? dOf(b) - dOf(a) : (a.rank.value ?? 0) - (b.rank.value ?? 0)));
+  const data = items.flatMap((it, y) => it.regions.filter((r) => regs.includes(r.region)).map((r) => [regs.indexOf(r.region), y, r.demand]));
   const opt: EChartsOption = {
-    tooltip: { formatter: (p) => { const d = (p as { data: number[] }).data; return `${items[d[1]].name} · ${res.regions[d[0]]}: talep ${d[2]}`; } },
+    tooltip: { formatter: (p) => { const d = (p as { data: number[] }).data; return `${items[d[1]].name} · ${regs[d[0]]}: talep ${d[2]}`; } },
     grid: { left: 160, right: 20, top: 10, bottom: 50 },
-    xAxis: { type: "category", data: res.regions, position: "top" },
+    xAxis: { type: "category", data: regs, position: "top" },
     yAxis: { type: "category", data: items.map((i) => i.name), inverse: true, axisLabel: { width: 150, overflow: "truncate" } },
     visualMap: { min: 0, max: 100, orient: "horizontal", left: "center", bottom: 0, calculable: false, inRange: { color: ["#fee2e2", "#fef9c3", "#bbf7d0", "#15803d"] } },
     series: [{ type: "heatmap", data, label: { show: true } }],
   };
-  const byRegion = res.summary.reach_by_region;
+  const byRegion = Object.fromEntries(Object.entries(res.summary.reach_by_region).filter(([r]) => !one || r === one));
   return (
     <div className="grid gap-3">
-      <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">Ürün × bölge talep skoru (0-100) <BasisChip basis="ajan" />. Bir ürün bir bölgede zayıfsa o bölgenin koleksiyonundan çıkarılabilir.</p>
+      <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">Ürün × bölge talep skoru (0-100) <BasisChip basis="ajan" />. {one ? `Yalnızca ${one}, talebe göre sıralı.` : "Bir ürün bir bölgede zayıfsa o bölgenin koleksiyonundan çıkarılabilir."}</p>
       {Object.keys(byRegion).length > 0 && (
         <div className="flex flex-wrap gap-2 text-sm">
           {Object.entries(byRegion).map(([r, v]) => <Badge key={r} variant="outline">{r}: erişim %{v}</Badge>)}
@@ -561,10 +671,10 @@ const ZONE_CLASS: Record<string, string> = {
   too_cheap: "bg-slate-200", cheap: "bg-sky-200", ideal: "bg-emerald-300", expensive: "bg-amber-200", too_expensive: "bg-rose-200",
 };
 
-function Prices({ res, m, scenario, setScenario }: {
-  res: CollectionResult; m: (v: number | null | undefined) => string; scenario: WhatIf; setScenario: (f: (s: WhatIf) => WhatIf) => void;
+function Prices({ res, m, scenario, setScenario, one }: {
+  res: CollectionResult; m: (v: number | null | undefined) => string; scenario: WhatIf; setScenario: (f: (s: WhatIf) => WhatIf) => void; one: string | null;
 }) {
-  const [region, setRegion] = useState(res.regions[0]);
+  const regs = one ? [one] : res.regions;
   const items = res.items.filter((i) => i.regions.length);
   const cats = Array.from(new Set(items.map((i) => i.category || "kategorisiz")));
   const legend = items.flatMap((i) => i.regions).find((r) => r.zones.length)?.zones ?? [];
@@ -575,10 +685,8 @@ function Prices({ res, m, scenario, setScenario }: {
           Renkli bantlar panelin fiyat bölgeleri (Van Westendorp) <BasisChip basis="ajan" />, koyu çizgi sistemin önerdiği en kârlı fiyat.
           Satış fiyatını siz girmiyorsunuz; isterseniz sağdaki kutuya bir fiyat yazıp marjı ve kararı deneyebilirsiniz (panel yeniden sorulmaz) <BasisChip basis="kullanıcı girdisi" />.
           Her satırın ölçeği kendi fiyat aralığına göredir.
+          {!one && regs.length > 1 && " Genel görünümde her ürün için bölge başına ayrı satır var; tek bölgeye bakmak için yukarıdan bölge seçin."}
         </p>
-        <select className="ml-auto h-8 rounded-md border bg-background px-2 text-sm text-foreground" value={region} onChange={(e) => setRegion(e.target.value)}>
-          {res.regions.map((r) => <option key={r}>{r}</option>)}
-        </select>
       </div>
       {legend.length > 0 && (
         <div className="flex flex-wrap gap-3 text-xs">
@@ -590,17 +698,21 @@ function Prices({ res, m, scenario, setScenario }: {
         return (
           <div key={c} className="grid gap-2">
             <h3 className="text-sm font-medium">{c}</h3>
-            {rows.map((i) => {
+            {rows.flatMap((i) => regs.map((region, ri) => {
               const r = i.regions.find((x) => x.region === region);
               if (!r) return null;
+              const first = ri === 0 || !i.regions.some((x) => x.region === regs[ri - 1]);
               const trial = i.planned_price_usd;
               const min = Math.min(r.range_low * 0.6, trial ?? Infinity);
               const max = Math.max(r.range_high * 1.4, trial ? trial * 1.05 : 0);
               const pos = (v: number) => Math.max(0, Math.min(100, (100 * (v - min)) / (max - min || 1)));
               const zones = r.zones.length ? r.zones : [{ key: "ideal", label: "Kabul aralığı", low: r.range_low, high: r.range_high }];
               return (
-                <div key={i.sku} className="grid grid-cols-[minmax(110px,190px)_1fr_minmax(150px,auto)_110px] items-center gap-3 text-sm">
-                  <span className="grid min-w-0 gap-0.5"><span className="truncate" title={i.name}>{i.name}</span><span><DecisionChip d={i.decision} /></span></span>
+                <div key={i.sku + region} className={cn("grid grid-cols-[minmax(110px,190px)_1fr_minmax(150px,auto)_110px] items-center gap-3 text-sm", !one && regs.length > 1 && first && "mt-1 border-t pt-2")}>
+                  <span className="grid min-w-0 gap-0.5">
+                    {(one || first || regs.length === 1) && <span className="truncate" title={i.name}>{i.name}</span>}
+                    <span className="flex items-center gap-1.5">{!one && regs.length > 1 && <span className="rounded border px-1 font-mono text-[11px]">{region}</span>}<DecisionChip d={regionDecision(i, region)} /></span>
+                  </span>
                   <div className="relative h-7 overflow-hidden rounded bg-muted/50">
                     {zones.map((z) => {
                       const lo = pos(z.low), hi = pos(z.high ?? max);
@@ -618,7 +730,7 @@ function Prices({ res, m, scenario, setScenario }: {
                     <b className="text-sm">{m(r.optimal_price)}</b> önerilen<br />
                     <span className="text-muted-foreground">kabul {m(r.range_low)} – {m(r.range_high)}{r.net_margin_pct != null ? ` · net marj %${r.net_margin_pct}` : ""}</span>
                   </span>
-                  <Input className="h-8 text-right" type="number" placeholder="fiyat dene"
+                  {first || one ? <Input className="h-8 text-right" type="number" placeholder="fiyat dene" title="Denenen fiyat bütün bölgelere uygulanır"
                     value={scenario.planned_prices?.[i.sku] ?? ""}
                     onChange={(e) => {
                       const v = e.target.value;
@@ -627,10 +739,10 @@ function Prices({ res, m, scenario, setScenario }: {
                         if (v === "") delete pp[i.sku]; else pp[i.sku] = Number(v);
                         return { ...s, planned_prices: pp };
                       });
-                    }} />
+                    }} /> : <span />}
                 </div>
               );
-            })}
+            }))}
           </div>
         );
       })}
@@ -638,11 +750,15 @@ function Prices({ res, m, scenario, setScenario }: {
   );
 }
 
-function Budget({ res, m, scenario, setScenario }: {
-  res: CollectionResult; m: (v: number | null | undefined) => string; scenario: WhatIf; setScenario: (f: (s: WhatIf) => WhatIf) => void;
+function Budget({ res, m, scenario, setScenario, one }: {
+  res: CollectionResult; m: (v: number | null | undefined) => string; scenario: WhatIf; setScenario: (f: (s: WhatIf) => WhatIf) => void; one: string | null;
 }) {
   const s = res.summary;
-  const items = res.items.filter((i) => i.regions.length).sort((a, b) => (b.recommended_qty.value ?? 0) - (a.recommended_qty.value ?? 0));
+  const regs = one ? [one] : res.regions;
+  const q = (i: ItemResult) => (one ? (i.qty_by_region[one] ?? 0) : (i.recommended_qty.value ?? 0));
+  const items = res.items.filter((i) => i.regions.length && (!one || i.regions.some((r) => r.region === one))).sort((a, b) => q(b) - q(a));
+  const regQty = items.reduce((a, i) => a + q(i), 0);
+  const regCost = items.reduce((a, i) => a + q(i) * (i.unit_cost_usd ?? 0), 0);
   const localBudget = s.budget_total_usd != null ? Math.round(res.currency === "TRY" ? s.budget_total_usd * res.fx_rate : s.budget_total_usd) : "";
   return (
     <div className="grid gap-4">
@@ -660,7 +776,8 @@ function Budget({ res, m, scenario, setScenario }: {
           </select>
         </div>
         <div className="text-sm text-muted-foreground">
-          Kullanılan {m(s.budget_used_usd)} · {s.total_qty.toLocaleString("tr-TR")} adet <BasisChip basis="kural varsayımı" how={s.expected_units.how} />
+          {one ? <>{one}: {m(regCost)} · {regQty.toLocaleString("tr-TR")} adet <span className="text-xs">(toplam {m(s.budget_used_usd)} · {s.total_qty.toLocaleString("tr-TR")} adet)</span></>
+            : <>Kullanılan {m(s.budget_used_usd)} · {s.total_qty.toLocaleString("tr-TR")} adet</>} <BasisChip basis="kural varsayımı" how={s.expected_units.how} />
         </div>
       </div>
       <p className="text-xs text-muted-foreground">
@@ -670,20 +787,21 @@ function Budget({ res, m, scenario, setScenario }: {
       <Table>
         <TableHeader><TableRow>
           <TableHead>Ürün</TableHead><TableHead>Karar</TableHead>
-          {res.regions.map((r) => <TableHead key={r} className="text-right">{r}</TableHead>)}
-          <TableHead className="text-right">Toplam</TableHead><TableHead className="text-right">Planlanan</TableHead><TableHead className="text-right">Tutar</TableHead>
+          {regs.map((r) => <TableHead key={r} className="text-right">{r}</TableHead>)}
+          <TableHead className="text-right">{one ? "Tüm bölgeler" : "Toplam"}</TableHead><TableHead className="text-right">Planlanan</TableHead><TableHead className="text-right">Tutar{one ? ` (${one})` : ""}</TableHead>
         </TableRow></TableHeader>
         <TableBody>
           {items.map((i) => {
             const tot = i.recommended_qty.value ?? 0;
+            const amt = q(i);
             return (
               <TableRow key={i.sku}>
                 <TableCell>{i.name}<div className="text-[11px] text-muted-foreground">{i.flags.filter((f) => f.startsWith("MOQ") || f === "maliyet yok").join(", ")}</div></TableCell>
-                <TableCell><DecisionChip d={i.decision} user={i.decision_source === "kullanıcı"} /></TableCell>
-                {res.regions.map((r) => <TableCell key={r} className="text-right">{(i.qty_by_region[r] ?? 0).toLocaleString("tr-TR")}</TableCell>)}
+                <TableCell><DecisionChip d={regionDecision(i, one)} user={i.decision_source === "kullanıcı"} /></TableCell>
+                {regs.map((r) => <TableCell key={r} className="text-right">{(i.qty_by_region[r] ?? 0).toLocaleString("tr-TR")}</TableCell>)}
                 <TableCell className="text-right font-medium">{i.recommended_qty.value != null ? tot.toLocaleString("tr-TR") : "–"}</TableCell>
                 <TableCell className="text-right text-muted-foreground">{i.planned_qty?.toLocaleString("tr-TR") ?? "–"}</TableCell>
-                <TableCell className="text-right">{i.unit_cost_usd != null ? m(tot * i.unit_cost_usd) : "–"}</TableCell>
+                <TableCell className="text-right">{i.unit_cost_usd != null ? m(amt * i.unit_cost_usd) : "–"}</TableCell>
               </TableRow>
             );
           })}
