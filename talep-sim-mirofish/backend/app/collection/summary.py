@@ -23,6 +23,8 @@ CANNIBAL_OVERLAP = 0.6   # hevesli kişilerin örtüşmesi (küçük kümeye gö
 CANNIBAL_PRICE = 0.25    # fiyatlar birbirinin ±%25'i içinde
 BOOTSTRAP = 200
 REVERSE_LOGISTICS_PCT = 8.0
+MIN_PERSON_SD = 5.0      # kişi içi normalizasyonda en küçük dağılım (puan): herkese aynı puanı veren kişinin tek sapması büyütülmesin
+FLAT_POINTS = 2.0        # ürünlerin ortalama ilgi puanları arasındaki fark bundan küçükse panel ayırt etmedi sayılır
 
 # Üretim kararı eşikleri (kural varsayımı; ERP ile kalibre edilene kadar sabit)
 DEMAND_DROP = 35         # talep skoru (0-100) bunun altındaysa: üretme
@@ -30,6 +32,7 @@ DEMAND_REDUCE = 50       # bunun altındaysa: azalt
 MARGIN_DROP = 15.0       # önerilen fiyatta iade sonrası net marj (%) bunun altındaysa: üretme
 MARGIN_REDUCE = 30.0     # bunun altındaysa: azalt
 REDUCE_FACTOR = 0.6      # "azalt" kararında bütçe dağıtımına giren talep oranı
+ENTHUSIAST_MIN = 0.05    # hevesli (70+) kişi oranı bunun altındaysa: azalt (kimse gerçekten istemiyorsa tam üretim yok)
 
 Person = Tuple[str, int]  # (bölge, kişi no)
 
@@ -101,7 +104,7 @@ def _relative(per_item: Dict[str, Dict[Person, float]]) -> Tuple[Dict[str, float
         if len(d) < 2:
             continue
         m = statistics.fmean(d.values())
-        sd = statistics.pstdev(d.values()) or 1.0
+        sd = max(statistics.pstdev(d.values()), MIN_PERSON_SD)
         z[p] = {s: (v - m) / sd for s, v in d.items()}
     rel = {}
     for sku in per_item:
@@ -372,21 +375,33 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
     ent_pct = {s: (len(ent[s]) / len(per_item_int[s]) if per_item_int.get(s) else None) for s in skus}
     disp = {s: (statistics.pstdev(per_item_int[s].values()) if len(per_item_int.get(s, {})) > 1 else None) for s in skus}
 
-    sc_items, sc_summary = summarize_showcase({} if indep else (showcase or {}), skus, ranks)
+    # panel ürünleri ayırt etti mi: kişi içi farklar ve ham ilgi ortalamaları neredeyse aynıysa tek tek sıra anlamsızdır
+    n = len(skus)
+    raw_mean = {s: statistics.fmean(per_item_int[s].values()) for s in skus if per_item_int.get(s)}
+    flat = n >= 3 and ((max(rel.values()) - min(rel.values())) < 0.1
+                       or (len(raw_mean) == n and max(raw_mean.values()) - min(raw_mean.values()) < FLAT_POINTS))
+    # tek tek sıra eşit puanlardan geliyorsa vitrinle karşılaştırılmaz (yoksa sahte "vitrinde güçlü/zayıf" çıkar)
+    sc_items, sc_summary = summarize_showcase({} if indep else (showcase or {}), skus, {} if flat else ranks)
     single_engines = {results[s]["response"].get("engine") for s in skus}
     if sc_summary and single_engines & {"mirofish", "hybrid"}:
         sc_summary.basis_note = ("Tek tek tur MiroFish ajanlarıyla, vitrin turu persona paneliyle yapıldı (MiroFish'te vitrin turu "
                                  "yok). İki turda soruya cevap veren kişiler farklı; sıralama uyumu iki ayrı panelin "
                                  "karşılaştırmasıdır, aynı kişilerin fikir değişimi olarak okunmamalı.")
+    flat_sc = flat and not indep and bool(sc_items) and all(s in sc_items for s in skus)
+    if flat_sc:
+        # tek tek puanlar ayırt etmedi ama vitrin turu (gruplar içinde seçim) ayırt ettiyse sıra ve rol vitrinden gelir
+        ranks = {s: sc_items[s].rank for s in skus}
+        rel = {s: sc_items[s].score for s in skus}
+        rel_basis, rel_how = "ajan", ("Tek tek ilgi puanları ürünleri ayırt etmedi; değer vitrin turundaki seçilme skoru "
+                                      "((en iyi - en kötü) / gösterim, -1..1).")
+        intervals = {}
 
     # roller (kural varsayımı)
-    n = len(skus)
     # eşit puanlı ürünler aynı yüzdelik dilimi alır (sıralama sırası rolü belirlemesin)
     rounded = {s: round(rel[s], 3) for s in skus}
     asc = sorted(rounded.values())
     pctl = {s: ((asc.index(v) + (len(asc) - 1 - asc[::-1].index(v))) / 2 / (n - 1) if n > 1 else 0.5)
             for s, v in rounded.items()}
-    flat = n >= 3 and (max(rel.values()) - min(rel.values())) < 0.1
     ent_vals = [v for v in ent_pct.values() if v is not None]
     ent_med = statistics.median(ent_vals) if ent_vals else None
     disp_vals = [v for v in disp.values() if v is not None]
@@ -404,7 +419,7 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
             roles[s], why[s] = "belirsiz", "Bağımsız ürün: koleksiyon içi rol verilmez."
         elif n < 3:
             roles[s], why[s] = "belirsiz", "Rol için en az 3 değerlendirilmiş ürün gerekli."
-        elif flat:
+        elif flat and not flat_sc:
             roles[s], why[s] = "belirsiz", "Panel ürünleri birbirinden ayırt etmedi (puanlar neredeyse aynı); rol verilemez."
         elif pctl[s] <= 0.2 or appeal[s] < 40:
             roles[s], why[s] = "riskli", f"Koleksiyonun en alt %20'sinde (sıra {ranks[s]}/{n})" + (" ve talep skoru 40'ın altında" if appeal[s] < 40 else "")
@@ -417,6 +432,16 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
         else:
             roles[s], why[s] = "destek", "İlgi orta seviyede; koleksiyonu tamamlayan ürün"
 
+    if flat_sc:
+        for s_ in skus:
+            why[s_] = "Tek tek puanlar ayırt etmedi, sıra vitrin turundan. " + why[s_]
+    elif sc_items and n >= 5:
+        # tek tek zayıf ama vitrinde üst yarıda: sinyaller çelişiyor, ürün riskli sayılmaz
+        for s_ in skus:
+            v = sc_items.get(s_)
+            if roles.get(s_) == "riskli" and appeal[s_] >= 40 and v and v.rank <= n / 2:
+                roles[s_], why[s_] = "destek", (f"Tek tek sıra {ranks[s_]}/{n} (alt dilim) ama vitrinde sıra {v.rank}/{n}: "
+                                                "sinyaller çelişiyor, riskli sayılmadı")
     if sc_items:
         tog = sorted((v.together for v in sc_items.values()), reverse=True)
         cut = max(2, tog[max(0, len(tog) // 4 - 1)]) if tog else 2
@@ -503,6 +528,10 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
             red.append(Reason(text=f"Talep skoru {a:.0f}/100, temkinli üretim eşiği {DEMAND_REDUCE}'nin altında", basis="ajan"))
         else:
             ctx.append(Reason(text=f"Talep skoru {a:.0f}/100", basis="ajan"))
+        ep = ent_pct.get(s)
+        if ep is not None and len(per_item_int.get(s, {})) >= 6 and ep < ENTHUSIAST_MIN and a >= DEMAND_DROP:
+            red.append(Reason(text=f"Panelde ürüne hevesli kişi yok denecek kadar az ({ENTHUSIAST}+ puan veren %{_pct(ep):g}); "
+                                   "ortalama ilgi kararsız düzeyde", basis="ajan"))
         price_word = "denenen fiyatta" if w.planned_prices.get(s, it.planned_price) else "önerilen fiyatta"
         if nm is None:
             ctx.append(Reason(text="Maliyet fiyatı yok: marj hesaplanamadı, karar yalnızca talebe dayanıyor", basis="kullanıcı girdisi"))
@@ -731,8 +760,11 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
                                   text=f"{c.category} kategorisinde öne çıkan (hero) ürün yok ve ilgi koleksiyon ortalamasının altında."))
 
     if flat:
-        notes.append("Panel ürünleri birbirinden ayırt etmedi: ürün puanları neredeyse aynı. Sahte LLM ya da çok küçük bir "
-                     "model kullanıldıysa beklenir; sıralama ve roller bu koşuda anlamlı değildir.")
+        spread = (max(raw_mean.values()) - min(raw_mean.values())) if raw_mean else 0
+        notes.append(f"Panel ürünleri tek tek bakarken birbirinden ayırt etmedi, neredeyse aynı ilgi puanını verdi (ürün ortalamaları arasındaki fark "
+                     f"{spread:.1f} puan). Küçük modelde ya da sahte LLM'de beklenir. "
+                     + ("Sıra ve roller bu yüzden vitrin turundaki seçimlerden hesaplandı; talep skoru ve adetler ürünleri ayırmıyor."
+                        if flat_sc else "Sıralama ve roller bu koşuda anlamlı değildir."))
     notes.append(f"Üretim kararı eşikleri kural varsayımıdır: talep skoru {DEMAND_DROP} altı ya da önerilen fiyatta iade sonrası net "
                  f"marj %{MARGIN_DROP:g} altı 'üretme'; talep {DEMAND_REDUCE} altı, marj %{MARGIN_REDUCE:g} altı"
                  + ("" if indep else ", koleksiyon içi zayıflık ya da kanibalizasyon") + f" ya da bir bölgede talep {DEMAND_DROP} altı "

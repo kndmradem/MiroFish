@@ -91,13 +91,14 @@ def user_prompt(lines: List[str], letters: List[str], ctx, brand: Optional[Brand
         f"Sorular (yalnızca A-{last} harflerini kullan):\n"
         f"- best: en çok almak istediğin en fazla {MAX_BEST} ürün (hiçbirini istemiyorsan boş liste)\n"
         f"- worst: kesinlikle almayacağın en fazla {MAX_WORST} ürün\n"
-        f"- together: birlikte alıp kombinleyeceğin ürün çiftleri, en fazla {MAX_PAIRS} (ör. [[\"A\",\"C\"]])\n"
+        f"- together: birlikte alıp kombinleyeceğin ürün çiftleri, en fazla {MAX_PAIRS} (harf çiftleri listesi)\n"
         "- substitutes: birbirinin yerine geçen, 'ikisinden birini alırım' dediğin çiftler\n"
         "- n_buy: bu ürünlerden toplam kaç parça alırdın (0 olabilir)\n"
         "- comment: bu ürünlerin bir arada nasıl göründüğü hakkında tek kısa cümle\n"
         "Herkes her ürünü beğenmez; listedeki sıraya göre değil, kendi zevkine göre seç.\n"
-        'Sadece şu biçimde JSON yaz: {"best": ["B"], "worst": ["D"], "together": [["B","E"]], '
-        '"substitutes": [], "n_buy": 1, "comment": "..."}'
+        "Sadece şu biçimde JSON yaz; <...> yerlerine kendi seçtiğin harfleri koy (yer tutucuları kopyalama):\n"
+        '{"best": [<harfler>], "worst": [<harfler>], "together": [[<harf>, <harf>]], "substitutes": [[<harf>, <harf>]], '
+        '"n_buy": <sayı>, "comment": "<tek kısa cümle>"}'
     )
 
 

@@ -273,7 +273,12 @@ export async function whatIf(cid: string, body: WhatIf): Promise<CollectionResul
   }));
 }
 
-export async function itemPrediction(cid: string, sku: string): Promise<PredictionResponse> {
+export interface CollectionContext {
+  decision: Decision | null; qty: number | null; qty_by_region: Record<string, number>;
+  colors: { color: string; qty: number | null; decision: string | null }[]; detail_qty: number;
+}
+
+export async function itemPrediction(cid: string, sku: string): Promise<PredictionResponse & { collection_context?: CollectionContext }> {
   return normalizePrediction(await json(await fetch(`${API_URL}/api/collections/${cid}/items/${encodeURIComponent(sku)}/prediction`)));
 }
 

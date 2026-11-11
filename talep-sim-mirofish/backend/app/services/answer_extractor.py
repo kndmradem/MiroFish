@@ -37,8 +37,8 @@ Cevaba göre doldur:
   supheli -> uygun -> pahali -> cok_pahali yönünde ilerler. Cevap bir fiyattan açıkça söz etmiyorsa tonundan çıkar.
 - "objection": en büyük itiraz, tek kısa cümle (yoksa "")
 {currency}
-Örnek çıktı:
-{{"interest": 65, "ladder": {example}, "objection": "Kumaş biraz kalın"}}"""
+Biçim (<...> yerlerine cevaptan çıkardığını yaz, yer tutucuyu kopyalama):
+{{"interest": <0-100 sayı>, "ladder": {example}, "objection": "<itiraz ya da boş>"}}"""
 
 
 def make_ladder(reference: float) -> List[float]:
@@ -61,8 +61,30 @@ def ladder_text(ladder: List[float], try_rate: Optional[float] = None) -> str:
 
 
 def example_ladder(n: int) -> str:
-    cycle = ["supheli", "uygun", "uygun", "uygun", "pahali", "pahali", "pahali", "cok_pahali", "cok_pahali"]
-    return json.dumps({str(i + 1): cycle[min(i, len(cycle) - 1)] for i in range(n)})
+    """Örnek değer içermeyen merdiven kalıbı (küçük modeller örnek etiketleri aynen kopyalıyordu)."""
+    return "{" + ", ".join(f'"{i + 1}": "<etiket>"' for i in range(n)) + "}"
+
+
+def _fold(s: str) -> str:
+    s = (s or "").lower().translate(str.maketrans("şğıöüçâîİ", "sgioucaii"))
+    return " ".join(re.sub(r"[^a-z0-9 ]+", " ", s).split())
+
+
+# Prompttaki yer tutucu ve etiket açıklamaları: cevapta itiraz olarak kopyalanırsa itiraz sayılmaz
+_TEMPLATE_PARTS = ["en buyuk itirazin", "tek kisa cumle", "kararinin kisa nedeni", "itiraz ya da bos", "kumas biraz kalin"]
+_LABEL_PHRASES = {"asla almam", "alirim", "makul alirim", "pahali ama dusunurum", "bu kadar ucuzsa kaliteden suphelenirim",
+                  "kaliteden suphelenirim", "cok pahali asla almam", "yok", "itiraz yok", "none", ""}
+
+
+def clean_objection(text) -> str:
+    """Şablondan kopyalanmış ya da anlamsız itirazı boşaltır."""
+    t = str(text or "").strip()
+    f = _fold(t)
+    if re.search(r"[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]", t):     # model başka dile kaydıysa (Çince vb.)
+        return ""
+    if f in _LABEL_PHRASES or any(x in f for x in _TEMPLATE_PARTS) or "<" in t:
+        return ""
+    return t
 
 
 def label_rank(value) -> Optional[int]:
@@ -167,7 +189,7 @@ def answer_from_obj(raw: dict, ladder: Optional[List[float]] = None) -> Optional
         return None
     interest = max(0.0, min(100.0, interest))
     out = {"interest": interest, "prices": None, "estimated": False, "price_source": None,
-           "objection": str(raw.get("objection") or raw.get("itiraz") or "").strip()}
+           "objection": clean_objection(raw.get("objection") or raw.get("itiraz"))}
     if ladder:
         for key in ("ladder", "fiyatlar", "prices", "merdiven"):
             ranks = _ladder_ranks(raw.get(key), len(ladder))
