@@ -194,8 +194,8 @@ async def test_world_contains_only_selected_regions(tmp_path):
     engine = make_engine(tmp_path, fake)
     card = await engine.fuse_product_card(REQ)
     await engine.simulate_region(card, "EU", 25.0, scope=["EU", "TR"])
-    assert "EU paneli" in fake.uploaded_seed and "TR paneli" in fake.uploaded_seed
-    for other in ("MENA paneli", "CIS paneli", "US paneli"):
+    assert "EU bölgesinde" in fake.uploaded_seed and "TR bölgesinde" in fake.uploaded_seed
+    for other in ("MENA bölgesinde", "CIS bölgesinde", "US bölgesinde"):
         assert other not in fake.uploaded_seed
     world = json.loads((tmp_path / "world.json").read_text())
     (w,) = world.values()

@@ -151,7 +151,11 @@ def simulation_requirement(regions: Optional[Sequence[str]] = None) -> str:
         f"{len(regions)} bölgesel pazardaki ({', '.join(regions)}) tüketicilerin yeni moda/tekstil ürünlerini "
         "nasıl değerlendirdiğini simüle et. Her tüketici kendi şehrinin iklimini, kültürünü ve "
         "satın alma önceliklerini korumalı. Tüketiciler ürünler hakkında fikir paylaşır, fiyat "
-        "algılarını ve itirazlarını tartışır."
+        "algılarını ve itirazlarını tartışır. "
+        "Varlık tipi olarak yalnızca Person (birey) kullan: dokümandaki her madde tek bir gerçek kişidir. Bölge, panel, "
+        "kurum, marka, medya ya da resmi hesap ayrı bir varlık/ajan değildir. Profillerde kişinin dokümandaki yaşı, "
+        "şehri ve ülkesi aynen kullanılır; cinsiyet addan çıkarılır. Profil metinleri Türkçe ya da İngilizce yazılır, "
+        "Çince yazılmaz."
     )
 
 
@@ -164,7 +168,7 @@ def scope_of(regions: Optional[Sequence[str]] = None) -> List[str]:
 
 
 # Persona/seed/prompt mantığı anlamlı biçimde değiştiğinde artır: eski önbellek dünyaları otomatik geçersiz olur.
-WORLD_VERSION = 2
+WORLD_VERSION = 3
 
 
 def seed_hash(regions: Optional[Sequence[str]] = None) -> str:
@@ -179,7 +183,8 @@ def build_seed_document(regions: Optional[Sequence[str]] = None) -> str:
     for region in scope_of(regions):
         people = SEED_CONSUMERS[region]
         persona = PERSONAS[region]
-        lines += [f"## {region} paneli ({persona.city} ve çevresi)", "", f"Bölge profili: {persona.prompt}", ""]
+        lines += [f"## {region} bölgesinde yaşayan bireysel tüketiciler ({persona.city} ve çevresi)", "",
+                  f"Bu kişilerin ortak bağlamı (kişi değildir): {persona.prompt}", ""]
         lines += [f"- {p} ({region} bölgesi tüketicisi)" for p in people]
         lines.append("")
     return "\n".join(lines)
