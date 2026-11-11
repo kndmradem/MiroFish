@@ -6,7 +6,7 @@ import type { EChartsOption } from "echarts";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  imageUrl, type Basis, type ColorDecision, type ColorLine, type CollectionResult, type ItemResult, type WhatIf,
+  imageUrl, type Basis, type ColorDecision, type ColorFamilySummary, type ColorLine, type CollectionResult, type ItemResult, type WhatIf,
 } from "@/lib/collection-api";
 import { cn } from "@/lib/utils";
 
@@ -27,14 +27,14 @@ export function Swatch({ family, className }: { family: string; className?: stri
 const qtyFmt = (v: number | null | undefined) => (v == null ? "–" : v.toLocaleString("tr-TR"));
 
 /** Ürün satırının altında kısa renk özeti: renk, adet; üretilmeyen renk üstü çizili. */
-export function ColorStrip({ it }: { it: ItemResult }) {
+export function ColorStrip({ it, region }: { it: ItemResult; region?: string | null }) {
   if (!it.colors?.length) return null;
   return (
     <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
       {it.colors.map((c) => (
         <span key={c.color} className={cn("inline-flex items-center gap-1", c.decision === "üretme" && "line-through opacity-60")}
           title={`${c.family_label}, pay %${c.share.value}`}>
-          <Swatch family={c.family} className="size-2.5" />{c.color}{c.qty != null && c.decision !== "üretme" ? ` ${qtyFmt(c.qty)}` : ""}
+          <Swatch family={c.family} className="size-2.5" />{c.color}{c.qty != null && c.decision !== "üretme" ? ` ${qtyFmt(region ? (c.qty_by_region[region] ?? 0) : c.qty)}` : ""}
         </span>
       ))}
     </div>
@@ -42,12 +42,13 @@ export function ColorStrip({ it }: { it: ItemResult }) {
 }
 
 /** Ürün ayrıntısındaki renk tablosu. */
-export function ColorTable({ res, it, overrides, onColor, BasisChip }: {
-  res: CollectionResult; it: ItemResult; overrides: Record<string, ColorDecision>;
+export function ColorTable({ res, it, overrides, onColor, BasisChip, region }: {
+  res: CollectionResult; it: ItemResult; overrides: Record<string, ColorDecision>; region?: string | null;
   onColor: (key: string, d: ColorDecision | "") => void; BasisChip: (p: { basis: Basis; how?: string }) => React.ReactNode;
 }) {
   if (!it.colors?.length) return null;
   const basis = it.colors[0].share.basis;
+  const regs = region ? [region] : res.regions;
   return (
     <div className="grid gap-1">
       <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
@@ -58,8 +59,8 @@ export function ColorTable({ res, it, overrides, onColor, BasisChip }: {
       <Table>
         <TableHeader><TableRow>
           <TableHead>Renk</TableHead><TableHead className="text-right">Pay</TableHead><TableHead>Karar</TableHead>
-          <TableHead className="text-right">Adet</TableHead>
-          {res.regions.map((r) => <TableHead key={r} className="text-right">{r}</TableHead>)}
+          <TableHead className="text-right">Adet{region ? " (tüm bölgeler)" : ""}</TableHead>
+          {regs.map((r) => <TableHead key={r} className="text-right">{r}</TableHead>)}
           <TableHead>Gerekçe</TableHead>
         </TableRow></TableHeader>
         <TableBody>
@@ -89,7 +90,7 @@ export function ColorTable({ res, it, overrides, onColor, BasisChip }: {
                   </div>
                 </TableCell>
                 <TableCell className="text-right font-medium">{qtyFmt(c.qty)}</TableCell>
-                {res.regions.map((r) => <TableCell key={r} className="text-right">{qtyFmt(c.qty_by_region[r])}</TableCell>)}
+                {regs.map((r) => <TableCell key={r} className="text-right">{qtyFmt(c.qty_by_region[r])}</TableCell>)}
                 <TableCell className="text-xs whitespace-normal">
                   {c.reasons.map((x, k) => <div key={k} className="flex items-start gap-1.5"><span className="flex-1">{x.text}</span><BasisChip basis={x.basis} /></div>)}
                 </TableCell>
@@ -103,14 +104,18 @@ export function ColorTable({ res, it, overrides, onColor, BasisChip }: {
 }
 
 /** "Renkler" sekmesi: koleksiyonun renk dağılımı, renk x bölge, model x renk adetleri ve renk ayarları. */
-export function ColorsTab({ res, scenario, setScenario, BasisChip }: {
-  res: CollectionResult; scenario: WhatIf; setScenario: (f: (s: WhatIf) => WhatIf) => void;
+export function ColorsTab({ res, scenario, setScenario, BasisChip, one }: {
+  res: CollectionResult; scenario: WhatIf; setScenario: (f: (s: WhatIf) => WhatIf) => void; one?: string | null;
   BasisChip: (p: { basis: Basis; how?: string }) => React.ReactNode;
 }) {
   const cp = res.color_plan;
   if (!cp) return <p className="text-sm text-muted-foreground">Ürünlerde renk bilgisi yok. Excel&apos;de &quot;renkler&quot; sütunu ya da her renk için ayrı satır (aynı SKU) olursa renk bazlı plan çıkar.</p>;
-  const items = res.items.filter((i) => i.colors?.length);
-  const total = cp.families.reduce((a, f) => a + f.qty, 0);
+  const regs = one ? [one] : res.regions;
+  const items = res.items.filter((i) => i.colors?.length && (!one || i.regions.some((r) => r.region === one)));
+  const fq = (f: ColorFamilySummary) => (one ? (f.by_region[one] ?? 0) : f.qty);
+  const total = cp.families.reduce((a, f) => a + fq(f), 0);
+  const mq = (it: ItemResult) => (one ? (it.qty_by_region[one] ?? 0) : it.recommended_qty.value);
+  const cq = (c: ColorLine) => (one ? (c.qty_by_region[one] ?? 0) : c.qty);
   const actions = res.summary.actions.filter((a) => a.kind === "renk");
   const opt: EChartsOption = {
     grid: { left: 110, right: 30, top: 30, bottom: 20 },
@@ -118,7 +123,7 @@ export function ColorsTab({ res, scenario, setScenario, BasisChip }: {
     tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
     xAxis: { type: "value", axisLabel: { fontSize: 10 } },
     yAxis: { type: "category", inverse: true, data: cp.families.map((f) => f.label), axisLabel: { fontSize: 11 } },
-    series: res.regions.map((r) => ({ name: r, type: "bar", stack: "q", data: cp.families.map((f) => f.by_region[r] ?? 0), barMaxWidth: 18 })),
+    series: regs.map((r) => ({ name: r, type: "bar", stack: "q", data: cp.families.map((f) => f.by_region[r] ?? 0), barMaxWidth: 18 })),
   };
   const allColors = items.flatMap((i) => i.colors);
   return (
@@ -149,23 +154,23 @@ export function ColorsTab({ res, scenario, setScenario, BasisChip }: {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div>
-          <div className="mb-1 text-sm font-medium">Renk ailesine göre üretim adedi (bölgelere göre)</div>
-          {total > 0 ? <ReactECharts option={opt} style={{ height: Math.max(160, 34 * cp.families.length + 50) }} /> : <p className="text-sm text-muted-foreground">Bütçe girilmediği için adet yok; yalnızca renk payları gösteriliyor.</p>}
+          <div className="mb-1 text-sm font-medium">Renk ailesine göre üretim adedi ({one ?? "bölgelere göre"})</div>
+          {total > 0 ? <ReactECharts option={opt} style={{ height: Math.max(160, 34 * cp.families.length + 50) }} notMerge /> : <p className="text-sm text-muted-foreground">Bütçe girilmediği için adet yok; yalnızca renk payları gösteriliyor.</p>}
         </div>
         <Table>
           <TableHeader><TableRow>
             <TableHead>Renk ailesi</TableHead><TableHead className="text-right">Model</TableHead><TableHead className="text-right">Adet</TableHead>
-            <TableHead className="text-right">Pay</TableHead>
-            {res.regions.map((r) => <TableHead key={r} className="text-right">{r}</TableHead>)}
+            <TableHead className="text-right">{one ? `Pay (${one})` : "Pay"}</TableHead>
+            {!one && regs.map((r) => <TableHead key={r} className="text-right">{r}</TableHead>)}
           </TableRow></TableHeader>
           <TableBody>
             {cp.families.map((f) => (
               <TableRow key={f.family}>
                 <TableCell><span className="inline-flex items-center gap-1.5"><Swatch family={f.family} />{f.label}</span></TableCell>
                 <TableCell className="text-right">{f.n_models}</TableCell>
-                <TableCell className="text-right font-medium">{qtyFmt(f.qty)}</TableCell>
-                <TableCell className="text-right">%{f.share_pct}</TableCell>
-                {res.regions.map((r) => <TableCell key={r} className="text-right">{qtyFmt(f.by_region[r])}</TableCell>)}
+                <TableCell className="text-right font-medium">{qtyFmt(fq(f))}</TableCell>
+                <TableCell className="text-right">%{one ? (total ? Math.round((1000 * fq(f)) / total) / 10 : 0) : f.share_pct}</TableCell>
+                {!one && regs.map((r) => <TableCell key={r} className="text-right">{qtyFmt(f.by_region[r])}</TableCell>)}
               </TableRow>
             ))}
           </TableBody>
@@ -176,7 +181,7 @@ export function ColorsTab({ res, scenario, setScenario, BasisChip }: {
         <div className="mb-1 text-sm font-medium">Model ve renk bazında üretim hedefi</div>
         <Table>
           <TableHeader><TableRow>
-            <TableHead>Model</TableHead><TableHead className="text-right">Model adedi</TableHead><TableHead>Renkler (adet · pay)</TableHead>
+            <TableHead>Model</TableHead><TableHead className="text-right">Model adedi{one ? ` (${one})` : ""}</TableHead><TableHead>Renkler ({one ? `${one} adedi` : "adet"} · pay)</TableHead>
           </TableRow></TableHeader>
           <TableBody>
             {items.map((it) => (
@@ -185,14 +190,14 @@ export function ColorsTab({ res, scenario, setScenario, BasisChip }: {
                   <div className="font-medium">{it.name}</div>
                   <div className="font-mono text-[11px] text-muted-foreground">{it.sku}{it.color_mix ? ` · renk çarpanı ×${it.color_mix.value}` : ""}</div>
                 </TableCell>
-                <TableCell className="text-right">{qtyFmt(it.recommended_qty.value)}</TableCell>
+                <TableCell className="text-right">{qtyFmt(mq(it))}</TableCell>
                 <TableCell>
                   <div className="flex flex-wrap gap-1.5">
                     {it.colors.map((c: ColorLine) => (
                       <span key={c.color} title={c.reasons.map((x) => x.text).join(" · ") || c.share.how}
                         className={cn("inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs",
                           c.decision === "üretme" ? "border-rose-200 bg-rose-50 text-rose-700 line-through" : "bg-background")}>
-                        <Swatch family={c.family} />{c.color}<b className="font-semibold">{c.decision === "üretme" ? 0 : qtyFmt(c.qty)}</b>
+                        <Swatch family={c.family} />{c.color}<b className="font-semibold">{c.decision === "üretme" ? 0 : qtyFmt(cq(c))}</b>
                         <span className="text-muted-foreground">%{c.share.value}</span>
                       </span>
                     ))}
