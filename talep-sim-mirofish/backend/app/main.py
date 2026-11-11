@@ -20,9 +20,10 @@ from .advisor import Advisor
 from .newstore import Candidate as NewStoreCandidate, NewStoreEstimate
 from .explain import allocation_note, allocation_view, explain_region, methodology_notes
 from . import economy
-from .forecast import DemandModel, forecast_sales
+from .forecast import HORIZON, DemandModel, forecast_sales
 from .extras import break_even, confidence, seasonal_factor, sensitivity, size_curve
-from .scenarios import build_campaigns, build_price_plan
+from .scenarios import _zone_of, build_campaigns, build_price_plan
+from .takvim import data as takvim_data, fit as takvim_fit, plan as takvim_plan
 from .returns import estimate_returns
 from .pricing import analyze, purchase_probability, steps_from_answers, steps_from_votes
 from .config import Settings, settings
@@ -228,6 +229,30 @@ async def _noop(_: dict) -> None:
     return None
 
 
+async def _calendar_fits(req: PredictionRequest, engine, card: dict, brand, priced: dict, fx_rate: float, emit):
+    """Takvim penceresindeki etkinlikler ve bölge başına takvim turu (etkinlik uygunluğu + bekleme). Hata planı düşürmez."""
+    from datetime import date as _date
+    if not req.assumptions.calendar_plan:
+        return None
+    try:
+        tk = takvim_data.load(settings.takvim_dir)
+    except (takvim_data.TakvimError, OSError) as e:
+        await emit({"stage": "finalize", "detail": f"Takvim dosyası okunamadı, takvim planı atlandı: {e}"})
+        return None
+    start = req.assumptions.calendar_start or _date.today()
+    events = {r: tk.window(r, start, HORIZON, settings.takvim_dogrulanmis_zorunlu) for r in priced}
+    await emit({"stage": "finalize", "detail": "Takvim turu: etkinlik uygunluğu ve bekleme eğilimi soruluyor"})
+    text = f"{req.product_name} {req.technical_specs}"
+
+    async def one(r):
+        s_, _, best_ = priced[r]
+        return r, await takvim_fit.evaluate(engine, card, r, events[r], tk, brand, float(best_),
+                                            fx_rate if r == "TR" else None, text, settings.takvim_turu, settings.takvim_dir)
+
+    fits = dict(await asyncio.gather(*(one(r) for r in priced)))
+    return {"takvim": tk, "start": start, "events": events, "fits": fits}
+
+
 async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profiler: BrandProfiler,
                          advisor: Advisor, emit=_noop) -> PredictionResponse:
     """Tahmin hattı. `emit` ilerleme olayları alır; bölge hataları tüm çalıştırmayı düşürmez."""
@@ -305,6 +330,7 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
         allocations = bal.allocations
 
     total_weight = sum((a.weight for a in allocations.values()), Decimal(0))
+    cal = await _calendar_fits(req, engine, card, brand, priced, fx_rate, emit)
     breakdown = []
     for region, (sim, vw, best) in priced.items():
         alloc = allocations[region]
@@ -325,6 +351,14 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
         plan = build_price_plan(dm, sim.price_answers, vw, float(best), unit_cost, alloc.quantity, ret.rate_pct, req.assumptions)
         camps = build_campaigns(region, dm, sim.price_answers, float(best), unit_cost, alloc.quantity, ret.rate_pct,
                                 req.assumptions, fc)
+        cplan = None
+        if cal is not None and region in cal["fits"]:
+            tk, start = cal["takvim"], cal["start"]
+            cplan = takvim_plan.build_calendar_plan(region, dm, sim.price_answers, float(best), unit_cost, alloc.quantity,
+                                                    ret.rate_pct, req.assumptions, tk, cal["events"][region],
+                                                    cal["fits"][region], start)
+            plan = takvim_plan.to_price_plan(cplan, dm, sim.price_answers, vw, float(best), unit_cost, alloc.quantity,
+                                             ret.rate_pct, req.assumptions, _zone_of) or plan
         breakdown.append(RegionPredictionResult(
             region=region,
             demand_score_100=sim.demand_score,
@@ -336,7 +370,7 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
             van_westendorp=vw,
             price_steps=_price_steps(sim, vw, best),
             returns=ret,
-            forecast=fc, price_plan=plan, campaigns=camps,
+            forecast=fc, price_plan=plan, campaigns=camps, calendar_plan=cplan,
             sensitivity=sensitivity(dm, sim.price_answers, float(best), unit_cost, alloc.quantity, ret.rate_pct,
                                     req.assumptions),
             break_even=break_even(float(best), unit_cost, alloc.quantity, ret.rate_pct, req.assumptions, fc),

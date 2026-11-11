@@ -1,5 +1,6 @@
 """API sözleşmesi (teknik doküman §4). Dokümandaki modellere ek olarak
 dashboard'un Van Westendorp grafiğini çizebilmesi için fiyat eğrisi alanları var."""
+from datetime import date
 from decimal import Decimal
 from typing import Dict, List, Literal, Optional
 
@@ -61,6 +62,13 @@ class Assumptions(BaseModel):
     launch_month: Optional[int] = Field(None, ge=1, le=12, description="Lansman ayı; mevsim uyumu hesabına girer, boşsa mevsim etkisi uygulanmaz")
     competitor_price_usd: Dict[str, float] = Field(default_factory=dict, description="Bölge bazında rakip ürün fiyatı ($); girilirse rakip savunma senaryosu bunu kullanır")
     conversion_ceiling_pct: float = Field(2.0, ge=0.1, le=30, description="İlgili ve fiyatı kabul eden kitlenin alıma dönüşme tavanı (%)")
+    # --- Takvimli kampanya planı (perakende takvimi veri dosyasından) ---
+    calendar_plan: bool = Field(True, description="Perakende takvimine göre kampanya planı hesaplansın")
+    calendar_start: Optional[date] = Field(None, description="Satışa çıkış tarihi (plan 120 gün bu tarihten başlar); boşsa bugün")
+    discount_steps: List[float] = Field(default_factory=lambda: [20.0, 30.0, 40.0], description="İzinli indirim basamakları (%)")
+    max_campaigns: int = Field(2, ge=0, le=4, description="120 günde en fazla kampanya sayısı")
+    min_campaign_gap_days: int = Field(21, ge=0, le=90, description="İki kampanya arası en az gün (marka yorgunluğu)")
+    residual_value_pct: float = Field(30.0, ge=0, le=100, description="120. günde kalan stoğun geri kazanılan değeri, maliyetin %'si (outlet/stok satışı)")
 
 
 # --- Girdi (Request) Modeli ---
@@ -215,6 +223,84 @@ class PricePlan(BaseModel):
     basis: str = "fiyat kabulü ajan eğrisinden; aşama süreleri ve satış hızı varsayım"
 
 
+class CalendarEvent(BaseModel):
+    code: str
+    name: str
+    scope: str = Field(..., description="Takvimdeki bölge ya da ülke kodu (ör. FR yalnızca Fransa)")
+    country_only: bool = False
+    kind: str
+    kind_label: str
+    date_from: date
+    date_to: date
+    day_from: int = Field(..., description="Plan başlangıcına göre gün (ön pencere hariç)")
+    day_to: int
+    window_from_day: int = Field(..., description="Ön pencere dahil etkinin başladığı gün")
+    fit_pct: float = Field(..., description="Ürünün bu etkinliğe uygunluğu (0-100)")
+    fit_basis: str
+    fit_n: int = 0
+    rule_fit_pct: float
+    lift_low_pct: float = Field(..., description="İndirimsiz etkinlik etkisi alt (uygunluk x tür aralığı)")
+    lift_high_pct: float
+    verified: bool
+    source: str = ""
+    legal_note: str = ""
+    comments: List[str] = []
+
+
+class CalendarCampaign(BaseModel):
+    event_code: str
+    event_name: str
+    day_from: int
+    day_to: int
+    date_from: date
+    date_to: date
+    discount_pct: float
+    price: Decimal
+    purchase_prob_pct: float
+    units: int
+    ref_price: Decimal = Field(..., description="Son 30 gündeki en düşük fiyat (indirim öncesi fiyat olarak gösterilebilecek)")
+    advertised_discount_pct: float
+    price_history_days: int = Field(..., description="Kampanya başladığında ürünün satışta olduğu gün sayısı")
+
+
+class CalendarPlanOption(BaseModel):
+    key: str
+    label: str
+    campaigns: List[CalendarCampaign] = []
+    units: int
+    units_low: int
+    units_high: int
+    leftover_units: int
+    sell_through_pct: float
+    revenue: Decimal
+    net_profit: Decimal
+    residual_value: Decimal
+    total_value: Decimal = Field(..., description="İade sonrası kâr + kalan stoğun geri kazanılan değeri")
+    total_value_low: Decimal
+    total_value_high: Decimal
+    recommended: bool = False
+    note: str = ""
+
+
+class CalendarPlan(BaseModel):
+    start_date: date
+    horizon_days: int
+    events: List[CalendarEvent]
+    options: List[CalendarPlanOption]
+    verdict: str = ""
+    wait_event: Optional[str] = None
+    wait_share_pct: Optional[float] = None
+    wait_basis: str = ""
+    wait_n: int = 0
+    engine: str = ""
+    engine_note: str = ""
+    n_plans_evaluated: int = 0
+    assumptions: List[str] = []
+    warnings: List[str] = []
+    basis: str = ("indirimli fiyatta satın alma olasılığı ajan eğrisinden; etkinlik uygunluğu ajan cevabı (yoksa kural "
+                  "varsayımı); etkinlik etkisinin büyüklüğü kural varsayımı aralığı (etkinlik_turleri.csv)")
+
+
 class CampaignLever(BaseModel):
     label: str
     uplift_low_pct: float
@@ -317,6 +403,7 @@ class RegionPredictionResult(BaseModel):
     forecast: Optional[SalesForecast] = None
     price_plan: Optional[PricePlan] = None
     campaigns: List[CampaignScenario] = []
+    calendar_plan: Optional[CalendarPlan] = None
     sensitivity: List[SensitivityRow] = []
     break_even: Optional[BreakEven] = None
     confidence: Optional[Confidence] = None

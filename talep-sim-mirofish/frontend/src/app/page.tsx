@@ -10,6 +10,7 @@ import { AllocationCard } from "@/components/allocation-card";
 import { ExtrasCard } from "@/components/extras-card";
 import { SummaryCard } from "@/components/summary-card";
 import { CampaignsCard, PricePlanCard } from "@/components/scenarios-card";
+import { CalendarPlanCard } from "@/components/calendar-plan-card";
 import { ForecastCard } from "@/components/forecast-card";
 import { ReturnsCard } from "@/components/returns-card";
 import { PriceZones } from "@/components/price-zones";
@@ -43,6 +44,11 @@ export default function Dashboard() {
   const [restock, setRestock] = useState("70");
   const [logistics, setLogistics] = useState("8");
   const [launchMonth, setLaunchMonth] = useState("");
+  const [calStart, setCalStart] = useState(() => new Date().toISOString().slice(0, 10));
+  const [calSteps, setCalSteps] = useState("20, 30, 40");
+  const [calMax, setCalMax] = useState("2");
+  const [calGap, setCalGap] = useState("21");
+  const [calResidual, setCalResidual] = useState("30");
   const [conversion, setConversion] = useState("2");
   const [competitor, setCompetitor] = useState<Record<string, string>>({});
   const [audience, setAudience] = useState<Record<string, string>>({});
@@ -134,6 +140,11 @@ export default function Dashboard() {
         brand_profile: profile ?? undefined,
         assumptions: {
           launch_month: launchMonth ? Number(launchMonth) : undefined,
+          calendar_start: calStart || undefined,
+          discount_steps: calSteps.split(/[,; ]+/).map(Number).filter((x) => x > 0 && x < 90),
+          max_campaigns: Math.max(0, Math.min(4, Math.floor(Number(calMax) || 0))),
+          min_campaign_gap_days: Math.max(0, Math.min(90, Math.floor(Number(calGap) || 0))),
+          residual_value_pct: Math.max(0, Math.min(100, Number(calResidual) || 0)),
           conversion_ceiling_pct: Math.max(0.1, Number(conversion) || 2),
           audience: Object.fromEntries(
             Object.entries(audience).filter(([r, v]) => regions.includes(r as RegionCode) && Number(v) > 0).map(([r, v]) => [r, Math.floor(Number(v))]),
@@ -270,6 +281,31 @@ export default function Dashboard() {
                       <option key={m} value={i + 1}>{m}</option>
                     ))}
                   </select>
+                </div>
+                <div className="grid gap-2 rounded-md border p-2">
+                  <p className="text-xs font-medium">Takvimli kampanya planı</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="grid gap-1">
+                      <Label htmlFor="calStart" className="text-xs">Satışa çıkış tarihi</Label>
+                      <Input id="calStart" type="date" value={calStart} onChange={(e) => setCalStart(e.target.value)} />
+                    </div>
+                    <div className="grid gap-1">
+                      <Label htmlFor="calSteps" className="text-xs">İndirim basamakları (%)</Label>
+                      <Input id="calSteps" value={calSteps} onChange={(e) => setCalSteps(e.target.value)} />
+                    </div>
+                    <div className="grid gap-1">
+                      <Label htmlFor="calMax" className="text-xs">En fazla kampanya (120 gün)</Label>
+                      <Input id="calMax" type="number" min="0" max="4" value={calMax} onChange={(e) => setCalMax(e.target.value)} />
+                    </div>
+                    <div className="grid gap-1">
+                      <Label htmlFor="calGap" className="text-xs">İki kampanya arası en az gün</Label>
+                      <Input id="calGap" type="number" min="0" max="90" value={calGap} onChange={(e) => setCalGap(e.target.value)} />
+                    </div>
+                    <div className="col-span-2 grid gap-1">
+                      <Label htmlFor="calRes" className="text-xs">120. günde kalan stoğun geri kazanılan değeri (% maliyet, outlet/stok satışı)</Label>
+                      <Input id="calRes" type="number" min="0" max="100" value={calResidual} onChange={(e) => setCalResidual(e.target.value)} />
+                    </div>
+                  </div>
                 </div>
                 <div className="grid gap-1.5">
                   <Label htmlFor="conv">Dönüşüm tavanı (% — ilgili ve fiyatı kabul eden kitlenin alıma dönüşen kısmı)</Label>
@@ -463,10 +499,27 @@ export default function Dashboard() {
             {chartRow?.price_plan && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Fiyat senaryoları: lansman, ilk kampanya sonrası, stok eritme ({chartRow.region})</CardTitle>
-                  <CardDescription>Fiyat kabulü ajan eğrisinden; aşama süreleri varsayım.</CardDescription>
+                  <CardTitle>Fiyat planı ({chartRow.region})</CardTitle>
+                  <CardDescription>
+                    {chartRow.calendar_plan
+                      ? "Aşamalar perakende takvimindeki önerilen kampanyalardan; fiyat kabulü ajan eğrisinden."
+                      : "Lansman, ilk kampanya sonrası, stok eritme. Fiyat kabulü ajan eğrisinden; aşama süreleri varsayım."}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent><PricePlanCard row={chartRow} /></CardContent>
+              </Card>
+            )}
+
+            {chartRow?.calendar_plan && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Takvimli kampanya planı ({chartRow.region})</CardTitle>
+                  <CardDescription>
+                    Perakende takvimindeki etkinlikler, ürünün bu etkinliklere uygunluğu ve hangi tarihte hangi indirimin değer kattığı.
+                    Yeni ürün: satış geçmişi yok, etkinlik etkisinin büyüklüğü kural varsayımıdır.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent><CalendarPlanCard row={chartRow} /></CardContent>
               </Card>
             )}
 

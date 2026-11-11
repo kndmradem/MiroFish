@@ -79,65 +79,14 @@ def build_price_plan(model: DemandModel, answers: Sequence[AgentPriceAnswer], vw
         flat_leftover_units=qty - flat_units, assumptions=notes)
 
 
-# Bölge x hedef için kampanya kataloğu. Kaldıraç: (etiket, talep artışı alt %, üst %, ciro maliyeti %).
-# Tüm yüzdeler kural varsayımıdır; bölge alışkanlığına dair genel eğilimlere dayanır.
-CATALOG = {
-    "TR": {
-        "clear_stock": ("Taksitli büyük indirim + Efsane Cuma", 25,
-                        [("Taksit (3-6 ay) seçeneği", 12, 25, 1.5), ("Efsane Cuma / sezon sonu etkinliği", 15, 30, 0.5)],
-                        "Kasım Efsane Cuma ya da sezon sonu", "Türkiye'de taksit ve indirim etkinlikleri satın alma kararını belirgin hızlandırır."),
-        "boost_sales": ("Taksit + ücretsiz kargo", 10,
-                        [("Taksit (3-6 ay) seçeneği", 10, 22, 1.5), ("Ücretsiz kargo", 5, 12, 2.0)],
-                        "Yeni sezon girişi, bayram öncesi", "Fiyata duyarlı ve enflasyon altında ezilen müşteri için taksit, indirimden daha az marj yer."),
-        "defend_competition": ("Fiyat eşleştirme + taksit", 5,
-                               [("Taksit (3-6 ay) seçeneği", 6, 14, 1.5), ("Sadakat/ilk alışveriş kodu", 3, 8, 1.0)],
-                               "Rakip kampanya haftaları", "Rakip fiyata yakın kal, indirimi taksit ve sadakatle destekle."),
-    },
-    "MENA": {
-        "clear_stock": ("Beyaz Cuma + paket (2'li set)", 25,
-                        [("White Friday etkinliği", 15, 30, 0.5), ("2'li paket / aile seti", 10, 20, 1.0)],
-                        "White Friday, sezon sonu", "Körfez'de büyük etkinlik dönemleri ve paket teklifleri yüksek hacim getirir."),
-        "boost_sales": ("Kapıda ödeme + ücretsiz kargo + Ramazan/Bayram koleksiyonu", 8,
-                        [("Kapıda ödeme ve ücretsiz teslimat", 8, 18, 3.0), ("Ramazan / Bayram sezon teması", 12, 28, 1.0)],
-                        "Ramazan öncesi 3-4 hafta, Bayram öncesi", "Güven (kapıda ödeme) ve dini takvim bu pazarda en güçlü kaldıraçlar."),
-        "defend_competition": ("Değer katan hediye + influencer", 5,
-                               [("Hediye / ek ürün (indirim yerine)", 4, 10, 2.0), ("Yerel influencer iş birliği", 4, 12, 3.0)],
-                               "Rakip lansmanlarında", "Fiyat savaşı yerine algılanan değeri artır."),
-    },
-    "EU": {
-        "clear_stock": ("Sezon sonu satışı + ücretsiz iade", 25,
-                        [("Sezon sonu (SALE) etkinliği", 15, 30, 0.5), ("Ücretsiz iade", 3, 8, 3.0)],
-                        "Sezon sonu, Black Friday", "AB'de sezon sonu indirimi alışılmış; ücretsiz iade güveni korur ama iade maliyetini artırır."),
-        "boost_sales": ("Ücretsiz kargo eşiği + bülten kodu", 8,
-                        [("Ücretsiz kargo (sepet eşiği)", 5, 12, 2.0), ("Bülten/ilk alışveriş kodu", 4, 10, 1.0)],
-                        "Yeni sezon girişi", "Sepet eşiği ortalama sipariş tutarını da yükseltir."),
-        "defend_competition": ("Sürdürülebilirlik/kalite vurgusu + sadakat", 4,
-                               [("Sadakat puanı", 3, 8, 1.0), ("Sürdürülebilirlik/kalite mesajı", 2, 6, 0.5)],
-                               "Sürekli", "AB müşterisi fiyat dışında kalite ve sürdürülebilirliğe de bakar."),
-    },
-    "US": {
-        "clear_stock": ("Black Friday / Cyber Monday + BOGO", 30,
-                        [("Black Friday/Cyber Monday", 20, 40, 0.5), ("Al-1-Öde-1-yarı fiyat (BOGO)", 10, 20, 1.0)],
-                        "Kasım sonu, yıl sonu", "ABD'de Black Friday hacmi diğer dönemlerin çok üzerindedir."),
-        "boost_sales": ("Ücretsiz kargo + Şimdi al sonra öde", 8,
-                        [("Ücretsiz kargo", 6, 14, 2.0), ("Şimdi al, sonra öde (BNPL)", 6, 15, 2.5)],
-                        "Yeni sezon, hafta sonu", "Kargo ve ödeme esnekliği dönüşümü artırır."),
-        "defend_competition": ("Fiyat eşleştirme garantisi + sadakat", 5,
-                               [("Fiyat eşleştirme garantisi", 4, 10, 1.5), ("Sadakat/üyelik", 3, 8, 1.0)],
-                               "Rakip kampanya haftaları", "Rekabetçi pazarda güven ve fiyat garantisi."),
-    },
-    "CIS": {
-        "clear_stock": ("Yılbaşı / 8 Mart indirimi + taksit", 25,
-                        [("Yılbaşı / 8 Mart / 11.11 etkinlikleri", 15, 30, 0.5), ("Taksit (рассрочка)", 8, 18, 1.5)],
-                        "Aralık-Ocak, Mart başı", "Bölgede takvim temelli hediye dönemleri ve taksit güçlü etki yapar."),
-        "boost_sales": ("Ücretsiz teslimat + hediye dönemi", 8,
-                        [("Ücretsiz teslimat", 6, 14, 2.5), ("Hediye dönemi teması (8 Mart, Yılbaşı)", 10, 24, 1.0)],
-                        "Aralık, Mart başı", "Hediye alışverişi tekil dönemlerde yoğunlaşır."),
-        "defend_competition": ("Fiyat eşleştirme + taksit", 5,
-                               [("Taksit (рассрочка)", 5, 12, 1.5), ("Yerel pazaryeri görünürlüğü", 3, 9, 2.0)],
-                               "Rakip dönemleri", "Fiyat ve ödeme kolaylığıyla rakibe yakın kal."),
-    },
-}
+# Bölge x hedef kampanya kataloğu artık veri dosyasında: panel_data/takvim/kampanya_kaldiraclari.csv (TAKVIM_DIR).
+# Tüm yüzdeler kural varsayımıdır; bölge alışkanlığına dair genel eğilimlere dayanır, dosyadan düzenlenir.
+def catalog() -> dict:
+    from .config import settings
+    from .takvim.data import load_catalog
+    return load_catalog(settings.takvim_dir)
+
+
 GOAL_LABEL = {"clear_stock": "Stok eritme", "boost_sales": "Satışı artırma", "defend_competition": "Rakibe karşı konum koruma"}
 WINDOW = {"clear_stock": (75, 21), "boost_sales": (30, 21), "defend_competition": (45, 21)}
 
@@ -148,7 +97,7 @@ def build_campaigns(region: str, model: DemandModel, answers: Sequence[AgentPric
     comp_price = a.competitor_price_usd.get(region)
     out: List[CampaignScenario] = []
     sold_at = {p.day: p.sold for p in forecast.curve}
-    for goal, (name, disc, lever_rows, timing, rationale) in CATALOG[region].items():
+    for goal, (name, disc, lever_rows, timing, rationale) in catalog()[region].items():
         notes: List[str] = []
         if goal == "defend_competition":
             if comp_price:
