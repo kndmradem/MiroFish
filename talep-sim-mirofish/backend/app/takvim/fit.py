@@ -124,8 +124,10 @@ def user_prompt(card: dict, events: List[Event], letters: List[str], takvim: Tak
         f"Sorular:\n- fit: her harf için 0-3 puan (0 bu dönemde almam, 1 belki, 2 muhtemelen, 3 kesin bu dönemde alırım "
         "ya da hediye ederim). Her dönem herkese uymaz; kendi hayatına göre puanla.\n"
         f"{wait_q}- comment: tek kısa cümle\n"
-        'Sadece JSON yaz, ör. {"fit": {' + ", ".join(f'"{L}": 1' for L in letters) + "}"
-        + (', "wait": "hemen"' if wait is not None else "") + ', "comment": "..."}'
+        # Örnek değer verilmez: küçük model örnekteki puanı ("1") ve "hemen"i her ürün için aynen kopyalıyordu.
+        "Sadece şu biçimde JSON yaz; <...> yerlerine KENDİ cevabını koy (yer tutucuları kopyalama):\n"
+        '{"fit": {' + ", ".join(f'"{L}": <0-3>' for L in letters) + "}"
+        + (', "wait": "<hemen|bekle|almam>"' if wait is not None else "") + ', "comment": "<tek kısa cümle>"}'
     )
 
 
