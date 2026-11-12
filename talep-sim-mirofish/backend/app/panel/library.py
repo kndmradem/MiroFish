@@ -128,6 +128,12 @@ class PanelMember:
     female: bool
     price_sensitivity: float
     trend_affinity: float
+    # Hedef kitleye göre (bkz. app/audience.py): kendisi / hediye (karşı cins ürününü yakını için) / ebeveyn
+    buyer_role: str = "kendisi"
+    audience: str = ""                 # kadin / erkek / cocuk / unisex ("" = kitle seçimi yok, eski davranış)
+    audience_label: str = ""
+    child_age: Optional[int] = None
+    child_female: Optional[bool] = None
 
 
 class LibraryError(ValueError):
@@ -239,12 +245,48 @@ def _allocate(weights: List[float], n: int) -> List[int]:
     return counts
 
 
+def _overlap(a: Tuple[int, int], b: Tuple[int, int]) -> int:
+    return max(0, min(a[1], b[1]) - max(a[0], b[0]) + 1)
+
+
+def _audience_slots(lib: PersonaLibrary, seg_list: List[Segment], plan, rng: random.Random):
+    """Kitle planına göre kota: kadın sayısı ve yaş bantları paneldeki kişilere dağıtılır.
+
+    Cinsiyet kotası tam (12 kişide %85 = 10 kadın), yaş bantları en büyük kalan yöntemiyle; her kişiye segmentinin yaş
+    aralığıyla en çok örtüşen boş bant verilir (genç trend segmenti genç banda düşer), örtüşme yoksa bandın kendi aralığı.
+    """
+    from ..audience import _allocate as alloc
+    n = len(seg_list)
+    d = plan.dist
+    n_f = round(n * d.female_share)
+    genders = [True] * n_f + [False] * (n - n_f)
+    rng.shuffle(genders)
+    bands = [(lo, hi) for lo, hi, _ in d.age_bands]
+    left = alloc([w for _, _, w in d.age_bands], n)
+    order = sorted(range(n), key=lambda i: seg_list[i].age_range[1] - seg_list[i].age_range[0])
+    ages: Dict[int, int] = {}
+    for i in order:
+        seg = seg_list[i].age_range
+        cand = [b for b in range(len(bands)) if left[b] > 0]
+        b = max(cand, key=lambda b: (_overlap(bands[b], seg), left[b], -b))
+        left[b] -= 1
+        lo, hi = bands[b]
+        if _overlap(bands[b], seg):
+            lo, hi = max(lo, seg[0]), min(hi, seg[1])
+        ages[i] = rng.randint(lo, hi)
+    return genders, ages
+
+
 def sample_panel(lib: PersonaLibrary, n: int, seed: str = "", sensitivity_scale: float = 1.0,
-                 trend_scale: float = 1.0) -> List[PanelMember]:
+                 trend_scale: float = 1.0, audience=None) -> List[PanelMember]:
     """Segment ağırlıklarına göre n kişilik deterministik panel. Aynı seed aynı paneli verir.
 
     `sensitivity_scale` ve `trend_scale` kalibrasyondan gelir (gerçek satışa göre ayarlanan çarpanlar).
+    `audience` (app.audience.AudiencePlan) verilirse cinsiyet ve yaş, ürünün hedef kitlesine ve bölgenin kalibre
+    dağılımına göre kota ile atanır; çocuk ürününde panel ebeveynlerden oluşur. Verilmezse eski davranış.
     """
+    if audience is not None:
+        return _sample_for_audience(lib, n, seed, sensitivity_scale, trend_scale, audience)
     rng = random.Random(_seed(lib.region, lib.version, seed))
     members: List[PanelMember] = []
     for seg, k in zip(lib.segments, _allocate([s.weight for s in lib.segments], n)):
@@ -255,6 +297,31 @@ def sample_panel(lib: PersonaLibrary, n: int, seed: str = "", sensitivity_scale:
                 female=rng.random() < seg.female_share,
                 price_sensitivity=clamp(seg.price_sensitivity * sensitivity_scale + rng.uniform(-0.08, 0.08)),
                 trend_affinity=clamp(seg.trend_affinity * trend_scale + rng.uniform(-0.1, 0.1))))
+    return members
+
+
+def _sample_for_audience(lib, n, seed, sensitivity_scale, trend_scale, plan) -> List[PanelMember]:
+    from ..audience import buyer_role
+    value = plan.info.value
+    rng = random.Random(_seed(lib.region, lib.version, seed, value))
+    seg_list = [seg for seg, k in zip(lib.segments, _allocate([s.weight for s in lib.segments], n)) for _ in range(k)]
+    genders, ages = _audience_slots(lib, seg_list, plan, rng)
+    clamp = lambda x: round(max(0.0, min(1.0, x)), 2)
+    lo_c, hi_c = plan.dist.child_age_range or (2, 12)
+    members: List[PanelMember] = []
+    for i, seg in enumerate(seg_list):
+        female = genders[i]
+        child_age = child_female = None
+        if value == "cocuk":
+            child_age = rng.randint(lo_c, hi_c)
+            g = plan.info.child_gender
+            child_female = True if g == "kız" else False if g == "erkek" else rng.random() < 0.5
+        members.append(PanelMember(
+            index=i + 1, segment=seg, age=ages[i], female=female,
+            price_sensitivity=clamp(seg.price_sensitivity * sensitivity_scale + rng.uniform(-0.08, 0.08)),
+            trend_affinity=clamp(seg.trend_affinity * trend_scale + rng.uniform(-0.1, 0.1)),
+            buyer_role=buyer_role(value, female), audience=value, audience_label=plan.info.label,
+            child_age=child_age, child_female=child_female))
     return members
 
 

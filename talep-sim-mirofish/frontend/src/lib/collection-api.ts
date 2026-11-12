@@ -1,5 +1,5 @@
 // Koleksiyon modu API istemcisi (/api/collections). Tekli ürün API'si (api.ts) değişmez.
-import { normalizePrediction, try_, usd, type BrandProfile, type PredictionResponse, type RegionCode } from "@/lib/api";
+import { normalizePrediction, try_, usd, type AudienceInfo, type BrandProfile, type PredictionResponse, type RegionCode } from "@/lib/api";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8100";
 
@@ -29,6 +29,8 @@ export interface CollectionItem {
   moq: number | null;
   attributes: Record<string, string>;
   color_images?: Record<string, string>;
+  /** Excel hedef_kitle sütunu; boşsa tahmin edilir */
+  target_audience?: string | null;
 }
 
 export interface CollectionMeta {
@@ -49,7 +51,7 @@ export interface CollectionMeta {
 }
 
 export interface Issue { level: "hata" | "uyarı" | "bilgi"; sku: string | null; row: number | null; message: string }
-export interface ItemPreview { row: number; item: CollectionItem; status: "ok" | "uyarı" | "hata" | "belirsiz"; match_rule: string; candidates: string[] }
+export interface ItemPreview { row: number; item: CollectionItem; status: "ok" | "uyarı" | "hata" | "belirsiz"; match_rule: string; candidates: string[]; audience?: AudienceInfo | null }
 export interface OrphanImage { file: string; suggestion: string | null; candidates: string[] }
 export interface ImportPreview {
   collection_id: string;
@@ -102,6 +104,8 @@ export interface ItemRegion {
 }
 
 export interface ItemResult {
+  /** Hedef kitle ve dayanağı (kullanıcı girdisi / tahmin) */
+  audience?: AudienceInfo | null;
   sku: string;
   name: string;
   category: string;

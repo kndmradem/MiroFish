@@ -9,6 +9,7 @@ import { applyProgress, initialProgress, ProgressPanel, type ProgressState } fro
 import { AllocationCard } from "@/components/allocation-card";
 import { ExtrasCard } from "@/components/extras-card";
 import { SummaryCard } from "@/components/summary-card";
+import { AUDIENCE_OPTIONS, AudienceCard } from "@/components/audience-card";
 import { CampaignsCard, PricePlanCard } from "@/components/scenarios-card";
 import { CalendarPlanCard } from "@/components/calendar-plan-card";
 import { ForecastCard } from "@/components/forecast-card";
@@ -59,6 +60,7 @@ export default function Dashboard() {
   const [regions, setRegions] = useState<RegionCode[]>(["EU", "MENA", "CIS"]);
   const [image, setImage] = useState<{ name: string; dataUrl: string } | null>(null);
   const [objective, setObjective] = useState<"balanced" | "profit" | "blended">("balanced");
+  const [targetAudience, setTargetAudience] = useState("");
   const [resetWorld, setResetWorld] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -114,6 +116,7 @@ export default function Dashboard() {
         setResult(res);
         setProductName(String(res.product_card?.product_name ?? sku));
         if (res.brand_profile) setProfile(res.brand_profile);
+        if (res.target_audience?.source === "kullanıcı girdisi") setTargetAudience(res.target_audience.raw || res.target_audience.label.toLowerCase());
         setChartRegion((res.regional_breakdown[0]?.region as RegionCode) ?? null);
         setFromCollection(`${sku} (koleksiyon ${cid})`);
         setCollectionCtx(res.collection_context ?? null);
@@ -162,6 +165,7 @@ export default function Dashboard() {
         usd_try_rate: regions.includes("TR") && Number(usdTry) > 0 ? Number(usdTry) : undefined,
         reset_world: resetWorld || undefined,
         allocation_objective: objective,
+        target_audience: targetAudience || undefined,
       }, handlers(regions));
       setResetWorld(false);
       if (res.brand_profile) setProfile(res.brand_profile);
@@ -213,6 +217,17 @@ export default function Dashboard() {
             <div className="grid gap-2">
               <Label htmlFor="name">Ürün adı</Label>
               <Input id="name" value={productName} onChange={(e) => setProductName(e.target.value)} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="target-audience">Hedef kitle</Label>
+              <select id="target-audience" value={targetAudience} onChange={(e) => setTargetAudience(e.target.value)}
+                className="h-9 rounded-md border bg-transparent px-2 text-sm">
+                {AUDIENCE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Panel buna göre seçilir: kadın ürününde ağırlıklı kadın, erkek ürününde ağırlıklı erkek, çocuk ürününde ebeveynler,
+                unisex&apos;te karışık. Boşsa ürün adından tahmin edilir ve sonuçta &quot;tahmin&quot; diye yazar.
+              </p>
             </div>
             <BrandPanel brand={brand} notes={brandNotes} profile={profile}
               onBrand={setBrand} onNotes={setBrandNotes} onProfile={setProfile} />
@@ -404,6 +419,7 @@ export default function Dashboard() {
               </div>
             )}
             <SummaryCard result={result} productName={productName} />
+            <AudienceCard result={result} />
 
             {result.failed_regions.length > 0 && (
               <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">

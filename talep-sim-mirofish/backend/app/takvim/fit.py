@@ -194,7 +194,9 @@ async def ask_panel(panel, card: dict, region: str, events: List[Event], takvim:
     ctx = panel.store.context(region, panel.as_of)
     cal = panel.calibration.for_region(region)
     seed = f"{card.get('panel_seed') or card.get('product_name')}|{brand.name if brand else ''}|{region}"  # tek tek turla aynı kişiler
-    members = sample_panel(lib, panel.panel_size, seed, cal.sensitivity_scale, cal.trend_scale)
+    from ..audience import plan_from_card
+    members = sample_panel(lib, panel.panel_size, seed, cal.sensitivity_scale, cal.trend_scale,
+                           audience=plan_from_card(card, region, panel.store.root))   # hedef kitleye göre aynı kişiler
     letters = list(LETTERS[:len(events)])
     wait = wait_event_of(events, takvim)
     brand_line = ""

@@ -110,4 +110,4 @@ def test_collection_does_not_pair_mirofish_agents_with_fallback_panel_persons():
 
     _, a, _ = _item_regions({"regional_breakdown": [rb(None)]}, None)
     _, b, _ = _item_regions({"regional_breakdown": [rb("MiroFish bu bölgeyi hesaplayamadı")]}, None)
-    assert list(a) == [("MENA", 1)] and list(b) == [("MENA", PANEL_FALLBACK_OFFSET + 1)]
+    assert list(a) == [("MENA", ":1")] and list(b) == [("MENA", f":{PANEL_FALLBACK_OFFSET + 1}")]

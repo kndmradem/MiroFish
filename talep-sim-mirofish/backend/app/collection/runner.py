@@ -16,6 +16,7 @@ from typing import Awaitable, Callable, Dict, Optional
 
 from ..advisor import Advisor
 from ..models import Assumptions, BrandProfile, PredictionRequest
+from .importer import item_audience
 from .models import Collection, CollectionItem, RunOptions, RunStatus
 from . import showcase
 from .store import CollectionStore
@@ -221,7 +222,8 @@ class CollectionRunner:
                     brand_profile=brand,
                     assumptions=Assumptions(channel=col.meta.channel, launch_month=it.launch_month or col.meta.launch_month,
                                             calendar_plan=False),  # takvim planı tekli üründe; koleksiyonda ek LLM turu yok
-                    usd_try_rate=fx_rate, allocation_objective=opts.allocation_objective)
+                    usd_try_rate=fx_rate, allocation_objective=opts.allocation_objective,
+                    target_audience_info=item_audience(it))
 
                 async def emit(ev: dict, _i=i, _it=it):
                     if ev.get("detail"):

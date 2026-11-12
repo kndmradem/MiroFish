@@ -19,7 +19,7 @@ from .models import Explanation, FailedRegion, BrandProfile, BrandProfileRequest
 from .advisor import Advisor
 from .newstore import Candidate as NewStoreCandidate, NewStoreEstimate
 from .explain import allocation_note, allocation_view, explain_region, methodology_notes
-from . import economy
+from . import audience, economy
 from .forecast import HORIZON, DemandModel, forecast_sales
 from .extras import break_even, confidence, seasonal_factor, sensitivity, size_curve
 from .scenarios import _zone_of, build_campaigns, build_price_plan
@@ -265,9 +265,14 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
             await emit({"stage": "brand", "detail": f"{req.brand} marka profili çıkarılıyor"})
             brand = await profiler.profile(req.brand, req.brand_notes)
         await emit({"stage": "card", "detail": "Görsel ve teknik metin ürün kartına çevriliyor"})
-        card = await engine.fuse_product_card(req)
+        card = dict(await engine.fuse_product_card(req))
     except (MiroFishError, LLMError, httpx.HTTPError) as e:
         raise HTTPException(status_code=502, detail=f"Simülasyon servisi hatası: {type(e).__name__}: {e}") from e
+
+    # Hedef kitle: kullanıcı girdisi ya da ad/kategoriden tahmin. Motorlar paneli buna göre seçer/ağırlıklandırır.
+    aud = req.target_audience_info or audience.resolve(req.target_audience, req.product_name, specs=req.technical_specs)
+    card["target_audience"] = aud.model_dump(mode="json")
+    await emit({"stage": "card", "detail": f"Hedef kitle: {aud.label} ({aud.source}{': ' + aud.reason if aud.source == 'tahmin' else ''})"})
 
     if req.reset_world and hasattr(engine, "reset_world"):
         await emit({"stage": "world", "detail": "Dünya sıfırlanıyor: eski proje/Zep grafiği siliniyor, baştan kurulacak"})
@@ -384,6 +389,7 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
             engine=sim.meta.get("engine"),
             engine_note=(f"MiroFish bu bölgeyi hesaplayamadı, persona paneli kullanıldı: {sim.meta['fallback_reason']}"
                          if sim.meta.get("fallback_from") else None),
+            audience_panel=sim.meta.get("audience"),
             explanations=[e if e.key != "quantity" else Explanation(
                 key="quantity", label=e.label, value=f"{alloc.quantity:,}", how=view.why,
                 assumptions=["Talep 120 günlük ajan talebi + kural varsayımlarından (kitle, dönüşüm) gelir; stok sınırsız varsayıldığında beklenen satıştır.",
@@ -415,6 +421,7 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
         allocation_note=allocation_note(req.allocation_objective, unallocated, req.unit_cost,
                                         sum(pre[r][0] for r in pre), sum(a.quantity for a in allocations.values())),
         product_card=card,
+        target_audience=aud,
         engine=engine_name,
         brand_profile=brand,
         recommendations=await advisor.recommend(breakdown, brand, unit_cost, req.total_production_budget, unallocated, card),

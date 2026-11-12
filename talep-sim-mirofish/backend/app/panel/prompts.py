@@ -22,6 +22,9 @@ def persona_text(m: PanelMember) -> str:
     s = m.segment
     parts = [f"Sen {s.city} şehrinde yaşayan {m.age} yaşında {'bir kadın' if m.female else 'bir erkek'} tüketicisin "
              f"({s.label}, {_INCOME[s.income_band]})."]
+    role = buyer_text(m)
+    if role:
+        parts.append(role)
     if s.style_affinity:
         parts.append(f"Tarzın: {', '.join(s.style_affinity)}.")
     parts.append(f"Fiyata duyarlılığın {_level(m.price_sensitivity, 'düşük', 'orta', 'yüksek')} "
@@ -36,6 +39,18 @@ def persona_text(m: PanelMember) -> str:
     if s.notes:
         parts.append(s.notes)
     return " ".join(parts)
+
+
+def buyer_text(m: PanelMember) -> str:
+    """Hedef kitleye göre kişinin ürünü kimin için değerlendirdiği."""
+    if m.buyer_role == "ebeveyn":
+        kid = "kızın" if m.child_female else "oğlun" if m.child_female is False else "çocuğun"
+        return (f"{'Annesin' if m.female else 'Babasın'}: {m.child_age} yaşındaki {kid} için alışveriş yapıyorsun. "
+                "Ürünü onun için değerlendir: rahatlık, dayanıklılık, yıkanabilirlik ve fiyat senin kararını belirler.")
+    if m.buyer_role == "hediye":
+        whom = "bir kadın (eşin, annen, kız kardeşin)" if m.audience == "kadin" else "bir erkek (eşin, baban, erkek kardeşin)"
+        return f"Bu ürünü kendin giymezsin; hayatındaki {whom} için alıp almayacağını değerlendir."
+    return ""
 
 
 def context_text(ctx: Optional[ContextPack]) -> str:
@@ -86,11 +101,14 @@ def user_prompt(card: dict, ctx: Optional[ContextPack], ladder: List[float], bra
                        f"Bu bölgedeki bilinirliği: {brandlib.region_strength(brand, region)}/100.{ref}\n")
     peer = (f"\nDiğer tüketicilerin bu ürün hakkındaki yorumlarının özeti (katılmak zorunda değilsin):\n{peer_summary}\n"
             if peer_summary else "")
+    aud = card.get("target_audience") or {}
+    aud_line = f"Ürünün hedef kitlesi: {aud['label']}\n" if aud.get("label") else ""
     return (
         f"{context_text(ctx)}\n\n"
         "Aşağıdaki yeni ürünü kendi gözünle değerlendir. Fiyatlar ABD doları.\n"
         f"{brand_block}"
         f"Ürün: {card.get('product_name')}\n"
+        f"{aud_line}"
         f"Kumaş: {card.get('fabric_texture', '-')}; bileşim: {card.get('composition', '-')}; gramaj: {card.get('gsm') or '-'}\n"
         f"İklim uyumu: {card.get('climate_fit', '-')}; stil: {card.get('style_category', '-')}\n"
         f"Görünüm: {card.get('visual_description', '-')}\n"

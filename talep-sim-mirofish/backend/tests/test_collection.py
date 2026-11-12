@@ -110,7 +110,10 @@ def test_template_is_readable_by_importer():
     assert not prev.ignored_columns
     first = prev.items[0].item
     assert first.unit_cost == 420 and first.technical_specs.startswith("%100 keten") and first.planned_price is None
-    assert first.attributes["Hedef kitle"] == "kadın" and first.attributes["yaka"] == "klasik"
+    assert first.target_audience == "kadın" and first.attributes["yaka"] == "klasik"
+    a1, a3 = prev.items[0].audience, prev.items[2].audience
+    assert (a1.value, a1.source) == ("kadin", "kullanıcı girdisi")
+    assert (a3.value, a3.source) == ("kadin", "tahmin") and "elbise" in a3.reason   # boş sütun: addan tahmin
     wb = load_workbook(io.BytesIO(template_bytes()))
     heads = [c.value for c in wb["Ürünler"][1]]
     assert not any("fiyat" in h and "maliyet" not in h for h in heads)          # satış fiyatı sütunu yok
@@ -266,7 +269,12 @@ def test_api_import_confirm_run_result_export(client):
     res = client.get(f"/api/collections/{cid}/result").json()
     assert res["summary"]["n_evaluated"] == 4 and res["currency"] == "TRY"
     assert {r["region"] for r in res["items"][0]["regions"]} == {"TR", "EU"}
-    assert client.get(f"/api/collections/{cid}/items/SW27-001/prediction").json()["regional_breakdown"]
+    pred = client.get(f"/api/collections/{cid}/items/SW27-001/prediction").json()
+    assert pred["regional_breakdown"]
+    # hedef kitle sütunu yok: her ürün için tahmin edilir, etiketlenir ve panele/sonuca taşınır
+    assert all(i["audience"]["source"] == "tahmin" for i in res["items"])
+    assert pred["target_audience"] == next(i["audience"] for i in res["items"] if i["sku"] == "SW27-001")
+    assert all(r["audience_panel"]["value"] == pred["target_audience"]["value"] for r in pred["regional_breakdown"])
 
     # ikinci koşu: girdiler değişmedi, önceki sonuçlar kullanılır
     client.post(f"/api/collections/{cid}/run", json={})
