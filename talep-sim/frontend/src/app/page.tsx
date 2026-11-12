@@ -342,7 +342,7 @@ export default function Dashboard() {
               <span>
                 <span className="font-medium">Dünyayı sıfırla ve baştan kur</span>
                 <span className="block text-xs text-muted-foreground">
-                  Seçili bölgelerin önbellekteki MiroFish dünyasını ve Zep grafiğini siler; ajanlar güncel profil ve
+                  Seçili bölgelerin önbellekteki tüm MiroFish dünyalarını (her hedef kitle için ayrı) siler; ajanlar güncel profil ve
                   promptlarla sıfırdan kurulur (yerel modelde 10-30 dk). Yalnızca bir sonraki koşuda uygulanır.
                 </span>
               </span>

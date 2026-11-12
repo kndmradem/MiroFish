@@ -315,6 +315,9 @@ class OasisProfileGenerator:
                 entity_attributes=entity.attributes
             )
         
+        from .local_people import apply_attributes
+        profile_data = apply_attributes(profile_data, entity.attributes or {})
+
         return OasisAgentProfile(
             user_id=user_id,
             user_name=user_name,
@@ -371,8 +374,9 @@ class OasisProfileGenerator:
             "context": ""
         }
         
-        # 必须有graph_id才能进行搜索
-        if not self.graph_id:
+        # 必须有graph_id才能进行搜索；yerel kişi listesinde Zep yok
+        from .local_people import is_local
+        if not self.graph_id or is_local(self.graph_id):
             logger.debug(f"跳过Zep检索：未设置graph_id")
             return results
         

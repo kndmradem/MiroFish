@@ -205,3 +205,81 @@ def test_api_uses_user_value_or_labels_guess():
     g = c.post("/api/predict", json={**BODY, "product_name": "Saten gecelik"}).json()
     assert g["target_audience"]["value"] == "kadin" and g["target_audience"]["source"] == "tahmin"
     assert "gecelik" in g["target_audience"]["reason"]
+
+
+# ---------------------------------------------------------------- MiroFish: kitleye göre yeni ajanlar (Zep yok)
+class LocalMiroFish(FakeMiroFish):
+    """Kişileri /api/graph/local ile alır; kadınlar ürünü çok, erkekler az beğenir."""
+
+    def handler(self, request: httpx.Request) -> httpx.Response:
+        if request.url.path != "/api/simulation/interview/batch":
+            return super().handler(request)
+        body = json.loads(request.content)
+        self.prompts = getattr(self, "prompts", []) + [i["prompt"] for i in body["interviews"]]
+        gender = {p["user_id"]: p["gender"] for p in self.profiles if "gender" in p}
+        out = {f"reddit_{i['agent_id']}": {"agent_id": i["agent_id"], "response": json.dumps({
+            "interest": 80 if gender.get(i["agent_id"]) == "female" else 20, "too_cheap": 30, "cheap": 55,
+            "expensive": 90, "too_expensive": 130, "objection": "Kumaş ince"})} for i in body["interviews"]}
+        return httpx.Response(200, json={"success": True, "data": {"result": {"results": out}}})
+
+
+def _local_engine(tmp_path, fake, n=10):
+    return make_mf_engine(tmp_path, fake, agents_per_region=n, local_people=True)
+
+
+async def _sim(engine, value, region="EU", child=None):
+    card = await engine.fuse_product_card(PredictionRequest(product_name="Ürün", **BODY))
+    info = aud.normalize(value)
+    if child:
+        info = info.model_copy(update={"child_gender": child})
+    card["target_audience"] = info.model_dump(mode="json")
+    return await engine.simulate_region(card, region, 12.0, scope=[region])
+
+
+async def test_mirofish_creates_new_agents_for_audience_without_zep(tmp_path):
+    fake = LocalMiroFish()
+    sim = await _sim(_local_engine(tmp_path, fake), "kadın", "TR")
+    assert "/api/graph/ontology/generate" not in fake.calls and "/api/graph/build" not in fake.calls   # Zep yok
+    people = fake.local_people[0]["people"]
+    women = sum(p["attributes"]["gender"] == "female" for p in people)
+    plan = aud.plan_for(aud.normalize("kadın"), "TR")
+    assert len(people) == 10 and women == round(10 * plan.dist.female_share) and women >= 8
+    assert all(p["attributes"]["region"] == "TR" and p["attributes"]["country"] == "Türkiye" for p in people)
+    assert "Kadın" in fake.local_people[0]["simulation_requirement"]
+    a = sim.meta["audience"]
+    assert a["method"] == "kota" and "sıfırdan oluşturuldu" in a["note"] and "unweighted_demand" not in a
+    assert a["composition"]["n_female"] == women
+    assert sim.demand_score == round((women * 80 + (10 - women) * 20) / 10)                 # ağırlık yok
+    assert all(r["weight"] == 1.0 and r["who"] for r in sim.meta["raw_answers"])
+
+
+async def test_each_audience_gets_its_own_world_and_worlds_are_reused(tmp_path):
+    fake = LocalMiroFish()
+    engine = _local_engine(tmp_path, fake)
+    women = await _sim(engine, "kadın")
+    await _sim(engine, "kadın")
+    men = await _sim(engine, "erkek")
+    assert len(fake.local_people) == 2                                                        # kadın dünyası yeniden kullanıldı
+    assert men.meta["audience"]["composition"]["n_female"] < 5 < women.meta["audience"]["composition"]["n_female"]
+    assert men.demand_score < women.demand_score
+    engine2 = _local_engine(tmp_path, fake)                                                   # diskteki önbellekten
+    await _sim(engine2, "erkek")
+    assert len(fake.local_people) == 2
+
+
+async def test_child_product_world_is_parents_of_that_child_gender(tmp_path):
+    fake = LocalMiroFish()
+    sim = await _sim(_local_engine(tmp_path, fake), "çocuk", "TR", child="kız")
+    people = fake.local_people[0]["people"]
+    assert all("kızı var" in p["summary"] for p in people)
+    assert sum(p["attributes"]["gender"] == "female" for p in people) >= 7                  # çoğunluk anne
+    assert "ebeveyn" in sim.meta["audience"]["note"]
+
+
+async def test_reset_forgets_all_audience_worlds_of_region(tmp_path):
+    fake = LocalMiroFish()
+    engine = _local_engine(tmp_path, fake)
+    await _sim(engine, "kadın")
+    await _sim(engine, "erkek")
+    notes = await engine.reset_world(["EU"])
+    assert len(notes) == 2 and json.loads((tmp_path / "world.json").read_text()) == {}

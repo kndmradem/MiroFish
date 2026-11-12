@@ -28,10 +28,17 @@ değiştirilmelidir. Müşteri kendi `PANEL_DATA_DIR` klasörüne `hedef_kitle/d
 - **Persona paneli (SIM_ENGINE=panel):** kişiler kota ile seçilir (12 kişide %85 kadın = 10 kadın, 2 erkek). Yaş bantları en büyük
   kalan yöntemiyle dağıtılır; her kişiye segmentinin yaş aralığıyla en çok örtüşen bant verilir. Aynı kitledeki ürünlere aynı kişiler
   bakar (koleksiyon içi karşılaştırma kitle içinde yapılır). Vitrin turu koleksiyonun çoğunluk kitlesiyle koşar.
-- **MiroFish (SIM_ENGINE=mirofish / hybrid):** dünyadaki kişiler sabittir (bölge başına 10). Hepsi sorulur, soruya hedef kitle notu eklenir
-  ("Kadınsan kendin için, erkeksen hayatındaki bir kadın için…"), cevaplar hedef cinsiyet/yaş dağılımına göre **ağırlıklandırılır**
-  (talep ve fiyat). Tek kişinin ağırlığı ortalamanın en fazla 3 katı; etkili kişi sayısı ve ağırlıksız talep sonuçta gösterilir.
-  Seed kişilerin cinsiyeti `services/personas.py` içinde `SEED_GENDER`; dünya yeniden kurulmaz (eski dünyada profiller bir kez çekilir).
+- **MiroFish (SIM_ENGINE=mirofish / hybrid), varsayılan:** her hedef kitle için **ayrı bir dünya, sıfırdan oluşturulan ajanlarla**
+  kurulur; **Zep kullanılmaz**. `services/world_people.py` bölge başına `MIROFISH_AGENTS_PER_REGION` kişi üretir: kadın payı ve yaş
+  bantları kitlenin bölge dağılımından (kota), çocukta hepsi ebeveyn (ürün kız/erkek çocuk içinse çocukları o cinsiyetten), şehir/gelir/
+  tarz persona kütüphanesinden, adlar `panel_data/hedef_kitle/isimler.json`dan. Kişiler MiroFish'e `POST /api/graph/local` ile verilir;
+  MiroFish bunları Zep grafiği yerine proje klasöründen okur, profil üretir (verilen yaş/cinsiyet/ülke/meslek LLM'in tahmininin önüne
+  geçer), kısa simülasyonu koşar. Dünyalar (bölgeler, kitle) başına önbelleğe alınır: bir kitle için ilk koşu yerel modelde 10-30 dk,
+  sonrakiler hazır dünyayı kullanır. Ağırlık yok (yöntem: kota). "Dünyayı sıfırla" seçili bölgelerin tüm kitle dünyalarını siler.
+- **MiroFish eski yol (`MIROFISH_ZEP=1`):** sabit seed dünyası (bölge başına 10 kişi, Zep grafiği). Hepsi sorulur, cevaplar hedef
+  cinsiyet/yaş dağılımına göre **ağırlıklandırılır** (talep ve fiyat; tek kişinin ağırlığı ortalamanın en fazla 3 katı; etkili kişi
+  sayısı ve ağırlıksız talep gösterilir). Seed kişilerin cinsiyeti `services/personas.py` içinde `SEED_GENDER`.
+- Her iki MiroFish yolunda soruya hedef kitle notu eklenir ("Kadınsan kendin için, erkeksen hayatındaki bir kadın için…").
 - **Mock motor:** kişi üretmez, hedef dağılım yalnızca gösterilir.
 
 ## Sonuç ekranı

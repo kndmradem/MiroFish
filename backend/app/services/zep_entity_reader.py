@@ -79,10 +79,13 @@ class ZepEntityReader:
     
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or Config.ZEP_API_KEY
-        if not self.api_key:
+        # Yerel kişi listesi (local_ grafik) Zep anahtarı olmadan da okunur; Zep çağrısı gelirse hata verilir.
+        self.client = get_zep_client(self.api_key) if self.api_key else None
+
+    def _require_client(self):
+        if self.client is None:
             raise ValueError("ZEP_API_KEY 未配置")
-        
-        self.client = get_zep_client(self.api_key)
+        return self.client
     
     def _call_with_retry(
         self, 
@@ -239,6 +242,11 @@ class ZepEntityReader:
         Returns:
             FilteredEntities: 过滤后的实体集合
         """
+        from .local_people import is_local, load_entities
+        if is_local(graph_id):
+            logger.info(f"Yerel kişi listesi okunuyor (Zep yok): {graph_id}")
+            return load_entities(graph_id, defined_entity_types)
+        self._require_client()
         logger.info(f"开始筛选图谱 {graph_id} 的实体...")
         
         # 获取所有节点

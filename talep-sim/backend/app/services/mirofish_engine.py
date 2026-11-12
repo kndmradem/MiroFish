@@ -1,9 +1,10 @@
 """MiroFish tabanlı simülasyon motoru.
 
 Akış:
-1. Dünya kurulumu (bir kez, diske kaydedilir): seed tüketici paneli ->
-   Zep grafiği -> OASIS ajan profilleri -> kısa simülasyon -> ortam hazır.
-   Ajanlar profil metnindeki isim/şehirden bölgelere eşlenir.
+1. Dünya kurulumu (her bölge kapsamı ve hedef kitle için bir kez, diske kaydedilir): hedef kitleye göre
+   üretilen kişiler (world_people) -> MiroFish yerel kişi listesi (Zep yok) -> OASIS ajan profilleri ->
+   kısa simülasyon -> ortam hazır. Ajanlar adlarından kişilere ve bölgelere eşlenir.
+   Eski yol (local_people=False, MIROFISH_ZEP=1): sabit seed paneli -> Zep grafiği -> profiller.
 2. Her tahminde: ürün kartı, bölgedeki ajanlara röportaj sorusu olarak sorulur.
    Ajan JSON cevap verir: ilgi puanı, dört Van Westendorp eşiği, itirazı.
 3. Cevaplar `RegionSimulation`a çevrilir; fiyat analizi ve bütçe dağıtımı
@@ -12,10 +13,11 @@ Akış:
 import asyncio
 import json
 import logging
+import hashlib
 import math
 from collections import Counter
 from pathlib import Path
-from typing import Awaitable, Callable, Dict, List, Optional, Sequence
+from typing import Awaitable, Callable, Dict, List, Optional, Sequence, Tuple
 
 from .. import audience as audlib
 from .. import brand as brandlib
@@ -26,6 +28,7 @@ from .answer_extractor import (AnswerExtractor, example_ladder, ladder_text, mak
                                parse_agent_answer)
 from .engine import RegionSimulation
 from .mirofish_client import MiroFishClient, MiroFishError, MiroFishTimeout
+from . import world_people as wp
 from .personas import (PERSONAS, build_seed_document, person_of, region_of, scope_of, seed_hash,
                        simulation_requirement)
 
@@ -33,6 +36,7 @@ Fuser = Callable[[PredictionRequest], Awaitable[dict]]
 Progress = Callable[[dict], Awaitable[None]]
 log = logging.getLogger(__name__)
 RAW_CHARS = 1500
+WORLD_VERSION = 1   # yerel (Zep'siz) dünya biçimi; değişirse dünyalar yeniden kurulur
 
 
 class RegionUnavailable(MiroFishError):
@@ -113,7 +117,7 @@ class MiroFishSimulationEngine:
                  poll_s: float = 5, env_wait_s: float = 3600, retries: int = 1,
                  batch_size: int = 3, timeout_retries: int = 1, max_concurrency: int = 1,
                  min_valid: int = 2, extractor: Optional[AnswerExtractor] = None,
-                 agents_per_region: int = 10):
+                 agents_per_region: int = 10, local_people: bool = True):
         self.client = client
         self.fuser = fuser
         self.state_path = Path(state_file)
@@ -130,6 +134,8 @@ class MiroFishSimulationEngine:
         self.min_valid = max(1, min_valid)
         self.extractor = extractor
         self.agents_per_region = max(1, agents_per_region)
+        # True: her hedef kitle için ajanlar sıfırdan, Zep'siz kurulur. False: eski sabit dünya + ağırlıklandırma.
+        self.local_people = local_people
         self._worlds: Optional[Dict[str, dict]] = None
         self._lock = asyncio.Lock()
 
@@ -137,36 +143,44 @@ class MiroFishSimulationEngine:
         return await self.fuser(req)
 
     # --- dünya kurulumu -------------------------------------------------
+    def _world_key(self, regions: List[str], audience: Tuple[str, Optional[str]]) -> str:
+        if not self.local_people:
+            return seed_hash(regions)
+        doc = wp.document(regions, self.agents_per_region, *audience)
+        return f"kitle-{WORLD_VERSION}-" + hashlib.sha256(doc.encode()).hexdigest()[:16]
+
     async def _ensure_world(self, scope: Optional[Sequence[str]] = None,
-                            progress: Optional[Progress] = None) -> dict:
-        """Seçili bölgelere özel dünya: yalnızca o bölgelerin tüketicileri kurulur ve kaydedilir."""
+                            progress: Optional[Progress] = None,
+                            audience: Tuple[str, Optional[str]] = ("unisex", None)) -> dict:
+        """Seçili bölgeler (ve yerel modda hedef kitle) için dünya: yalnızca o kişiler kurulur ve kaydedilir."""
         regions = scope_of(scope)
-        key = seed_hash(regions)
+        key = self._world_key(regions, audience)
         async with self._lock:
             self._load_state()
             world = self._worlds.get(key)
             if world is not None and await self._world_alive(world):
                 return world
-            world = await self._build_world(regions, progress)
+            world = (await self._build_local_world(regions, audience, progress) if self.local_people
+                     else await self._build_world(regions, progress))
             self._worlds[key] = world
             self.state_path.write_text(json.dumps(self._worlds))
             return world
 
     async def reset_world(self, scope: Optional[Sequence[str]] = None,
                           progress: Optional[Progress] = None) -> List[str]:
-        """Seçili bölgelerin önbellekteki dünyasını unutur ve MiroFish/Zep tarafında silmeyi dener.
+        """Seçili bölgelerin önbellekteki tüm dünyalarını (her hedef kitle için) unutur ve MiroFish'te silmeyi dener.
 
-        Silme en iyi çabayla yapılır: başarısız olsa bile bir sonraki çağrı yeni proje ve yeni Zep grafiğiyle
-        sıfırdan kurar (eski kayıt yalnızca Zep Cloud'da artık kalır). Dönüş: kullanıcıya gösterilecek notlar.
+        Silme en iyi çabayla yapılır: başarısız olsa bile bir sonraki çağrı yeni projeyle sıfırdan kurar (eski Zep
+        yolunda eski grafik Zep Cloud'da artık kalabilir). Dönüş: kullanıcıya gösterilecek notlar.
         """
         regions = scope_of(scope)
-        key = seed_hash(regions)
+        key = self._world_key(regions, ("unisex", None))
         notes: List[str] = []
         async with self._lock:
             self._load_state()
             world = self._worlds.pop(key, None)
             self.state_path.write_text(json.dumps(self._worlds))
-            # Eski sürümden kalan, artık kullanılmayan kayıtlar da bu bölge kapsamı için temizlenir.
+            # Aynı bölgelerin diğer hedef kitle dünyaları ve eski sürüm kayıtları da temizlenir.
             stale = [k for k, w in self._worlds.items() if sorted(w.get("regions", [])) == sorted(regions)]
             olds = ([world] if world else []) + [self._worlds.pop(k) for k in stale]
             if stale:
@@ -184,7 +198,7 @@ class MiroFishSimulationEngine:
                     log.info("Dünya sıfırlama: %s atlandı: %s", label, e)
             try:
                 await self.client.delete_project(w["project_id"])
-                notes.append(f"Eski proje ve Zep grafiği silindi ({w['project_id']}).")
+                notes.append(f"Eski proje silindi ({w['project_id']}).")
             except MiroFishError as e:
                 log.warning("Eski proje silinemedi: %s", e)
                 notes.append(f"Eski proje silinemedi ({w['project_id']}): Zep Cloud panelinden 'mirofish_' grafiklerini elle silebilirsin. Yeni dünya yine de sıfırdan kuruldu.")
@@ -265,6 +279,56 @@ class MiroFishSimulationEngine:
             await asyncio.sleep(self.poll_s)
         return {"project_id": project_id, "simulation_id": simulation_id, "agents": agents, "seed_hash": seed_hash(regions),
                 "regions": regions, "people": people}
+
+    async def _build_local_world(self, regions: List[str], audience: Tuple[str, Optional[str]],
+                                 progress: Optional[Progress] = None) -> dict:
+        """Hedef kitleye göre üretilen kişilerle Zep'siz dünya: kişiler MiroFish'e doğrudan verilir."""
+        c = self.client
+        started = asyncio.get_running_loop().time()
+        who = wp.label(*audience)
+        n = self.agents_per_region
+
+        async def step(k: int, text: str) -> None:
+            if progress:
+                mins = int((asyncio.get_running_loop().time() - started) // 60)
+                await progress({"stage": "world", "detail": (
+                    f"{who} kitlesi için ajanlar oluşturuluyor ({', '.join(regions)}), adım {k}/5: {text}. "
+                    f"Bu kitle için ilk seferde yerel modelle 10-30 dk sürebilir (geçen: {mins} dk)")})
+
+        people = wp.world_people(regions, n, *audience)
+        await step(1, f"{len(people)} kişi MiroFish'e veriliyor (Zep yok)")
+        project_id = await c.create_local_project(
+            wp.requirement(regions, *audience), wp.document(regions, n, *audience), [wp.entity(p) for p in people],
+            f"talep-{audience[0]}")
+        await step(2, "simülasyon oluşturuluyor")
+        simulation_id = await c.create_simulation(project_id)
+        await step(3, "ajan profilleri üretiliyor")
+        await c.wait_prepared(simulation_id, await c.prepare(simulation_id), poll_s=self.poll_s, timeout_s=self.env_wait_s)
+
+        by_name = {p["name"]: p for p in people}
+        agents: Dict[str, List[int]] = {r: [] for r in regions}
+        meta: Dict[str, dict] = {}
+        for prof in await c.profiles(simulation_id):
+            p = by_name.get(str(prof.get("name") or "").strip())
+            if p is None or "user_id" not in prof:
+                continue
+            uid = int(prof["user_id"])
+            agents[p["region"]].append(uid)
+            meta[str(uid)] = wp.person_meta(p)
+        if not any(agents.values()):
+            raise MiroFishError("MiroFish profilleri verilen kişilerle eşlenemedi (adlar değişmiş olabilir)")
+
+        await step(4, "simülasyon turları çalışıyor")
+        await c.start(simulation_id, self.max_rounds)
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + self.env_wait_s
+        await step(5, "ortamın röportaja hazır olması bekleniyor")
+        while not await c.env_alive(simulation_id):
+            if loop.time() > deadline:
+                raise MiroFishError("Simülasyon ortamı röportaja hazır hale gelmedi")
+            await asyncio.sleep(self.poll_s)
+        return {"project_id": project_id, "simulation_id": simulation_id, "agents": agents, "regions": regions,
+                "people": meta, "audience": list(audience), "version": WORLD_VERSION}
 
     @staticmethod
     def _people_from(profiles: List[dict]) -> Dict[str, dict]:
@@ -356,7 +420,9 @@ class MiroFishSimulationEngine:
                 await progress({"stage": "interview", "region": region, "detail": detail, **counts})
 
         await note("Simülasyon dünyası hazırlanıyor")
-        world = await self._ensure_world(scope or [region], progress)
+        aud_key = wp.audience_key(card)
+        world = await self._ensure_world(scope or [region], progress, aud_key)
+        built_for = world.get("audience") == list(aud_key)
         agent_ids = world["agents"].get(region, [])[: self.agents_per_region]
         if not agent_ids:
             raise RegionUnavailable(f"{region} bölgesi için ajan bulunamadı")
@@ -418,11 +484,16 @@ class MiroFishSimulationEngine:
                 f"{region}: {len(agent_ids)} ajandan yalnızca {len(valid)} geçerli cevap alınabildi "
                 f"({reason}; en az {need} gerekli).{hint}", raw_answers)
 
-        # Hedef kitle: MiroFish dünyasındaki kişiler sabit; cevaplar hedef cinsiyet/yaş dağılımına göre ağırlıklandırılır.
+        # Hedef kitle: yerel modda ajanlar bu kitle için oluşturuldu (kota, ağırlık yok); eski sabit dünyada cevaplar
+        # hedef cinsiyet/yaş dağılımına göre ağırlıklandırılır.
         plan = audlib.plan_from_card(card, region)
         people = await self._people(world) if plan else {}
         ids = list(parsed)
-        if plan:
+        if plan and built_for:
+            weights = [1.0] * len(ids)
+            for a in ids:
+                raw[a].update({"who": _who(people.get(str(a)) or {}), "weight": 1.0})
+        elif plan:
             pp = [people.get(str(a)) or {} for a in ids]
             weights = audlib.poststrat_weights([(p.get("female"), p.get("age")) for p in pp], plan.dist)
             for a, p, w in zip(ids, pp, weights):
@@ -450,7 +521,14 @@ class MiroFishSimulationEngine:
                 "n_estimated": sum(1 for a in valid if a.get("estimated")), "raw_answers": raw_answers,
                 "mean_interest": demand, "ladder": ladder, "ladder_votes": votes if price_source == "agents" else [],
                 "objection_counts": counts.most_common(3)}
-        if plan:
+        if plan and built_for:
+            pp = [people.get(str(a)) or {} for a in ids]
+            note = ("Ajanlar bu hedef kitle için MiroFish'te sıfırdan oluşturuldu (Zep kullanılmadı): cinsiyet ve yaş "
+                    "dağılımı bölge kalibrasyonundan, kişiler kota ile. Hepsi soruldu, ağırlık yok.")
+            if aud_key[0] == "cocuk":
+                note += " Kişiler ebeveyn; çocuk için alıp almayacaklarını değerlendirdiler."
+            meta["audience"] = audlib.describe(plan, [(p.get("female"), p.get("age"), 1.0) for p in pp], "kota", note)
+        elif plan:
             pp = [people.get(str(a)) or {} for a in ids]
             known = sum(1 for p in pp if p.get("female") is not None)
             note = ("MiroFish dünyasındaki kişiler sabit: hepsi soruldu, cevaplar hedef cinsiyet ve yaş dağılımına göre "

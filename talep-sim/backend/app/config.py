@@ -56,6 +56,8 @@ class Settings:
     mirofish_concurrency: int = field(default_factory=lambda: int(_env("MIROFISH_CONCURRENCY", "1")))
     mirofish_agents_per_region: int = field(default_factory=lambda: int(_env("MIROFISH_AGENTS_PER_REGION", "10")))
     mirofish_min_valid: int = field(default_factory=lambda: int(_env("MIROFISH_MIN_VALID", "2")))
+    # 1: eski yol (sabit seed paneli + Zep grafiği + ağırlıklandırma). Varsayılan: her hedef kitleye Zep'siz yeni ajanlar.
+    mirofish_zep: bool = field(default_factory=lambda: _env("MIROFISH_ZEP", "0") == "1")
 
     # --- Yeni mağaza öngörüsü ---
     # ERP veri sözleşmesi CSV klasörü (magazalar, satislar, doviz_kurlari) ve lokasyon profilleri dosyası.

@@ -48,6 +48,8 @@ class FakeMiroFish:
         self.started = False
         names = [(i, p.split(",")[0]) for i, p in enumerate(p for ps in SEED_CONSUMERS.values() for p in ps)]
         self.profiles = [{"user_id": i, "name": n, "bio": "", "persona": ""} for i, n in names]
+        self.local_people = []      # /api/graph/local ile verilen kişi listeleri (her dünya için bir liste)
+        self.last_local = None
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         path = request.url.path
@@ -56,6 +58,15 @@ class FakeMiroFish:
         if path == "/api/graph/ontology/generate":
             self.uploaded_seed = request.content.decode(errors="ignore")
             return ok({"project_id": "proj_1"})
+        if path == "/api/graph/local":
+            body = json.loads(request.content)
+            self.local_people.append(body)
+            base = 1000 * len(self.local_people)
+            self.last_local = [{"user_id": base + i, "name": p["name"], "bio": p["summary"], "persona": "",
+                                "gender": p["attributes"]["gender"], "age": p["attributes"]["age"]}
+                               for i, p in enumerate(body["people"])]
+            self.profiles = self.profiles + self.last_local
+            return ok({"project_id": f"proj_local_{len(self.local_people)}", "graph_id": "local_x"})
         if path == "/api/graph/build":
             return ok({"task_id": "t1"})
         if path == "/api/graph/task/t1":
@@ -67,7 +78,7 @@ class FakeMiroFish:
         if path == "/api/simulation/prepare/status":
             return ok({"status": "ready", "already_prepared": True})
         if path == "/api/simulation/sim_1/profiles":
-            return ok({"profiles": self.profiles})
+            return ok({"profiles": self.last_local if self.last_local is not None else self.profiles})
         if path == "/api/simulation/start":
             self.started = True
             return ok({"runner_status": "running"})
@@ -98,6 +109,7 @@ def make_engine(tmp_path, fake, **kw):
         base_url="http://mf", transport=httpx.MockTransport(fake.handler)))
     mock = MockSimulationEngine(latency_s=0)
     kw.setdefault("agents_per_region", 5)  # testler 5 ajanlık panel varsayar
+    kw.setdefault("local_people", False)   # bu dosyadaki testler eski (sabit seed + Zep) yolu sınar
     return MiroFishSimulationEngine(client, mock.fuse_product_card, str(tmp_path / "world.json"),
                                     poll_s=0, env_wait_s=1, **kw)
 

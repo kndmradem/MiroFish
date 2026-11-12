@@ -97,7 +97,7 @@ def build_mirofish_engine(cfg: Settings, mock: MockSimulationEngine):
         max_rounds=cfg.mirofish_max_rounds, interview_timeout=cfg.mirofish_interview_timeout,
         batch_size=cfg.mirofish_batch_size, timeout_retries=cfg.mirofish_timeout_retries,
         max_concurrency=cfg.mirofish_concurrency, env_wait_s=cfg.mirofish_build_timeout, min_valid=cfg.mirofish_min_valid, extractor=extractor,
-        agents_per_region=cfg.mirofish_agents_per_region,
+        agents_per_region=cfg.mirofish_agents_per_region, local_people=not cfg.mirofish_zep,
     )
 
 
@@ -275,7 +275,7 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
     await emit({"stage": "card", "detail": f"Hedef kitle: {aud.label} ({aud.source}{': ' + aud.reason if aud.source == 'tahmin' else ''})"})
 
     if req.reset_world and hasattr(engine, "reset_world"):
-        await emit({"stage": "world", "detail": "Dünya sıfırlanıyor: eski proje/Zep grafiği siliniyor, baştan kurulacak"})
+        await emit({"stage": "world", "detail": "Dünya sıfırlanıyor: eski projeler siliniyor, baştan kurulacak"})
         try:
             for note in await engine.reset_world(req.target_regions, emit):
                 await emit({"stage": "world", "detail": note})

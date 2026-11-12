@@ -1,0 +1,28 @@
+{
+  "notes": "MiroFish dünyasındaki kişilere verilen uydurma adlar (gerçek kişi değildir). MiroFish profilleri ad üzerinden bölgeye eşlenir; her bölgede ad+soyad benzersiz olmalı.",
+  "EU": {
+    "kadin": ["Lena", "Camille", "Sofia", "Anna", "Isabel", "Greta", "Marta", "Clara", "Elena", "Julia", "Ingrid", "Chiara", "Lucía", "Sanne", "Amélie", "Katarzyna", "Freya", "Paula", "Nora", "Valentina", "Eva", "Hanna", "Laura", "Marie"],
+    "erkek": ["Jonas", "Pieter", "Mats", "Tomás", "Lukas", "Marco", "Pablo", "Henrik", "Louis", "Jan", "Matteo", "Felix", "Hugo", "Sven", "Diego", "Tobias", "Erik", "Andrea", "Julien", "Paul", "Niklas", "Bruno", "Oskar", "Daniel"],
+    "soyad": ["Hoffmann", "Laurent", "Rossi", "Kowalski", "Moreno", "Novak", "Weber", "de Vries", "Eriksson", "Silva", "Bauer", "Bianchi", "García", "Jansen", "Dubois", "Nowak", "Lindqvist", "Fischer", "Costa", "Martin", "Schulz", "Ferrari", "Andersen", "Müller"]
+  },
+  "TR": {
+    "kadin": ["Elif", "Zeynep", "Ayşe", "Selin", "Merve", "Fatma", "Emine", "Esra", "Büşra", "Gizem", "Derya", "Hatice", "Sevgi", "Ceren", "Dilek", "Özlem", "Nur", "Gamze", "Sibel", "Tuğba", "Hülya", "İrem", "Pınar", "Aslı"],
+    "erkek": ["Mehmet", "Burak", "Can", "Hasan", "Emre", "Murat", "Ahmet", "Mustafa", "Okan", "Serkan", "Kerem", "Onur", "Yusuf", "Hakan", "Cem", "Tolga", "Ali", "Kaan", "Barış", "Volkan", "Eren", "Uğur", "Selim", "Oğuz"],
+    "soyad": ["Demir", "Yılmaz", "Kaya", "Şahin", "Çelik", "Özdemir", "Arslan", "Koç", "Aydın", "Polat", "Yıldız", "Öztürk", "Doğan", "Kılıç", "Aslan", "Çetin", "Kurt", "Özkan", "Şimşek", "Erdoğan", "Güneş", "Aksoy", "Tekin", "Korkmaz"]
+  },
+  "MENA": {
+    "kadin": ["Fatima", "Layla", "Noor", "Mariam", "Huda", "Salma", "Aisha", "Rania", "Yasmin", "Dana", "Hala", "Lina", "Sara", "Reem", "Amal", "Mona", "Nadia", "Hessa", "Shaikha", "Lubna", "Dina", "Rasha", "Zainab", "Maha"],
+    "erkek": ["Omar", "Khalid", "Yousef", "Tariq", "Ahmed", "Faisal", "Hamad", "Karim", "Saeed", "Rashid", "Majid", "Nasser", "Sultan", "Fahad", "Hassan", "Ali", "Ibrahim", "Mansour", "Adel", "Waleed", "Sami", "Zayed", "Bader", "Mazen"],
+    "soyad": ["Al Mansoori", "Haddad", "Nasser", "Al Farsi", "Saleh", "Al Hashimi", "Karim", "Al Qahtani", "Mansour", "Benali", "Al Suwaidi", "Khoury", "Al Mutairi", "Hamdan", "Al Dosari", "Aziz", "Al Shamsi", "Fares", "Al Otaibi", "Rahman", "Al Kaabi", "Youssef", "Al Harbi", "Najjar"]
+  },
+  "CIS": {
+    "kadin": ["Aigerim", "Nino", "Olga", "Madina", "Zarina", "Anna", "Elena", "Natalia", "Irina", "Dinara", "Tamar", "Svetlana", "Gulnara", "Maria", "Ekaterina", "Aliya", "Leyla", "Daria", "Saule", "Ksenia", "Aida", "Yulia", "Nargiza", "Polina"],
+    "erkek": ["Dmitri", "Rustam", "Anton", "Vladislav", "Giorgi", "Aibek", "Sergei", "Timur", "Alexei", "Nikolai", "Davit", "Bakhtiyar", "Ivan", "Arman", "Maksim", "Elnur", "Pavel", "Nurlan", "Andrei", "Levan", "Ruslan", "Kirill", "Farid", "Oleg"],
+    "soyad": ["Seitkali", "Volkov", "Beridze", "Aliyev", "Smirnova", "Petrov", "Karimova", "Kovalenko", "Akhmetova", "Kapanadze", "Ivanov", "Nurlanov", "Sokolov", "Mamedov", "Abdullaeva", "Kuznetsov", "Tsereteli", "Omarov", "Popova", "Lebedev", "Ismailov", "Morozova", "Suleimenov", "Gelashvili"]
+  },
+  "US": {
+    "kadin": ["Emily", "Ashley", "Rachel", "Jessica", "Priya", "Olivia", "Sarah", "Megan", "Lauren", "Hannah", "Grace", "Maria", "Taylor", "Chloe", "Danielle", "Brittany", "Natalie", "Kayla", "Amanda", "Sophia", "Jasmine", "Nicole", "Madison", "Emma"],
+    "erkek": ["Marcus", "Daniel", "Tyler", "Robert", "Michael", "James", "Kevin", "Brian", "Jason", "Ryan", "Andrew", "Carlos", "Justin", "David", "Eric", "Brandon", "Matthew", "Jose", "Chris", "Anthony", "Ethan", "Nathan", "Kyle", "Aaron"],
+    "soyad": ["Carter", "Johnson", "Nguyen", "Brooks", "Kim", "Martinez", "Anderson", "Patel", "Miller", "Thompson", "Williams", "Garcia", "Davis", "Wilson", "Lopez", "Moore", "Taylor", "Jackson", "White", "Harris", "Clark", "Lewis", "Walker", "Young"]
+  }
+}

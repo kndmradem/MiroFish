@@ -88,6 +88,9 @@ def _delete_cloud_graph_if_present(graph_id: str | None) -> None:
                 f"Graph {graph_id} is in use by active consumer(s): "
                 f"{', '.join(active_simulations)}"
             )
+        from ..services.local_people import is_local
+        if is_local(graph_id):
+            return      # yerel kişi listesi: bulutta silinecek grafik yok, dosya proje klasörüyle silinir
         try:
             GraphBuilderService(api_key=Config.ZEP_API_KEY).delete_graph(graph_id)
         except NotFoundError:
@@ -261,6 +264,46 @@ def _reset_project_impl(project_id: str):
 
 
 # ============== 接口1：上传文件并生成本体 ==============
+
+@graph_bp.route('/local', methods=['POST'])
+def create_local_graph():
+    """
+    Zep'siz proje: tanımlı kişi listesinden "kurulmuş grafik" (local_<project_id>).
+
+    İstek (JSON):
+        {
+            "project_name": "talep-simulasyonu",
+            "simulation_requirement": "...",           // zorunlu
+            "document": "...",                         // isteğe bağlı bağlam metni
+            "people": [{"name": "Ayşe Polat", "type": "Person", "summary": "...",
+                        "attributes": {"age": 34, "gender": "female", "country": "Türkiye", "profession": "..."}}]
+        }
+    Dönüş: {"project_id", "graph_id", "people"}. Sonra /api/simulation/create ve /prepare her zamanki gibi çalışır.
+    """
+    from ..services.local_people import save_people
+    data = request.get_json() or {}
+    requirement = (data.get("simulation_requirement") or "").strip()
+    people = data.get("people") or []
+    if not requirement:
+        return jsonify({"success": False, "error": t('api.requireSimulationRequirement')}), 400
+    if not people:
+        return jsonify({"success": False, "error": "people listesi boş"}), 400
+    project = ProjectManager.create_project(name=data.get("project_name") or "local-people")
+    try:
+        project.simulation_requirement = requirement
+        ProjectManager.save_extracted_text(project.project_id, data.get("document") or requirement)
+        project.ontology = {"entity_types": [{"name": "Person", "description": "Bireysel tüketici", "attributes": []}],
+                            "edge_types": []}
+        project.analysis_summary = "Yerel kişi listesi (Zep yok)"
+        project.graph_id = save_people(project.project_id, people)
+        project.status = ProjectStatus.GRAPH_COMPLETED
+        ProjectManager.save_project(project)
+    except ValueError as e:
+        ProjectManager.delete_project(project.project_id)
+        return jsonify({"success": False, "error": str(e)}), 400
+    return jsonify({"success": True, "data": {"project_id": project.project_id, "graph_id": project.graph_id,
+                                              "people": len(people)}})
+
 
 @graph_bp.route('/ontology/generate', methods=['POST'])
 def generate_ontology():
