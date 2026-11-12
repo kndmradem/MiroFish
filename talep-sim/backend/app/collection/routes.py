@@ -311,7 +311,7 @@ async def export(cid: str, store: CollectionStore = Depends(get_store)) -> Respo
     ws.title = "Ürünler"
     rate = res.fx_rate if res.currency == "TRY" else 1.0
     indep = res.kind == "bagimsiz"
-    head = ["SKU", "Ürün", "Kategori", "Karar", "Karar kaynağı", "Karar gerekçesi (dayanak)", "Talep skoru (ajan)",
+    head = ["SKU", "Ürün", "Kategori", "Hedef kitle (dayanak)", "Karar", "Karar kaynağı", "Karar gerekçesi (dayanak)", "Talep skoru (ajan)",
             f"Önerilen fiyat ({res.currency}, ajan)", f"Kabul aralığı ({res.currency}, ajan)", "Net marj % (kural)"]
     if not indep:
         head += ["Sıra", "Sıra aralığı", "Koleksiyon içi fark (ajan)", "Hevesli % (ajan)", "Rol (kural)", "Rol nedeni", "Hedef rol"]
@@ -324,7 +324,8 @@ async def export(cid: str, store: CollectionStore = Depends(get_store)) -> Respo
     for it in res.items:
         reg = {x.region: x for x in it.regions}
         rp = it.recommended_price
-        row = [it.sku, it.name, it.category, it.decision or "", it.decision_source if it.decision else "",
+        a = it.audience
+        row = [it.sku, it.name, it.category, f"{a.label} ({a.source})" if a else "", it.decision or "", it.decision_source if it.decision else "",
                "; ".join(f"{x.text} ({x.basis})" for x in it.decision_reasons), it.appeal.value,
                round(rp.value * rate, 2) if rp.value else None,
                f"{round(rp.low * rate):,} - {round(rp.high * rate):,}" if rp.low is not None else "", it.net_margin.value]

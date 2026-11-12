@@ -1,0 +1,62 @@
+{
+  "notes": "Hedef kitle boş bırakıldığında ürün adı, kategori, alt kategori, içerik ve beden aralığından tahmin için ipucu kelimeleri. Marka listesi yoktur; yalnızca ürün tipi ve kitle kelimeleri. Müşteri kendi ERP terimlerini ekleyebilir. Karşılaştırma Türkçe karakter ve büyük/küçük harf farkı gözetmeden, kelime başından yapılır.",
+  "cocuk": [
+    "çocuk",
+    "cocuk",
+    "kids",
+    "kid",
+    "child",
+    "bebek",
+    "baby",
+    "infant",
+    "toddler",
+    "kız çocuk",
+    "erkek çocuk",
+    "zıbın",
+    "patik",
+    "önlük",
+    "okul",
+    "junior",
+    "boys",
+    "girls"
+  ],
+  "kadin": [
+    "kadın",
+    "kadin",
+    "bayan",
+    "women",
+    "woman",
+    "ladies",
+    "female",
+    "elbise",
+    "etek",
+    "bluz",
+    "tunik",
+    "sütyen",
+    "bralet",
+    "büstiyer",
+    "abiye",
+    "jile",
+    "tayt",
+    "gecelik",
+    "sabahlık",
+    "korse",
+    "hamile"
+  ],
+  "erkek": [
+    "erkek",
+    "men",
+    "mens",
+    "male",
+    "boxer",
+    "kravat",
+    "papyon",
+    "smokin"
+  ],
+  "unisex": [
+    "unisex",
+    "uniseks",
+    "cinsiyetsiz",
+    "genderless"
+  ]
+}

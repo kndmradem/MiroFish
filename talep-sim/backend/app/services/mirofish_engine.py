@@ -17,6 +17,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Awaitable, Callable, Dict, List, Optional, Sequence
 
+from .. import audience as audlib
 from .. import brand as brandlib
 from .. import economy
 from ..models import BrandProfile, PredictionRequest
@@ -25,7 +26,8 @@ from .answer_extractor import (AnswerExtractor, example_ladder, ladder_text, mak
                                parse_agent_answer)
 from .engine import RegionSimulation
 from .mirofish_client import MiroFishClient, MiroFishError, MiroFishTimeout
-from .personas import PERSONAS, build_seed_document, region_of, scope_of, seed_hash, simulation_requirement
+from .personas import (PERSONAS, build_seed_document, person_of, region_of, scope_of, seed_hash,
+                       simulation_requirement)
 
 Fuser = Callable[[PredictionRequest], Awaitable[dict]]
 Progress = Callable[[dict], Awaitable[None]]
@@ -67,6 +69,7 @@ def build_interview_prompt(card: dict, region: str, brand: Optional[BrandProfile
         "Aşağıdaki yeni ürünü bir tüketici olarak değerlendir. Fiyatlar ABD doları.\n"
         f"{brand_block}"
         f"Ürün: {card.get('product_name')}\n"
+        f"{audience_line(card)}"
         f"Kumaş: {card.get('fabric_texture', '-')}; bileşim: {card.get('composition', '-')}; "
         f"gramaj: {card.get('gsm') or '-'}\n"
         f"İklim uyumu: {card.get('climate_fit', '-')}; stil: {card.get('style_category', '-')}\n"
@@ -74,6 +77,11 @@ def build_interview_prompt(card: dict, region: str, brand: Optional[BrandProfile
         f"Öne çıkan özellikler: {features}\n\n"
         f"{_answer_format(ladder, (fx_rates or {}).get(eco.currency) if eco else None)}"
     )
+
+
+def audience_line(card: dict) -> str:
+    note = audlib.prompt_note(card.get("target_audience") or {})
+    return f"{note}\n" if note else ""
 
 
 def _answer_format(ladder: Optional[List[float]], try_rate: Optional[float]) -> str:
@@ -90,6 +98,13 @@ def _answer_format(ladder: Optional[List[float]], try_rate: Optional[float]) -> 
         "<...> yerlerine kendi cevabını yaz, yer tutucuları kopyalama:\n"
         f'{{"interest": <0-100 sayı>, "ladder": {example_ladder(len(ladder))}, "objection": "<en büyük itirazın>"}}'
     )
+
+
+def _who(p: dict) -> Optional[str]:
+    if not p:
+        return None
+    g = "Kadın" if p.get("female") else "Erkek" if p.get("female") is False else "?"
+    return f"{p.get('name', '')} ({g}, {p.get('age', '?')})"
 
 
 class MiroFishSimulationEngine:
@@ -235,6 +250,7 @@ class MiroFishSimulationEngine:
             region = region_of(text)
             if region in agents:
                 agents[region].append(int(p["user_id"]))
+        people = self._people_from(profiles)
         if not any(agents.values()):
             raise MiroFishError("Hiçbir ajan bir bölgeye eşlenemedi; seed doküman ve profilleri kontrol et")
 
@@ -247,7 +263,35 @@ class MiroFishSimulationEngine:
             if loop.time() > deadline:
                 raise MiroFishError("Simülasyon ortamı röportaja hazır hale gelmedi")
             await asyncio.sleep(self.poll_s)
-        return {"project_id": project_id, "simulation_id": simulation_id, "agents": agents, "seed_hash": seed_hash(regions), "regions": regions}
+        return {"project_id": project_id, "simulation_id": simulation_id, "agents": agents, "seed_hash": seed_hash(regions),
+                "regions": regions, "people": people}
+
+    @staticmethod
+    def _people_from(profiles: List[dict]) -> Dict[str, dict]:
+        """Ajan id -> seed kişi (ad, yaş, cinsiyet). Hedef kitleye göre ağırlıklandırmada kullanılır."""
+        out: Dict[str, dict] = {}
+        for p in profiles:
+            text = " ".join(str(p.get(k, "")) for k in ("name", "username", "bio", "persona"))
+            person = person_of(text, region_of(text))
+            if person and "user_id" in p:
+                out[str(int(p["user_id"]))] = person
+        return out
+
+    async def _people(self, world: dict) -> Dict[str, dict]:
+        """Eski dünyalarda kişi eşlemesi yok: profiller bir kez çekilip önbelleğe yazılır (dünya yeniden kurulmaz)."""
+        if isinstance(world.get("people"), dict):
+            return world["people"]
+        try:
+            people = self._people_from(await self.client.profiles(world["simulation_id"]))
+        except (MiroFishError, KeyError, TypeError, ValueError) as e:
+            log.info("Ajan kişi eşlemesi alınamadı: %s", e)
+            return {}
+        world["people"] = people
+        try:
+            self.state_path.write_text(json.dumps(self._worlds))
+        except (OSError, TypeError):
+            pass
+        return people
 
     # --- bölge simülasyonu ----------------------------------------------
     async def _understand(self, text: str, currency_note: str, ladder: Optional[List[float]] = None,
@@ -374,15 +418,30 @@ class MiroFishSimulationEngine:
                 f"{region}: {len(agent_ids)} ajandan yalnızca {len(valid)} geçerli cevap alınabildi "
                 f"({reason}; en az {need} gerekli).{hint}", raw_answers)
 
-        priced = [a for a in valid if a["prices"] is not None]
+        # Hedef kitle: MiroFish dünyasındaki kişiler sabit; cevaplar hedef cinsiyet/yaş dağılımına göre ağırlıklandırılır.
+        plan = audlib.plan_from_card(card, region)
+        people = await self._people(world) if plan else {}
+        ids = list(parsed)
+        if plan:
+            pp = [people.get(str(a)) or {} for a in ids]
+            weights = audlib.poststrat_weights([(p.get("female"), p.get("age")) for p in pp], plan.dist)
+            for a, p, w in zip(ids, pp, weights):
+                raw[a].update({"who": _who(p), "weight": round(w, 2)})
+        else:
+            weights = [1.0] * len(ids)
+        wmap = dict(zip(ids, weights))
+        priced_ids = [a for a in ids if parsed[a]["prices"] is not None]
+        priced = [parsed[a] for a in priced_ids]
         if len(priced) >= max(2, min(self.min_valid, len(valid))):
             answers = [AgentPriceAnswer(*a["prices"]) for a in priced]
+            if plan:
+                answers = audlib.replicate(answers, [wmap[a] for a in priced_ids])
             price_source = "agents"
         else:  # fiyat bilgisi yetersiz: eşikler ajanlardan değil, marka/maliyet referansından üretilir
             answers = self._fallback_prices(reference, brand, region, max(len(valid), 5))
             price_source = "brand_fallback"
         votes = [a["ranks"] for a in priced if a.get("ranks")]
-        demand = round(sum(a["interest"] for a in valid) / len(valid))
+        demand = round(sum(parsed[a]["interest"] * wmap[a] for a in ids) / (sum(weights) or 1))
         counts = Counter(a["objection"] for a in valid if a["objection"])
         objections = [o for o, _ in counts.most_common(3)]
         meta = {"engine": "mirofish", "n_agents": len(agent_ids), "n_valid": len(valid),
@@ -391,4 +450,14 @@ class MiroFishSimulationEngine:
                 "n_estimated": sum(1 for a in valid if a.get("estimated")), "raw_answers": raw_answers,
                 "mean_interest": demand, "ladder": ladder, "ladder_votes": votes if price_source == "agents" else [],
                 "objection_counts": counts.most_common(3)}
+        if plan:
+            pp = [people.get(str(a)) or {} for a in ids]
+            known = sum(1 for p in pp if p.get("female") is not None)
+            note = ("MiroFish dünyasındaki kişiler sabit: hepsi soruldu, cevaplar hedef cinsiyet ve yaş dağılımına göre "
+                    "ağırlıklandırıldı (talep ve fiyat). Tek kişinin ağırlığı ortalamanın en fazla 3 katı.")
+            if known < len(ids):
+                note += f" {len(ids) - known} kişinin cinsiyeti/yaşı bilinmiyor; ağırlığı 1."
+            meta["audience"] = audlib.describe(plan, [(p.get("female"), p.get("age"), w) for p, w in zip(pp, weights)],
+                                               "ağırlık", note, audlib.effective_n(weights))
+            meta["audience"]["unweighted_demand"] = round(sum(parsed[a]["interest"] for a in ids) / len(ids))
         return RegionSimulation(region, demand, answers, objections, meta)

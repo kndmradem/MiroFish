@@ -5,6 +5,8 @@ from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+from .audience import AudienceInfo
+
 Region = Literal["EU", "MENA", "CIS", "US", "TR"]
 
 
@@ -79,6 +81,8 @@ class PredictionRequest(BaseModel):
     allocation_objective: Literal["balanced", "profit", "blended"] = Field(
         "balanced", description="Üretim dağıtım hedefi: balanced = satış hızı/dengeli stok, profit = kâr ağırlıklı, blended = karışık")
     reset_world: bool = Field(False, description="Seçili bölgelerin önbellekteki MiroFish dünyasını (ve Zep grafiğini) silip baştan kurar")
+    target_audience: Optional[str] = Field(None, description="Hedef kitle: kadın / erkek / çocuk / unisex (kız çocuk, erkek çocuk, bebek de olur). Boşsa ad/kategoriden tahmin edilir")
+    target_audience_info: Optional[AudienceInfo] = Field(None, description="Önceden çözülmüş hedef kitle (koleksiyon koşusu; dayanağı korunur)")
 
     @field_validator("target_regions")
     @classmethod
@@ -131,6 +135,9 @@ class RawAnswer(BaseModel):
     text: str = Field("", description="Ajanın ham cevabı (kısaltılmış)")
     segment: Optional[str] = Field(None, description="Panel motorunda kişinin segmenti")
     interest: Optional[float] = None
+    who: Optional[str] = Field(None, description="Kişi: cinsiyet, yaş, ürünü kimin için değerlendirdiği")
+    audience: Optional[str] = Field(None, description="Kişinin seçildiği hedef kitle (kadin / erkek / cocuk / unisex)")
+    weight: Optional[float] = Field(None, description="MiroFish: hedef kitle dağılımına göre cevabın ağırlığı (1 = ortalama)")
 
 
 class ReturnDriver(BaseModel):
@@ -324,6 +331,7 @@ class RegionPredictionResult(BaseModel):
     seasonality: Optional[Seasonality] = None
     raw_answers: List[RawAnswer] = Field([], description="Ajanların ham cevapları ve nasıl çözümlendikleri (MiroFish motoru)")
     data_basis: Optional[dict] = Field(None, description="Panel motoru: persona/bağlam sürümü, 'as of' tarihleri, eskime uyarıları, kalibrasyon")
+    audience_panel: Optional[dict] = Field(None, description="Bu bölgede kime soruldu: hedef kitle, cinsiyet/yaş dağılımı (hedef ve gerçekleşen), yöntem (kota / ağırlık), kalibrasyon dayanağı")
     local_currency: Optional[str] = Field(None, description="Bölgenin yerel para birimi (yalnızca TL gösterilen bölgelerde)")
     local_price: Optional[Decimal] = Field(None, description="Önerilen fiyatın yerel para karşılığı")
     fx_rate: Optional[float] = Field(None, description="Kullanılan kur: 1 USD = fx_rate yerel para")
@@ -343,6 +351,7 @@ class PredictionResponse(BaseModel):
     allocation_objective: str = "balanced"
     allocation_note: str = ""
     product_card: dict = Field(..., description="Vision+Text füzyonundan çıkan ürün kartı")
+    target_audience: Optional[AudienceInfo] = Field(None, description="Ürünün hedef kitlesi ve dayanağı (kullanıcı girdisi / tahmin)")
     engine: str = "mock"
     brand_profile: Optional[BrandProfile] = None
     recommendations: List[Recommendation] = []

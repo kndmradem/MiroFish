@@ -20,6 +20,7 @@ from collections import Counter
 from datetime import date
 from typing import Awaitable, Callable, Dict, List, Optional, Sequence
 
+from .. import audience as audlib
 from .. import brand as brandlib
 from .. import economy
 from ..models import BrandProfile, PredictionRequest
@@ -47,6 +48,23 @@ class PanelUnavailable(LLMError):
 
 def _seed_int(*parts: str) -> int:
     return int(hashlib.sha256("|".join(parts).encode()).hexdigest()[:8], 16)
+
+
+def audience_plan(card: dict, region: str, root=None) -> Optional[audlib.AudiencePlan]:
+    """Kartta hedef kitle varsa bölgenin kalibre dağılımıyla plan; yoksa None (eski davranış)."""
+    return audlib.plan_from_card(card, region, root)
+
+
+def member_label(m) -> str:
+    """Ham cevaplarda kişinin kim olduğu: 'Kadın, 34' / 'Anne, 36 (kızı 7 yaşında)' / 'Erkek, 41 (hediye)'."""
+    base = ("Anne" if m.female else "Baba") if m.buyer_role == "ebeveyn" else ("Kadın" if m.female else "Erkek")
+    extra = ""
+    if m.buyer_role == "ebeveyn" and m.child_age is not None:
+        kid = "kızı" if m.child_female else "oğlu" if m.child_female is False else "çocuğu"
+        extra = f" ({kid} {m.child_age} yaşında)"
+    elif m.buyer_role == "hediye":
+        extra = " (yakını için)"
+    return f"{base}, {m.age}{extra}"
 
 
 class DirectPanelEngine:
@@ -119,8 +137,12 @@ class DirectPanelEngine:
         try_rate = rate if currency == "TRY" and rate else None
         # Koleksiyon modunda kart `panel_seed` taşır: bölgedeki bütün ürünlere aynı kişiler bakar.
         seed = f"{card.get('panel_seed') or card.get('product_name')}|{brand.name if brand else ''}|{region}"
-        members = sample_panel(lib, self.panel_size, seed, cal.sensitivity_scale, cal.trend_scale)
-        await note(f"{len(members)} kişilik panel ({lib.version}, {len(lib.segments)} segment) sorgulanıyor",
+        plan = audience_plan(card, region, self.store.root)
+        members = sample_panel(lib, self.panel_size, seed, cal.sensitivity_scale, cal.trend_scale, audience=plan)
+        if plan:
+            warnings = warnings + plan.warnings
+        who = f", hedef kitle {plan.info.label}" if plan else ""
+        await note(f"{len(members)} kişilik panel ({lib.version}, {len(lib.segments)} segment{who}) sorgulanıyor",
                    answered=0, agents=len(members), phase="interview")
 
         replies = await self._ask_all(members, card, ctx, ladder, brand, region, unit_cost, try_rate, seed, note)
@@ -137,6 +159,7 @@ class DirectPanelEngine:
 
         by_index = {m.index: m for m in members}
         raw_answers = [{"agent": i, "status": r.status, "segment": by_index[i].segment.label,
+                        "who": member_label(by_index[i]), "audience": by_index[i].audience or None,
                         "text": (r.text or r.error)[:RAW_CHARS],
                         **({"interest": r.answer["interest"]} if r.answer else {})}
                        for i, r in sorted(replies.items())]
@@ -176,5 +199,7 @@ class DirectPanelEngine:
                             "sensitivity_scale": cal.sensitivity_scale, "trend_scale": cal.trend_scale,
                             "n_obs": cal.n_obs},
             "elapsed_s": round(time.monotonic() - started, 1),
+            "audience": audlib.describe(plan, [(m.female, m.age, 1.0) for m in members], "kota",
+                                        "Panel kişileri bu dağılıma göre seçildi (kota).") if plan else None,
         }
         return RegionSimulation(region, demand, answers, [o for o, _ in counts.most_common(3)], meta)

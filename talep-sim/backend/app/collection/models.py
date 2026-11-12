@@ -3,6 +3,7 @@ from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
+from ..audience import AudienceInfo
 from ..models import Assumptions, BrandProfile, Region
 
 Basis = Literal["ajan", "kural varsayımı", "LLM tahmini", "ERP", "kullanıcı girdisi"]
@@ -31,6 +32,7 @@ class CollectionItem(BaseModel):
     launch_month: Optional[int] = Field(None, ge=1, le=12)
     moq: Optional[int] = None
     attributes: Dict[str, str] = Field(default_factory=dict)
+    target_audience: Optional[str] = Field(None, description="Excel hedef_kitle sütunu (kadın / erkek / çocuk / unisex); boşsa ad/kategoriden tahmin")
     color_images: Dict[str, str] = Field(default_factory=dict, description="Renk -> o rengin görseli (Excel'de renk satırına gömülü)")
 
 
@@ -62,6 +64,7 @@ class Issue(BaseModel):
 class ItemPreview(BaseModel):
     row: int
     item: CollectionItem
+    audience: Optional[AudienceInfo] = Field(None, description="Çözülen hedef kitle; boş sütunda tahmin (etiketli)")
     status: Literal["ok", "uyarı", "hata", "belirsiz"]
     match_rule: str = ""
     candidates: List[str] = Field(default_factory=list, description="Belirsiz görsel için aday SKU'lar")
@@ -294,6 +297,7 @@ class ItemResult(BaseModel):
     showcase: Optional[ShowcaseItem] = None
     colors: List[ColorLine] = Field(default_factory=list)
     color_mix: Optional[Metric] = Field(None, description="Renk karışımının model adedine çarpanı")
+    audience: Optional[AudienceInfo] = Field(None, description="Ürünün hedef kitlesi ve dayanağı (kullanıcı girdisi / tahmin)")
 
 
 class ReachPoint(BaseModel):

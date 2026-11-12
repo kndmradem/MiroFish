@@ -16,6 +16,7 @@ from typing import Awaitable, Callable, Dict, Optional
 
 from ..advisor import Advisor
 from ..models import Assumptions, BrandProfile, PredictionRequest
+from .importer import item_audience
 from .models import Collection, CollectionItem, RunOptions, RunStatus
 from . import showcase
 from .store import CollectionStore
@@ -216,7 +217,8 @@ class CollectionRunner:
                     total_production_budget=per_item_budget, target_regions=regions, brand=brand.name if brand else None,
                     brand_profile=brand,
                     assumptions=Assumptions(channel=col.meta.channel, launch_month=it.launch_month or col.meta.launch_month),
-                    usd_try_rate=fx_rate, allocation_objective=opts.allocation_objective)
+                    usd_try_rate=fx_rate, allocation_objective=opts.allocation_objective,
+                    target_audience_info=item_audience(it))
 
                 async def emit(ev: dict, _i=i, _it=it):
                     if ev.get("detail"):

@@ -18,6 +18,7 @@ import {
 } from "@/lib/collection-api";
 import { cn } from "@/lib/utils";
 import { ColorStrip, ColorsTab, ColorTable } from "./colors";
+import { AudienceChip } from "@/components/audience-card";
 
 const ReactECharts = dynamic(() => import("echarts-for-react"), { ssr: false });
 
@@ -41,6 +42,16 @@ function Tile({ label, value, sub, m }: { label: string; value: string; sub?: st
       {sub && <div className="text-xs text-muted-foreground">{sub}</div>}
     </div>
   );
+}
+
+/** Başlıkta: ürünlerin hedef kitle dağılımı ve kaçının tahmin olduğu (panel her ürün için kitlesine göre seçilir). */
+function audienceSummary(items: ItemResult[]): string {
+  const withA = items.filter((i) => i.audience);
+  if (!withA.length) return "";
+  const cnt = new Map<string, number>();
+  withA.forEach((i) => cnt.set(i.audience!.label, (cnt.get(i.audience!.label) ?? 0) + 1));
+  const guessed = withA.filter((i) => i.audience!.source === "tahmin").length;
+  return ` · hedef kitle: ${[...cnt].map(([l, n]) => `${n} ${l.toLowerCase()}`).join(", ")}${guessed ? ` (${guessed} ürün tahmin)` : ""}; panel her ürün için kendi kitlesine göre seçildi`;
 }
 
 const TABS = ["Özet", "Ürünler", "Renkler", "Vitrin", "Bölgeler", "Fiyat", "Bütçe"] as const;
@@ -119,6 +130,7 @@ export function CollectionResults({ base }: { base: CollectionResult }) {
               {s.n_evaluated}/{s.n_items} ürün değerlendirildi · bölgeler: {res.regions.join(", ")}
               {res.panel_shared ? " · her bölgede bütün ürünlere aynı kişiler baktı" : ""}
               {indep ? " · her ürün kendi paneliyle ayrı değerlendirildi" : ""}
+              {audienceSummary(res.items)}
               {res.data_basis?.persona_version ? ` · persona ${String(res.data_basis.persona_version)}` : ""}
               {res.data_basis?.context_as_of ? `, bağlam ${String(res.data_basis.context_as_of)}` : ""}
             </CardDescription>
@@ -441,7 +453,7 @@ function Items({ res, items, excluded, onExclude, m, overrides, onDecision, colo
                     <div className="flex items-center gap-2">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       {it.image && <img src={imageUrl(res.collection_id, it.image)} alt="" className="size-11 rounded object-cover" />}
-                      <div className="min-w-40 whitespace-normal"><div className="font-medium">{it.name}</div><div className="font-mono text-[11px] text-muted-foreground">{it.sku} · {it.category || "kategorisiz"}</div><ColorStrip it={it} region={one} /></div>
+                      <div className="min-w-40 whitespace-normal"><div className="font-medium">{it.name}</div><div className="font-mono text-[11px] text-muted-foreground">{it.sku} · {it.category || "kategorisiz"}</div><AudienceChip a={it.audience} className="mt-0.5" /><ColorStrip it={it} region={one} /></div>
                     </div>
                   </TableCell>
                   <TableCell className="min-w-44 whitespace-normal">

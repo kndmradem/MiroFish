@@ -15,9 +15,11 @@ from typing import Dict, List, Optional, Set, Tuple
 
 from .. import brand as brandlib
 from ..allocation import DEMAND_SCENARIOS, STOP_P, p_sells
+from ..audience import AudienceInfo
 from ..models import BrandProfile
 from . import colors as colorlib
 from .importer import norm
+from .importer import item_audience
 from .models import (Action, ColorFamilySummary, ColorLine, ColorPlan, Reason, BrandEffect, PairCount, PositionBias, ShowcaseItem, ShowcaseSummary, CannibalPair, CategorySummary, Collection, CollectionResult, CollectionSummary,
                      ItemRegion, ItemResult, Metric, ReachPoint, WhatIf)
 
@@ -37,7 +39,7 @@ MARGIN_REDUCE = 30.0     # bunun altındaysa: azalt
 REDUCE_FACTOR = 0.6      # "azalt" kararında bütçe dağıtımına giren talep oranı
 ENTHUSIAST_MIN = 0.05    # hevesli (70+) kişi oranı bunun altındaysa: azalt (kimse gerçekten istemiyorsa tam üretim yok)
 
-Person = Tuple[str, int]  # (bölge, kişi no)
+Person = Tuple[str, str]  # (bölge, "hedef kitle:kişi no"): farklı kitleli ürünlere farklı kişiler bakar
 
 
 def _pct(x: float) -> float:
@@ -115,7 +117,7 @@ def _item_regions(resp: dict, planned_usd: Optional[float], cost_usd: Optional[f
         own = {}
         for a in rb.get("raw_answers") or []:
             if a.get("interest") is not None:
-                own[(r, int(a["agent"]))] = float(a["interest"])
+                own[(r, f"{a.get('audience') or ''}:{int(a['agent'])}")] = float(a["interest"])
         interests.update(own)
         alloc = rb.get("allocation") or {}
         ret = rb.get("returns") or {}
@@ -138,6 +140,15 @@ def _item_regions(resp: dict, planned_usd: Optional[float], cost_usd: Optional[f
             confidence=(rb.get("confidence") or {}).get("level", "")))
         basis = basis or rb.get("data_basis")
     return regions, interests, basis
+
+
+def _resp_audience(res: Optional[dict]):
+    """Koşuda kullanılan hedef kitle (yanıtta saklı); eski sonuçlarda yok."""
+    a = ((res or {}).get("response") or {}).get("target_audience")
+    try:
+        return AudienceInfo.model_validate(a) if a else None
+    except ValueError:
+        return None
 
 
 def _relative(per_item: Dict[str, Dict[Person, float]]) -> Tuple[Dict[str, float], Dict[Person, Dict[str, float]]]:
@@ -808,7 +819,8 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
                 enthusiast_pct=Metric(value=None, basis="ajan"), role="belirsiz",
                 role_why=(res or {}).get("error") or "Henüz değerlendirilmedi",
                 recommended_qty=Metric(value=None, basis="kural varsayımı"), planned_qty=it.planned_qty,
-                flags=["değerlendirilmedi"] if not res else ["hata"], failed_regions=failed))
+                flags=["değerlendirilmedi"] if not res else ["hata"], failed_regions=failed,
+                audience=item_audience(it)))
             continue
         s = it.sku
         regs = per_item_regions[s]
@@ -878,6 +890,7 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
             decision_reasons=decisive[s] + context[s], recommended_price=rec_price, net_margin=nm_metric,
             recommended_qty=qty_metric,
             qty_by_region=qty_item.get(s, {}), planned_qty=it.planned_qty, flags=flags, failed_regions=failed,
+            audience=_resp_audience(res) or item_audience(it),
             showcase=sc_items.get(s), colors=clines, color_mix=cmix))
 
     # kategori özeti

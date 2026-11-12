@@ -16,6 +16,7 @@ import unicodedata
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
+from .. import audience
 from .models import CollectionItem, CollectionMeta, ImportPreview, Issue, ItemPreview, OrphanImage
 
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp"}
@@ -65,7 +66,7 @@ ITEM_ALIASES: Dict[str, List[str]] = {
     "moq": ["min siparis adedi", "min sipariş adedi", "min_siparis_adedi", "moq", "minimum siparis"],
     "attributes": ["ek ozellikler", "ek özellikler", "ek_ozellikler", "ozellikler", "özellikler"],
     # Ürün detayı sütunları: panele ürün kartının parçası olarak gider (ek özelliklere yazılır)
-    "attr:Hedef kitle": ["hedef kitle", "hedef_kitle", "cinsiyet", "gender", "kitle"],
+    "target_audience": ["hedef kitle", "hedef_kitle", "cinsiyet", "gender", "kitle", "target audience", "cinsiyet grubu"],
     "attr:Kalıp": ["kalip", "kalıp", "fit", "kesim"],
     "attr:Desen": ["desen", "pattern", "baski", "baskı"],
     "attr:Gramaj": ["gramaj", "gsm", "kumas gramaji", "kumaş gramajı"],
@@ -306,7 +307,7 @@ def parse_items(sheet: Sheet, issues: List[Issue]) -> Tuple[List[Tuple[int, Coll
         vals = {f: row[i] if i < len(row) else None for i, f in cols.items()}
         probs: List[str] = []
         d: dict = {"sku": _str(vals.get("sku")), "name": _str(vals.get("name"))}
-        for f in ("category", "subcategory", "technical_specs", "outfit_group", "sizes"):
+        for f in ("category", "subcategory", "technical_specs", "outfit_group", "sizes", "target_audience"):
             d[f] = _str(vals.get(f))
         try:
             n = _num(vals.get("unit_cost"))
@@ -336,6 +337,9 @@ def parse_items(sheet: Sheet, issues: List[Issue]) -> Tuple[List[Tuple[int, Coll
             if f.startswith("attr:") and _str(v):
                 attrs.setdefault(f[5:], _str(v))
         d["attributes"] = attrs
+        if d["target_audience"] and audience.normalize(d["target_audience"]) is None:
+            probs.append(f"Hedef kitle tanınmadı ({d['target_audience']}); kadın / erkek / çocuk / unisex yazın. Addan tahmin edilecek")
+        d["target_audience"] = d["target_audience"] or None
         out.append((rowno, CollectionItem(**d), probs))
     colmap = {sheet.headers[i]: f for i, f in cols.items()}
     return out, colmap, ignored
@@ -583,7 +587,8 @@ def build_preview(collection_id: str, book: Dict[str, Sheet], images: List[Image
         if cands and not imgs:
             issues.append(Issue(level="uyarı", sku=it.sku, row=rowno,
                                 message=f"Görsel belirsiz: {', '.join(cands)} birden fazla SKU'ya uyuyor, elle seçin"))
-        previews.append(ItemPreview(row=rowno, item=item, status=status, match_rule=rule_it, candidates=cands))
+        previews.append(ItemPreview(row=rowno, item=item, status=status, match_rule=rule_it, candidates=cands,
+                                    audience=item_audience(item)))
     for p, owners in img_owner.items():
         if len(owners) > 1:
             issues.append(Issue(level="uyarı", message=f"Aynı görsel birden fazla üründe: {p} ({', '.join(owners)})"))
@@ -606,6 +611,12 @@ def build_preview(collection_id: str, book: Dict[str, Sheet], images: List[Image
                          column_map=colmap, ignored_columns=ignored, counts=counts)
 
 
+def item_audience(it: CollectionItem) -> "audience.AudienceInfo":
+    """Excel'deki hedef kitle; boşsa ad, kategori, içerik ve beden aralığından tahmin (eski kayıtta ek özellikten)."""
+    raw = it.target_audience or it.attributes.get("Hedef kitle")
+    return audience.resolve(raw, it.name, it.category, it.subcategory, it.technical_specs, it.sizes)
+
+
 TEMPLATE_ITEM_COLS = ["sku", "urun_adi", "kategori", "alt_kategori", "urun_icerigi", "maliyet_fiyati", "gorsel_dosyalari",
                       "renkler", "beden_araligi", "hedef_kitle", "kalip", "desen", "gramaj", "planlanan_adet",
                       "min_siparis_adedi", "lansman_ayi", "hedef_rol", "kombin_grubu", "ek_ozellikler"]
@@ -617,7 +628,7 @@ TEMPLATE_EXAMPLES = [
      "URN-002_on.jpg; URN-002_arka.jpg", "ekru", "34-44", "kadın", "geniş paça", "düz", "220 gsm", 600, 300, 3,
      "tamamlayıcı", "Sahil", ""],
     ["URN-003", "Çiçek desenli midi elbise", "Elbise", "Midi", "%100 viskon, 120 gsm, astarlı", 640, "", "", "XS-L",
-     "kadın", "A kesim", "çiçek", "120 gsm", None, 200, 4, "hero", "", ""],
+     "", "A kesim", "çiçek", "120 gsm", None, 200, 4, "hero", "", ""],
 ]
 
 
@@ -665,6 +676,9 @@ def template_bytes() -> bytes:
         "renkler: modelin renkleri virgülle (ör. siyah, pembe) ya da ERP çıktısındaki gibi her renk ayrı satırda aynı SKU ile.",
         "hedef_rol (koleksiyon): hero / çekirdek / tamamlayıcı / deneme. Tasarımcının niyetidir; panel sonucuyla karşılaştırılır.",
         "kombin_grubu (koleksiyon): birlikte satılması düşünülen ürünler için aynı ad.",
+        "hedef_kitle: kadın / erkek / çocuk / unisex (kız çocuk, erkek çocuk, bebek de yazılabilir). Panel bu kitleye göre seçilir:",
+        "   kadın ürününde ağırlıklı kadın, erkek ürününde ağırlıklı erkek, çocuk ürününde ebeveynler, unisex'te karışık.",
+        "   Boş bırakılırsa ürün adı, kategori, içerik ve beden aralığından tahmin edilir ve sonuçta 'tahmin' diye etiketlenir.",
         "ek_ozellikler: anahtar=değer; ile ayırarak (ör. yaka=klasik; kol=uzun).",
     ]:
         guide.append([line])
@@ -693,7 +707,7 @@ def template_bytes() -> bytes:
     dv2 = DataValidation(type="list", formula1='"hero,çekirdek,tamamlayıcı,deneme"')
     items.add_data_validation(dv2)
     dv2.add(f"{col_of['hedef_rol']}2:{col_of['hedef_rol']}2000")
-    dv3 = DataValidation(type="list", formula1='"kadın,erkek,unisex,kız çocuk,erkek çocuk,bebek"', allow_blank=True)
+    dv3 = DataValidation(type="list", formula1='"kadın,erkek,çocuk,unisex,kız çocuk,erkek çocuk,bebek"', allow_blank=True)
     items.add_data_validation(dv3)
     dv3.add(f"{col_of['hedef_kitle']}2:{col_of['hedef_kitle']}2000")
     buf = io.BytesIO()
