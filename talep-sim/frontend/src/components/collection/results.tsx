@@ -51,7 +51,7 @@ function audienceSummary(items: ItemResult[]): string {
   const cnt = new Map<string, number>();
   withA.forEach((i) => cnt.set(i.audience!.label, (cnt.get(i.audience!.label) ?? 0) + 1));
   const guessed = withA.filter((i) => i.audience!.source === "tahmin").length;
-  return ` · hedef kitle: ${[...cnt].map(([l, n]) => `${n} ${l.toLowerCase()}`).join(", ")}${guessed ? ` (${guessed} ürün tahmin)` : ""}; panel her ürün için kendi kitlesine göre seçildi`;
+  return ` · hedef kitle: ${[...cnt].map(([l, n]) => `${n} ${l.toLowerCase()}`).join(", ")}${guessed ? ` (${guessed} ürün tahmin)` : ""}`;
 }
 
 const TABS = ["Özet", "Ürünler", "Renkler", "Vitrin", "Bölgeler", "Fiyat", "Bütçe"] as const;
@@ -128,7 +128,8 @@ export function CollectionResults({ base }: { base: CollectionResult }) {
             <CardTitle className="text-base">4. Sonuç: {res.name}</CardTitle>
             <CardDescription>
               {s.n_evaluated}/{s.n_items} ürün değerlendirildi · bölgeler: {res.regions.join(", ")}
-              {res.panel_shared ? " · her bölgede bütün ürünlere aynı kişiler baktı" : ""}
+              {res.panel_shared ? (new Set(res.items.map((i) => i.audience?.value).filter(Boolean)).size > 1
+                ? " · her bölgede aynı hedef kitledeki ürünlere aynı kişiler baktı" : " · her bölgede bütün ürünlere aynı kişiler baktı") : ""}
               {indep ? " · her ürün kendi paneliyle ayrı değerlendirildi" : ""}
               {audienceSummary(res.items)}
               {res.data_basis?.persona_version ? ` · persona ${String(res.data_basis.persona_version)}` : ""}
