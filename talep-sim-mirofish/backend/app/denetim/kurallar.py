@@ -451,6 +451,56 @@ def _ayirt(s: Sonuc):
                      dayanak=a.get("basis") or "kural varsayımı")
 
 
+@kural("erisim_egrisi", "koleksiyon", "Erişim eğrisi az ürüne / az kişiye dayanıyor",
+       "Erişim eğrisi kendi içinde tutarsızsa (azalan erişim, toplamı tutmayan katkılar), tek ürünle doyuyorsa ya da "
+       "eğrideki erişim 10 kişiden azına dayanıyorsa")
+def _erisim(s: Sonuc):
+    summ = s.veri.get("summary") or {}
+    curve = summ.get("reach_curve") or []
+    if not curve:
+        return
+    alan = "summary.reach_curve"
+    adds = [p for p in curve if (p.get("added") or 0) > 0 or (_sayi(p.get("added_pct")) or 0) > 0]
+    # tutarlılık: erişim azalmaz, katkılar toplamı son erişime eşit, son erişim kutudaki erişimle aynı
+    prev = 0.0
+    for i, p in enumerate(curve):
+        r = _sayi(p.get("reach_pct")) or 0.0
+        if r + 0.05 < prev:
+            yield _b("hata", "erisim_egrisi", f"Erişim eğrisi {p.get('name')} ürününde azalıyor (%{prev:g} -> %{r:g}); "
+                     "ürün eklemek erişimi düşüremez.", skus=[p.get("sku")], alan=f"{alan}[{i}]", dayanak="ajan")
+        prev = max(prev, r)
+    son = _sayi(curve[-1].get("reach_pct")) or 0.0
+    top = sum(_sayi(p.get("added_pct")) or 0.0 for p in curve)
+    if abs(top - son) > 0.15 * max(1, len(adds)):
+        yield _b("hata", "erisim_egrisi", f"Erişim eğrisinde ürünlerin eklediği kişilerin toplamı %{top:.1f}, son erişim %{son:g}.",
+                 alan=alan, dayanak="ajan")
+    kutu = _sayi((summ.get("reach") or {}).get("value"))
+    if kutu is not None and abs(kutu - son) > 0.15:
+        yield _b("hata", "erisim_egrisi", f"Koleksiyon erişimi kutusu %{kutu:g}, erişim eğrisinin sonu %{son:g}; ikisi aynı olmalı.",
+                 alan=alan, dayanak="ajan")
+    n_panel = max((int(p.get("panel_n") or 0) for p in curve), default=0)
+    ulasilan = sum(int(p.get("added") or 0) for p in curve)
+    n_urun = summ.get("n_evaluated") or len([i for i in s.urunler() if i.get("regions")])
+    if len(adds) == 1 and n_urun >= 3:
+        ilk = adds[0]
+        bos = [p for p in curve if p is not ilk and (p.get("added") or 0) == 0 and "enthusiasts" in p and not p.get("enthusiasts")]
+        ort = [p for p in curve if p is not ilk and (p.get("enthusiasts") or 0) > 0]
+        ayr = []
+        if ort:
+            ayr.append(f"{len(ort)} ürünün hevesli kişilerinin hepsi {ilk.get('name')} ürününü de seviyor")
+        if bos:
+            ayr.append(f"{len(bos)} ürüne kimse 70+ ilgi vermedi")
+        kisi = f" ({n_panel} kişilik panelden {ulasilan} kişi)" if n_panel else ""
+        yield _b("uyarı", "erisim_egrisi",
+                 f"Erişim eğrisi tek ürünle doyuyor: {ilk.get('name')} panelin %{ilk.get('reach_pct')}'ine ulaşıyor{kisi}, "
+                 f"diğer {n_urun - 1} ürün yeni kişi eklemiyor" + (f" ({'; '.join(ayr)})" if ayr else "") + ". "
+                 "Bu çoğunlukla aynı birkaç kişinin her ürüne yüksek puan vermesinden ya da panelin küçük olmasından gelir; "
+                 "'diğer ürünler gereksiz' diye okunmamalı.", skus=[ilk.get("sku")], alan=alan, dayanak="ajan")
+    if n_panel and ulasilan and ulasilan < MIN_KISI:
+        yield _b("uyarı", "erisim_egrisi", f"Erişim (%{son:g}) yalnızca {ulasilan} kişiye dayanıyor ({n_panel} kişilik panel, "
+                 f"{MIN_KISI} altı): eğrinin şekli ve sıralaması kaba.", alan=alan, dayanak="ajan")
+
+
 @kural("eksik_sonuc", "koleksiyon,tekli", "Eksik / başarısız sonuç",
        "Hiç ürün değerlendirilmedi, ürünlerin ya da bölgelerin bir kısmı hesaplanamadı")
 def _eksik(s: Sonuc):

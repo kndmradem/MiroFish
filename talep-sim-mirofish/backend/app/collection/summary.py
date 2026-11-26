@@ -647,11 +647,22 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
             covered |= ent[best]
             k += 1
             reach_curve.append(ReachPoint(k=k, sku=best, name=next(i.name for i in evaluated if i.sku == best),
-                                          reach_pct=_pct(len(covered) / len(persons)), added_pct=_pct(add / len(persons))))
+                                          reach_pct=_pct(len(covered) / len(persons)), added_pct=_pct(add / len(persons)),
+                                          enthusiasts=len(ent[best]), added=add, panel_n=len(persons)))
             left.discard(best)
+        # Yeni kişi eklemeyen ürünler de eğrinin sonunda (eklediği 0) gösterilir; neden eklemediği kişi sayısıyla yazılır:
+        # ya hevesli kişisi hiç yok ya da hevesli kişilerinin hepsi eğride önce gelen ürünleri de seviyor.
+        reach_now = _pct(len(covered) / len(persons))
+        for s_ in sorted(left, key=lambda x: (-len(ent[x]), x)):
+            k += 1
+            prev = [p.sku for p in reach_curve if p.added > 0 and ent[s_] & ent[p.sku]]
+            reach_curve.append(ReachPoint(k=k, sku=s_, name=next(i.name for i in evaluated if i.sku == s_),
+                                          reach_pct=reach_now, added_pct=0.0, enthusiasts=len(ent[s_]), added=0,
+                                          panel_n=len(persons), overlap_with=prev))
         allent = set().union(*ent.values()) if ent else set()
         reach = Metric(value=_pct(len(allent) / len(persons)), basis="ajan",
-                       how=f"Paneldeki {len(persons)} kişiden en az bir ürüne {ENTHUSIAST}+ ilgi puanı veren kişilerin oranı.")
+                       how=f"Paneldeki {len(persons)} kişiden {len(allent)} kişi en az bir ürüne {ENTHUSIAST}+ ilgi puanı verdi "
+                           f"(eşik kural varsayımı)." + (f" Az kişiye dayanıyor ({len(allent)} kişi)." if len(allent) < 10 else ""))
         for r in sorted({p[0] for p in persons}):
             pr = {p for p in persons if p[0] == r}
             reach_by_region[r] = _pct(len(allent & pr) / len(pr)) if pr else 0.0
@@ -707,7 +718,7 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
                      "Aynı kategori (eşikler kural varsayımı).")))
 
     # üretim kararı: üret / azalt / üretme. Sinyaller ajandan, eşikler kural varsayımı.
-    in_curve = {p.sku for p in reach_curve}
+    in_curve = {p.sku for p in reach_curve if p.added > 0}
     name_by = {i.sku: i.name for i in evaluated}
     decision: Dict[str, str] = {}
     source: Dict[str, str] = {}

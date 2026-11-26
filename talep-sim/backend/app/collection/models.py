@@ -307,6 +307,11 @@ class ReachPoint(BaseModel):
     name: str
     reach_pct: float
     added_pct: float
+    enthusiasts: int = Field(0, description="Bu ürüne hevesli (70+) kişi sayısı")
+    added: int = Field(0, description="Bu ürünün eğriye eklediği yeni kişi sayısı (0: hevesli kişileri zaten kapsanmış ya da hiç yok)")
+    panel_n: int = Field(0, description="Paneldeki kişi sayısı (yüzdelerin paydası)")
+    overlap_with: List[str] = Field(default_factory=list,
+                                    description="added=0 ve hevesli kişisi varsa: o kişileri zaten kapsayan, eğride önce gelen ürünler (SKU)")
 
 
 class CannibalPair(BaseModel):

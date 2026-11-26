@@ -268,17 +268,43 @@ function catStats(res: CollectionResult, category: string, region: string) {
 function Summary({ res, m, one }: { res: CollectionResult; m: (v: number | null | undefined) => string; one: string | null }) {
   const s = res.summary;
   const indep = res.kind === "bagimsiz";
+  const rc = s.reach_curve;
+  const adds = rc.filter((p) => (p.added ?? (p.added_pct > 0 ? 1 : 0)) > 0);
+  const rest = rc.filter((p) => !adds.includes(p));
+  const panelN = rc[0]?.panel_n ?? 0;
+  const reached = adds.reduce((t, p) => t + (p.added ?? 0), 0);
+  const nameOf = (sku: string) => res.items.find((i) => i.sku === sku)?.name ?? sku;
   const curve: EChartsOption = {
-    grid: { left: 40, right: 16, top: 16, bottom: 60 },
-    tooltip: { trigger: "axis", valueFormatter: (v) => `%${v}` },
-    xAxis: { type: "category", data: s.reach_curve.map((p) => p.name), axisLabel: { rotate: 30, fontSize: 10 } },
+    grid: { left: 40, right: 16, top: 16, bottom: 70 },
+    tooltip: {
+      trigger: "axis",
+      formatter: (ps: unknown) => {
+        const arr = ps as { dataIndex: number }[];
+        const p = rc[arr[0]?.dataIndex ?? 0];
+        if (!p) return "";
+        const n = panelN ? ` / ${panelN} kişi` : "";
+        const why = (p.added ?? 0) > 0 || p.added_pct > 0
+          ? `Eklediği yeni kişi: ${p.added ?? "?"}${n} (%${p.added_pct})`
+          : (p.enthusiasts ?? 0) === 0 ? "Yeni kişi eklemiyor: kimse 70+ ilgi vermedi"
+            : `Yeni kişi eklemiyor: ${p.enthusiasts} hevesli kişisi zaten ${(p.overlap_with ?? []).map(nameOf).join(", ") || "önceki ürünleri"} de seviyor`;
+        return `<b>${p.name}</b><br/>Toplam erişim: %${p.reach_pct}<br/>Hevesli (70+) kişi: ${p.enthusiasts ?? "?"}${n}<br/>${why}`;
+      },
+    },
+    xAxis: {
+      type: "category",
+      data: rc.map((p) => ({ value: p.name, textStyle: { color: adds.includes(p) ? undefined : "#9ca3af" } })),
+      axisLabel: { rotate: 30, fontSize: 10 },
+    },
     yAxis: { type: "value", max: 100, axisLabel: { formatter: "%{value}" } },
     series: [
-      { type: "line", name: "Erişim", data: s.reach_curve.map((p) => p.reach_pct), smooth: true, areaStyle: { opacity: 0.15 } },
-      { type: "bar", name: "Bu ürünün eklediği", data: s.reach_curve.map((p) => p.added_pct), barWidth: 10, itemStyle: { opacity: 0.5 } },
+      { type: "line", name: "Erişim", data: rc.map((p) => p.reach_pct), smooth: false, areaStyle: { opacity: 0.15 } },
+      { type: "bar", name: "Bu ürünün eklediği", data: rc.map((p) => p.added_pct), barWidth: 10, itemStyle: { opacity: 0.5 } },
     ],
   };
-  const sat = s.reach_curve.length;
+  const sat = rc.length;
+  const overl = rest.filter((p) => (p.enthusiasts ?? 0) > 0);
+  const none = rest.filter((p) => p.enthusiasts === 0);
+  const reachLast = adds.length ? adds[adds.length - 1].reach_pct : 0;
   const scope = one ?? "tüm bölgeler";
   const v = regionView(res, one);
   return (
@@ -329,8 +355,26 @@ function Summary({ res, m, one }: { res: CollectionResult; m: (v: number | null 
         <div className="grid gap-1">
           <h3 className="flex items-center gap-2 text-sm font-medium">Erişim eğrisi <BasisChip basis="ajan" how="En çok yeni kişi getiren ürün sırayla eklenir (TURF)." /></h3>
           <p className="text-xs text-muted-foreground">
-            İlk {sat} ürün panelin %{s.reach_curve[sat - 1].reach_pct}&apos;ine ulaşıyor; listede olmayan ürünler panelde yeni bir kişiye ulaşmıyor (başka ürünü seven kişileri seviyor).
+            {adds.length} ürün {panelN ? `${panelN} kişilik panelin ${reached} kişisine (%${reachLast})` : `panelin %${reachLast} kısmına`} ulaşıyor
+            (bir ürüne 70+ ilgi veren kişi).
+            {rest.length > 0 && <> Diğer {rest.length} ürün yeni kişi eklemiyor (grafikte gri):
+              {overl.length > 0 && <> {overl.map((p) => `${p.name} (${p.enthusiasts} hevesli kişi)`).join(", ")} ürünlerini seven kişiler zaten eğrideki ürünleri de seviyor</>}
+              {overl.length > 0 && none.length > 0 && ";"}
+              {none.length > 0 && <> {none.map((p) => p.name).join(", ")} ürününe kimse 70+ ilgi vermedi</>}.
+            </>}
+            {panelN > 0 && reached < panelN && <> Panelin kalan {panelN - reached} kişisi hiçbir ürüne 70+ vermedi.</>}
           </p>
+          {(adds.length === 1 && sat >= 3) && (
+            <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs">
+              Eğri tek ürünle doyuyor. Bu, diğer ürünlerin gereksiz olduğu anlamına gelmez: çoğunlukla aynı birkaç kişinin her ürüne
+              yüksek puan vermesinden gelir. Ürün kararları için talep skoru ve rollere bakın.
+            </p>
+          )}
+          {panelN > 0 && reached > 0 && reached < 10 && (
+            <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs">
+              Bu eğri yalnızca {reached} kişiye dayanıyor ({panelN} kişilik panel): şekli ve sırası kaba. Daha net sonuç için paneli büyütün.
+            </p>
+          )}
           <ReactECharts option={curve} style={{ height: 280 }} notMerge />
         </div>
       )}

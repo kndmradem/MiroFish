@@ -200,6 +200,34 @@ def test_product_list_rules():
 VAKALAR = vakalar()
 
 
+def test_reach_curve_lists_every_product_with_reason():
+    """Yeni kişi eklemeyen ürünler de eğride: eklediği 0, hevesli kişi sayısı ve onları kapsayan ürün yazılı."""
+    ans = {"S0": [90, 85, 80, 75, 40, 40, 40, 40, 40, 40, 40, 40],   # 4 hevesli
+           "S1": [90, 85, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40],   # 2 hevesli, hepsi S0'da da
+           "S2": [40] * 12}                                            # hevesli yok
+    res = summarize(_col(n=3), {s: _resp({"TR": a}) for s, a in ans.items()}, 42.0)
+    rc = {p.sku: p for p in res.summary.reach_curve}
+    assert set(rc) == {"S0", "S1", "S2"}
+    assert rc["S0"].added == 4 and rc["S0"].panel_n == 12
+    assert rc["S1"].added == 0 and rc["S1"].enthusiasts == 2 and rc["S1"].overlap_with == ["S0"]
+    assert rc["S2"].added == 0 and rc["S2"].enthusiasts == 0 and rc["S2"].overlap_with == []
+    assert all(p.reach_pct == res.summary.reach.value for p in res.summary.reach_curve)
+    bul = [b.mesaj for b in res.denetim.bulgular if b.kural == "erisim_egrisi"]
+    assert any("tek ürünle doyuyor" in m for m in bul) and any("yalnızca 4 kişiye" in m for m in bul)
+
+
+def test_reach_curve_inconsistency_is_error(temiz):
+    v = copy.deepcopy(temiz)
+    rc = v["summary"]["reach_curve"]
+    assert len(rc) >= 2
+    rc[1]["reach_pct"] = rc[0]["reach_pct"] - 10
+    assert "erisim_egrisi" in _kurallar(denetle_koleksiyon(v), "hata")
+    v = copy.deepcopy(temiz)
+    v["summary"]["reach"]["value"] = (v["summary"]["reach"]["value"] or 0) - 20
+    assert "erisim_egrisi" in _kurallar(denetle_koleksiyon(v), "hata")
+    assert "erisim_egrisi" not in _kurallar(denetle_koleksiyon(temiz), "hata")
+
+
 def test_there_are_regression_cases():
     assert any(ad.startswith("bralet-slip") for ad, _ in VAKALAR)
 
