@@ -315,6 +315,11 @@ class CannibalPair(BaseModel):
     category: str
     overlap_pct: float
     why: str
+    source: str = "ilgi"     # "ilgi": tek tek turdaki hevesli kişilerin örtüşmesi; "vitrin": "ikisinden birini alırım"
+    basis: str = "ajan"
+    shared: int = 0          # ortak sinyal veren kişi sayısı
+    base: int = 0            # yüzdenin paydası (kişi)
+    panel_n: int = 0
 
 
 class CategorySummary(BaseModel):

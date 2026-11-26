@@ -334,10 +334,17 @@ function Summary({ res, m, one }: { res: CollectionResult; m: (v: number | null 
 
       {s.cannibal_pairs.length > 0 && (
         <div className="grid gap-2">
-          <h3 className="flex items-center gap-2 text-sm font-medium">Birbirinin müşterisini paylaşan ürünler <BasisChip basis="ajan" /><BasisChip basis="kural varsayımı" /></h3>
+          <h3 className="flex items-center gap-2 text-sm font-medium">Birbirinin müşterisini paylaşan ürünler <BasisChip basis="ajan" how="Yalnızca aynı kategorideki ürünler karşılaştırılır. Kaynak: tek tek turda ikisine de yüksek ilgi veren kişiler ya da vitrinde 'ikisinden birini alırım' diyenler." /><BasisChip basis="kural varsayımı" how="Eşikler: en az 3 kişi, ilgi örtüşmesi %60+ ve fiyatlar ±%25 içinde, vitrinde %20+." /></h3>
           {s.cannibal_pairs.map((p) => {
             const a = res.items.find((i) => i.sku === p.a), b = res.items.find((i) => i.sku === p.b);
-            return <div key={p.a + p.b} className="text-sm">{a?.name} ↔ {b?.name} <span className="text-muted-foreground">({p.category}, örtüşme %{p.overlap_pct})</span></div>;
+            const src = p.source === "vitrin" ? "vitrin" : "ilgi örtüşmesi";
+            const n = p.base ? `, ${p.shared}/${p.base} kişi` : "";
+            return (
+              <div key={p.a + p.b} className="text-sm" title={p.why}>
+                {a?.name} ↔ {b?.name} <span className="text-muted-foreground">({p.category}, {src} %{p.overlap_pct}{n})</span>
+                {(p.base ?? 0) > 0 && (p.base ?? 0) < 10 && <span className="ml-1 text-xs text-amber-700">az kişiye dayanıyor</span>}
+              </div>
+            );
           })}
         </div>
       )}

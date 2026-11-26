@@ -26,6 +26,8 @@ from .models import (Action, ColorFamilySummary, ColorLine, ColorPlan, Reason, B
 ENTHUSIAST = 70          # ilgi puanı bu ve üstü: "hevesli" (prompttaki ölçek: hevesli 70-95)
 CANNIBAL_OVERLAP = 0.6   # hevesli kişilerin örtüşmesi (küçük kümeye göre)
 CANNIBAL_PRICE = 0.25    # fiyatlar birbirinin ±%25'i içinde
+CANNIBAL_MIN_PEOPLE = 3  # en az bu kadar kişinin ortak sinyali (daha azı tesadüf sayılır)
+CANNIBAL_SC_PCT = 20     # vitrinde birlikte görenlerin en az bu yüzdesi "ikisinden biri" demeli
 BOOTSTRAP = 200
 REVERSE_LOGISTICS_PCT = 8.0
 MIN_PERSON_SD = 5.0      # kişi içi normalizasyonda en küçük dağılım (puan): herkese aynı puanı veren kişinin tek sapması büyütülmesin
@@ -648,29 +650,49 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
         planned = w.planned_prices.get(it.sku, it.planned_price)
         regs = per_item_regions[it.sku]
         price_of[it.sku] = to_usd(planned) if planned else (statistics.fmean(r.optimal_price for r in regs) if regs else 0)
+    # Müşteri paylaşımı yalnızca aynı kategorideki ürünler arasında aranır (kategori kullanıcının Excel/ERP
+    # verisinden gelir; sabit liste yok). Farklı kategoriler (ör. sütyen ve külot) birbirinin yerine geçmez,
+    # birlikte alınır; o sinyal "birlikte alınanlar"da kalır.
+    item_by = {i.sku: i for i in evaluated}
+
+    def same_cat(x, y) -> bool:
+        return bool(x.category) and norm(x.category) == norm(y.category)
+
     pairs: List[CannibalPair] = []
     if have_panel:
         for i, a in enumerate(evaluated):
             for b in evaluated[i + 1:]:
-                if not a.category or norm(a.category) != norm(b.category):
+                if not same_cat(a, b):
                     continue
                 ea, eb = ent[a.sku], ent[b.sku]
-                if len(ea) < 2 or len(eb) < 2:
+                n_both, base = len(ea & eb), min(len(ea), len(eb))
+                if n_both < CANNIBAL_MIN_PEOPLE:
                     continue
-                ov = len(ea & eb) / min(len(ea), len(eb))
+                ov = n_both / base
                 pa, pb = price_of[a.sku], price_of[b.sku]
                 close = pa > 0 and pb > 0 and abs(pa - pb) / max(pa, pb) <= CANNIBAL_PRICE
                 if ov >= CANNIBAL_OVERLAP and close:
-                    pairs.append(CannibalPair(a=a.sku, b=b.sku, category=a.category, overlap_pct=_pct(ov),
-                                              why=f"İkisini de beğenen kişilerin örtüşmesi %{_pct(ov):g}, aynı kategori ve fiyatlar birbirine yakın"))
-        pairs.sort(key=lambda p: -p.overlap_pct)
+                    pairs.append(CannibalPair(
+                        a=a.sku, b=b.sku, category=a.category, overlap_pct=_pct(ov), source="ilgi", basis="ajan",
+                        shared=n_both, base=base, panel_n=len(persons),
+                        why=(f"{len(persons)} kişilik panelde {a.name} ürününe {len(ea)}, {b.name} ürününe {len(eb)} kişi "
+                             f"{ENTHUSIAST}+ ilgi verdi; az olan {base} kişinin {n_both}'ü ikisini de seviyor. "
+                             f"Aynı kategori, fiyatlar ±%{int(CANNIBAL_PRICE * 100)} içinde (eşikler kural varsayımı).")))
+        pairs.sort(key=lambda p: (-p.overlap_pct, -p.shared))
     if sc_summary:
         have = {tuple(sorted((p.a, p.b))) for p in pairs}
-        cat = {i.sku: i.category for i in evaluated}
         for sp in sc_summary.substitute_pairs:
-            if (sp.a, sp.b) not in have and sp.pct >= 20:
-                pairs.append(CannibalPair(a=sp.a, b=sp.b, category=cat.get(sp.a, ""), overlap_pct=sp.pct,
-                                          why=f"Vitrinde {sp.count} kişi 'ikisinden birini alırım' dedi"))
+            a, b = item_by.get(sp.a), item_by.get(sp.b)
+            if a is None or b is None or not same_cat(a, b):
+                continue
+            if tuple(sorted((sp.a, sp.b))) in have or sp.pct < CANNIBAL_SC_PCT or sp.count < CANNIBAL_MIN_PEOPLE:
+                continue
+            seen = round(sp.count * 100 / sp.pct) if sp.pct else sp.count
+            pairs.append(CannibalPair(
+                a=sp.a, b=sp.b, category=a.category, overlap_pct=sp.pct, source="vitrin", basis="ajan",
+                shared=sp.count, base=seen, panel_n=seen,
+                why=(f"Vitrin turunda ikisini yan yana gören {seen} kişiden {sp.count}'ü 'ikisinden birini alırım' dedi. "
+                     "Aynı kategori (eşikler kural varsayımı).")))
 
     # üretim kararı: üret / azalt / üretme. Sinyaller ajandan, eşikler kural varsayımı.
     in_curve = {p.sku for p in reach_curve}
@@ -928,7 +950,7 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
         na = next(i.name for i in out_items if i.sku == p.a)
         nb = next(i.name for i in out_items if i.sku == p.b)
         actions.append(Action(kind="kanibalizasyon", skus=[p.a, p.b], basis="ajan",
-                              text=f"{na} ile {nb} aynı müşteriyi paylaşıyor (örtüşme %{p.overlap_pct:g}). Birini çıkarmayı ya da fiyat/renkle ayrıştırmayı düşünün."))
+                              text=f"{na} ile {nb} aynı müşteriyi paylaşıyor (örtüşme %{p.overlap_pct:g}, {p.shared}/{p.base} kişi). Birini çıkarmayı ya da fiyat/renkle ayrıştırmayı düşünün."))
     over_p = [r for r in out_items if "fiyat aralığın üstünde" in r.flags]
     under_p = [r for r in out_items if "fiyat aralığın altında" in r.flags]
     if len(over_p) > 3:

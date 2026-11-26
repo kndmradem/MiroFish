@@ -797,3 +797,36 @@ def test_delete_collection_removes_everything(client):
     assert client.get(f"/api/collections/{cid}").status_code == 404
     assert client.delete(f"/api/collections/{cid}").status_code == 404
     assert client.delete("/api/collections/../etc").status_code in (404, 405)
+
+
+# ---------- müşteri paylaşımı yalnızca aynı kategoride ----------
+
+def test_cannibal_pairs_only_within_same_category_and_with_counts():
+    # S0, S1 aynı kişilerce sevilir ama farklı kategoride (ör. bralet ve külot): çift olmamalı.
+    # S2, S3 aynı kategoride ve aynı kişilerce sevilir: çift olmalı, kişi sayılarıyla.
+    ans = {"S0": [90, 90, 90, 90, 20, 20], "S1": [90, 90, 90, 90, 20, 20],
+           "S2": [20, 20, 90, 90, 90, 90], "S3": [20, 20, 90, 90, 90, 90], "S4": [40, 40, 40, 40, 40, 40]}
+    cats = {"S0": "SUTYEN", "S1": "KULOT", "S2": "KULOT", "S3": "KULOT", "S4": "BODY"}
+    col = _col()
+    for it in col.items:
+        it.category = cats[it.sku]
+    # vitrinde herkes S0 ile S1'i "ikisinden biri" diyor: kategori farklı olduğu için yine çift sayılmaz
+    sc_recs = _showcase_recs(5, best="S2", worst="S4")
+    for r in sc_recs["TR"]:
+        inv = {v: k for k, v in r["letters"].items()}
+        r["answer"]["substitutes"] = [[inv["S0"], inv["S1"]]]
+    res = summarize(col, {s: _resp({"TR": a}) for s, a in ans.items()}, 42.0, showcase=sc_recs)
+    got = {tuple(sorted((p.a, p.b))) for p in res.summary.cannibal_pairs}
+    assert ("S0", "S1") not in got
+    assert ("S2", "S3") in got
+    p = next(p for p in res.summary.cannibal_pairs if {p.a, p.b} == {"S2", "S3"})
+    assert p.category == "KULOT" and p.source == "ilgi" and p.shared == 4 and p.base == 4 and p.panel_n == 6
+    assert "4" in p.why
+
+
+def test_cannibal_pair_needs_minimum_people():
+    # yalnızca 2 kişi ikisini de seviyor: %100 örtüşme olsa da tesadüf sayılır
+    ans = {"S0": [90, 90, 20, 20, 20, 20], "S1": [90, 90, 20, 20, 20, 20],
+           "S2": [50, 50, 50, 50, 50, 50], "S3": [40] * 6, "S4": [30] * 6}
+    res = summarize(_col(), {s: _resp({"TR": a}) for s, a in ans.items()}, 42.0)
+    assert not any({p.a, p.b} == {"S0", "S1"} for p in res.summary.cannibal_pairs)

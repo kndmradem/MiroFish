@@ -165,7 +165,7 @@ export interface ShowcaseSummary {
 }
 
 export interface ReachPoint { k: number; sku: string; name: string; reach_pct: number; added_pct: number }
-export interface CannibalPair { a: string; b: string; category: string; overlap_pct: number; why: string }
+export interface CannibalPair { a: string; b: string; category: string; overlap_pct: number; why: string; source?: string; basis?: string; shared?: number; base?: number; panel_n?: number }
 export interface CategorySummary { category: string; count: number; roles: Record<string, number>; price_min: number | null; price_max: number | null; mean_appeal: number; in_zone: number; out_zone: number }
 export interface Action { kind: string; text: string; skus: string[]; basis: Basis }
 
