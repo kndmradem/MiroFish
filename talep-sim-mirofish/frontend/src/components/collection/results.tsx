@@ -13,12 +13,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  DECISION_CLASS, DECISION_LABEL, exportUrl, imageUrl, money, ROLE_CLASS, ROLE_LABEL, whatIf,
+  auditReportUrl, DECISION_CLASS, DECISION_LABEL, exportUrl, imageUrl, money, ROLE_CLASS, ROLE_LABEL, whatIf,
   type Basis, type CollectionResult, type ColorDecision, type Decision, type ItemResult, type Metric, type WhatIf,
 } from "@/lib/collection-api";
 import { cn } from "@/lib/utils";
 import { ColorStrip, ColorsTab, ColorTable } from "./colors";
 import { AudienceChip } from "@/components/audience-card";
+import { AuditCard } from "@/components/audit-card";
 
 const ReactECharts = dynamic(() => import("echarts-for-react"), { ssr: false });
 
@@ -150,6 +151,8 @@ export function CollectionResults({ base }: { base: CollectionResult }) {
           </div>
         )}
         {error && <div className="text-sm text-rose-600">{error}</div>}
+        <AuditCard key={`${res.denetim?.durum}-${res.denetim?.bulgular.length}`} rapor={res.denetim}
+          names={Object.fromEntries(res.items.map((i) => [i.sku, i.name]))} reportUrl={active ? undefined : auditReportUrl(res.collection_id)} />
         <div className="flex flex-wrap gap-1 border-b">
           {tabs.map((t) => (
             <button key={t} onClick={() => setTab(t)}

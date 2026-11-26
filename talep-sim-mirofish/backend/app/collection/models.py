@@ -4,6 +4,7 @@ from typing import Dict, List, Literal, Optional
 from pydantic import BaseModel, Field
 
 from ..audience import AudienceInfo
+from ..denetim.model import DenetimRaporu
 from ..models import Assumptions, BrandProfile, Region
 
 Basis = Literal["ajan", "kural varsayımı", "LLM tahmini", "ERP", "kullanıcı girdisi"]
@@ -375,3 +376,4 @@ class CollectionResult(BaseModel):
     brand_effect: Optional[BrandEffect] = None
     showcase: Optional[ShowcaseSummary] = None
     color_plan: Optional[ColorPlan] = None
+    denetim: Optional[DenetimRaporu] = Field(None, description="Mantık denetimi: sonucun kendi içinde tutarlılığı (hata / uyarı / bilgi)")

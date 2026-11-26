@@ -1,4 +1,5 @@
 // Koleksiyon modu API istemcisi (/api/collections). Tekli ürün API'si (api.ts) değişmez.
+import type { DenetimRaporu } from "./denetim";
 import { normalizePrediction, try_, usd, type AudienceInfo, type BrandProfile, type PredictionResponse, type RegionCode } from "@/lib/api";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8100";
@@ -222,6 +223,8 @@ export interface CollectionResult {
   brand_effect: BrandEffect | null;
   showcase: ShowcaseSummary | null;
   color_plan: ColorPlan | null;
+  /** Mantık denetimi (her hesaplamada, 'ne olur' denemeleri dahil). */
+  denetim?: DenetimRaporu | null;
 }
 
 export interface WhatIf {
@@ -246,6 +249,7 @@ async function json<T>(res: Response): Promise<T> {
 
 export const templateUrl = `${API_URL}/api/collections/template.xlsx`;
 export const exportUrl = (cid: string) => `${API_URL}/api/collections/${cid}/export.xlsx`;
+export const auditReportUrl = (cid: string) => `${API_URL}/api/denetim/koleksiyon/${cid}?bicim=html`;
 export const imageUrl = (cid: string, path: string) =>
   `${API_URL}/api/collections/${cid}/images/${path.split("/").map(encodeURIComponent).join("/")}`;
 

@@ -9,6 +9,7 @@ import { applyProgress, initialProgress, ProgressPanel, type ProgressState } fro
 import { AllocationCard } from "@/components/allocation-card";
 import { ExtrasCard } from "@/components/extras-card";
 import { SummaryCard } from "@/components/summary-card";
+import { AuditCard } from "@/components/audit-card";
 import { AUDIENCE_OPTIONS, AudienceCard } from "@/components/audience-card";
 import { CampaignsCard, PricePlanCard } from "@/components/scenarios-card";
 import { ForecastCard } from "@/components/forecast-card";
@@ -383,6 +384,7 @@ export default function Dashboard() {
               </div>
             )}
             <SummaryCard result={result} productName={productName} />
+            <AuditCard rapor={result.denetim} />
             <AudienceCard result={result} />
 
             {result.failed_regions.length > 0 && (

@@ -1,3 +1,4 @@
+import type { DenetimRaporu } from "./denetim";
 export const REGIONS = [
   { code: "EU", label: "Avrupa (EU)" },
   { code: "MENA", label: "Körfez (MENA)" },
@@ -383,6 +384,8 @@ export interface PredictionResponse {
   failed_regions: { region: string; reason: string; raw_answers?: RawAnswer[] }[];
   /** Eski bir API sürümü açıklama/öneri alanlarını göndermediyse true (istemci tarafında eklenir). */
   api_outdated?: boolean;
+  /** Mantık denetimi: sonucun kendi içinde tutarlılığı. */
+  denetim?: DenetimRaporu | null;
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";

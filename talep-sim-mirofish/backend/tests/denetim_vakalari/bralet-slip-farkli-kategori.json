@@ -1,0 +1,5320 @@
+{
+ "ad": "bralet-slip-farkli-kategori",
+ "tarih": "2026-11-26",
+ "aciklama": "Gerçek koşu (anonimleştirildi). Koleksiyon özeti 'Birbirinin müşterisini paylaşan ürünler' listesinde bralet (SUTYEN) ile slip (KULOT) çiftini 'SUTYEN, örtüşme %25' diye gösterdi: vitrinde 12 kişiden 3'ünün 'ikisinden biri' cevabı kategori kontrolü olmadan kanibalizasyon sayılmış ve ilk ürünün kategorisiyle etiketlenmişti. Aynı listede iki sütyen için %100 örtüşme 3 kişinin 3'üne dayanıyordu ve kişi sayısı yazmıyordu. Kod 2cc5f70 ile düzeldi.",
+ "tur": "koleksiyon",
+ "durum": "kapali",
+ "anonim": true,
+ "sonuc": {
+  "collection_id": "20261112-9624f603",
+  "name": "Vaka koleksiyonu",
+  "kind": "koleksiyon",
+  "currency": "TRY",
+  "fx_rate": 47.0,
+  "regions": [
+   "TR"
+  ],
+  "items": [
+   {
+    "sku": "U01",
+    "name": "Body 1",
+    "category": "BODY",
+    "image": null,
+    "unit_cost_usd": 21.5531914893617,
+    "planned_price_usd": null,
+    "declared_role": null,
+    "regions": [
+     {
+      "region": "TR",
+      "demand": 63,
+      "enthusiast_pct": 50.0,
+      "optimal_price": 43.28,
+      "range_low": 35.48,
+      "range_high": 43.28,
+      "margin_pct": 50.2,
+      "return_pct": 20.0,
+      "demand_units": 548,
+      "price_fit": null,
+      "ipp": 37.43,
+      "zones": [
+       {
+        "key": "too_cheap",
+        "label": "Çok ucuz",
+        "low": 0.0,
+        "high": 35.48
+       },
+       {
+        "key": "cheap",
+        "label": "Ucuz / avantajlı",
+        "low": 35.48,
+        "high": 37.43
+       },
+       {
+        "key": "ideal",
+        "label": "İdeal bölge",
+        "low": 37.43,
+        "high": 39.89
+       },
+       {
+        "key": "expensive",
+        "label": "Pahalı ama kabul edilebilir",
+        "low": 39.89,
+        "high": 43.28
+       },
+       {
+        "key": "too_expensive",
+        "label": "Çok pahalı",
+        "low": 43.28,
+        "high": null
+       }
+      ],
+      "net_margin_pct": 44.5,
+      "objections": [],
+      "confidence": "orta"
+     }
+    ],
+    "appeal": {
+     "value": 63.0,
+     "low": null,
+     "high": null,
+     "basis": "ajan",
+     "how": "Bölgelerdeki talep skorlarının ortalaması (0-100)."
+    },
+    "relative": {
+     "value": 0.83,
+     "low": null,
+     "high": null,
+     "basis": "ajan",
+     "how": "Aynı kişilerin bu ürüne verdiği puanın, o kişinin bütün ürünlere verdiği puanların ortalamasından farkı (standart sapma cinsinden). Kişinin cömertliği ya da titizliği elenir."
+    },
+    "rank": {
+     "value": 1.0,
+     "low": 1.0,
+     "high": 2.0,
+     "basis": "ajan",
+     "how": "Koleksiyon içi sıra. Aralık, panel kişileri yeniden örneklenince sıranın %80 olasılıkla düştüğü bant."
+    },
+    "enthusiast_pct": {
+     "value": 50.0,
+     "low": null,
+     "high": null,
+     "basis": "ajan",
+     "how": "Ürüne 70+ ilgi puanı veren kişi oranı."
+    },
+    "role": "hero",
+    "role_why": "Koleksiyonun en üst %20'sinde (sıra 1/7), hevesli kişi oranı %50",
+    "decision": "üret",
+    "decision_source": "sistem",
+    "decision_reasons": [
+     {
+      "text": "Talep skoru 63/100",
+      "basis": "ajan"
+     },
+     {
+      "text": "Önerilen fiyatta iade sonrası net marj %44.5",
+      "basis": "kural varsayımı"
+     },
+     {
+      "text": "Vitrinde diğer ürünlerin yanında belirgin zayıflıyor (tek tek sıra 1, vitrin sırası 4)",
+      "basis": "ajan"
+     },
+     {
+      "text": "Koleksiyonun öne çıkan (hero) ürünü",
+      "basis": "kural varsayımı"
+     }
+    ],
+    "recommended_price": {
+     "value": 43.28,
+     "low": 35.48,
+     "high": 43.28,
+     "basis": "ajan",
+     "how": "TR bölgesinde (en çok talep beklenen bölge) panelin fiyat cevaplarından bulunan en kârlı fiyat; aralık panelin kabul edilebilir fiyat aralığı (Van Westendorp). Diğer bölgeler ürün ayrıntısında."
+    },
+    "net_margin": {
+     "value": 44.5,
+     "low": null,
+     "high": null,
+     "basis": "kural varsayımı",
+     "how": "Fiyattan iade (ve %8 ters lojistik) ile maliyet düşülerek; bölgelerin beklenen satışına göre ağırlıklı. Fiyat panelden, iade oranı kural varsayımı."
+    },
+    "recommended_qty": {
+     "value": 609.0,
+     "low": null,
+     "high": null,
+     "basis": "kural varsayımı",
+     "how": "Bütçenin satış hızına göre dağıtımı: talep panelden, kitle ve dönüşüm varsayımdan."
+    },
+    "qty_by_region": {
+     "TR": 609
+    },
+    "planned_qty": null,
+    "flags": [
+     "vitrinde daha zayıf"
+    ],
+    "failed_regions": [],
+    "showcase": {
+     "shown": 12,
+     "best": 5,
+     "worst": 4,
+     "score": 0.083,
+     "best_pct": 41.7,
+     "worst_pct": 33.3,
+     "rank": 4,
+     "single_rank": 1,
+     "together": 4
+    },
+    "colors": [
+     {
+      "color": "BLACK",
+      "code": "012",
+      "family": "siyah",
+      "family_label": "Siyah",
+      "image": "excel-gorsel/s1-satir2.png",
+      "share": {
+       "value": 42.1,
+       "low": null,
+       "high": null,
+       "basis": "kural varsayımı",
+       "how": "Siyah ailesinin kural ağırlığı (1.6), modelin renkleri arasında normalize edildi. Ağırlıklar doğrulanmamış taslaktır; canlıda ERP satış payı kullanılır."
+      },
+      "qty": 257,
+      "qty_by_region": {
+       "TR": 257
+      },
+      "decision": "üret",
+      "decision_source": "sistem",
+      "reasons": []
+     },
+     {
+      "color": "BROWN",
+      "code": "019",
+      "family": "kahve",
+      "family_label": "Kahverengi",
+      "image": "excel-gorsel/s1-satir3.png",
+      "share": {
+       "value": 26.3,
+       "low": null,
+       "high": null,
+       "basis": "kural varsayımı",
+       "how": "Kahverengi ailesinin kural ağırlığı (1), modelin renkleri arasında normalize edildi. Ağırlıklar doğrulanmamış taslaktır; canlıda ERP satış payı kullanılır."
+      },
+      "qty": 160,
+      "qty_by_region": {
+       "TR": 160
+      },
+      "decision": "üret",
+      "decision_source": "sistem",
+      "reasons": []
+     },
+     {
+      "color": "ECRU",
+      "code": "036",
+      "family": "beyaz",
+      "family_label": "Beyaz / ekru",
+      "image": "excel-gorsel/s1-satir4.png",
+      "share": {
+       "value": 31.6,
+       "low": null,
+       "high": null,
+       "basis": "kural varsayımı",
+       "how": "Beyaz / ekru ailesinin kural ağırlığı (1.2), modelin renkleri arasında normalize edildi. Ağırlıklar doğrulanmamış taslaktır; canlıda ERP satış payı kullanılır."
+      },
+      "qty": 192,
+      "qty_by_region": {
+       "TR": 192
+      },
+      "decision": "üret",
+      "decision_source": "sistem",
+      "reasons": []
+     }
+    ],
+    "color_mix": {
+     "value": 1.103,
+     "low": null,
+     "high": null,
+     "basis": "kural varsayımı",
+     "how": "Renk karışımının gücü koleksiyon ortalamasına göre 1.21 kat; bunun %50'ı model talebine yansıtıldı (0.85-1.15 arası)."
+    },
+    "audience": {
+     "value": "kadin",
+     "label": "Kadın",
+     "source": "kullanıcı girdisi",
+     "reason": "Kullanıcı girdisi",
+     "child_gender": null,
+     "child_age_range": null,
+     "raw": "Kadın"
+    }
+   },
+   {
+    "sku": "U02",
+    "name": "Sutyen 1",
+    "category": "SUTYEN",
+    "image": null,
+    "unit_cost_usd": 10.27659574468085,
+    "planned_price_usd": null,
+    "declared_role": null,
+    "regions": [
+     {
+      "region": "TR",
+      "demand": 48,
+      "enthusiast_pct": 8.3,
+      "optimal_price": 26.86,
+      "range_low": 18.04,
+      "range_high": 26.86,
+      "margin_pct": 61.7,
+      "return_pct": 20.5,
+      "demand_units": 369,
+      "price_fit": null,
+      "ipp": 18.66,
+      "zones": [
+       {
+        "key": "too_cheap",
+        "label": "Çok ucuz",
+        "low": 0.0,
+        "high": 17.77
+       },
+       {
+        "key": "cheap",
+        "label": "Ucuz / avantajlı",
+        "low": 17.77,
+        "high": 18.66
+       },
+       {
+        "key": "ideal",
+        "label": "İdeal bölge",
+        "low": 18.66,
+        "high": 25.99
+       },
+       {
+        "key": "expensive",
+        "label": "Pahalı ama kabul edilebilir",
+        "low": 25.99,
+        "high": 26.88
+       },
+       {
+        "key": "too_expensive",
+        "label": "Çok pahalı",
+        "low": 26.88,
+        "high": null
+       }
+      ],
+      "net_margin_pct": 56.7,
+      "objections": [],
+      "confidence": "orta"
+     }
+    ],
+    "appeal": {
+     "value": 48.0,
+     "low": null,
+     "high": null,
+     "basis": "ajan",
+     "how": "Bölgelerdeki talep skorlarının ortalaması (0-100)."
+    },
+    "relative": {
+     "value": -0.34,
+     "low": null,
+     "high": null,
+     "basis": "ajan",
+     "how": "Aynı kişilerin bu ürüne verdiği puanın, o kişinin bütün ürünlere verdiği puanların ortalamasından farkı (standart sapma cinsinden). Kişinin cömertliği ya da titizliği elenir."
+    },
+    "rank": {
+     "value": 5.0,
+     "low": 4.0,
+     "high": 6.0,
+     "basis": "ajan",
+     "how": "Koleksiyon içi sıra. Aralık, panel kişileri yeniden örneklenince sıranın %80 olasılıkla düştüğü bant."
+    },
+    "enthusiast_pct": {
+     "value": 8.3,
+     "low": null,
+     "high": null,
+     "basis": "ajan",
+     "how": "Ürüne 70+ ilgi puanı veren kişi oranı."
+    },
+    "role": "destek",
+    "role_why": "İlgi orta seviyede; koleksiyonu tamamlayan ürün",
+    "decision": "azalt",
+    "decision_source": "sistem",
+    "decision_reasons": [
+     {
+      "text": "Talep skoru 48/100, temkinli üretim eşiği 50'nin altında",
+      "basis": "ajan"
+     },
+     {
+      "text": "Önerilen fiyatta iade sonrası net marj %56.7",
+      "basis": "kural varsayımı"
+     }
+    ],
+    "recommended_price": {
+     "value": 26.86,
+     "low": 18.04,
+     "high": 26.86,
+     "basis": "ajan",
+     "how": "TR bölgesinde (en çok talep beklenen bölge) panelin fiyat cevaplarından bulunan en kârlı fiyat; aralık panelin kabul edilebilir fiyat aralığı (Van Westendorp). Diğer bölgeler ürün ayrıntısında."
+    },
+    "net_margin": {
+     "value": 56.7,
+     "low": null,
+     "high": null,
+     "basis": "kural varsayımı",
+     "how": "Fiyattan iade (ve %8 ters lojistik) ile maliyet düşülerek; bölgelerin beklenen satışına göre ağırlıklı. Fiyat panelden, iade oranı kural varsayımı."
+    },
+    "recommended_qty": {
+     "value": 196.0,
+     "low": null,
+     "high": null,
+     "basis": "kural varsayımı",
+     "how": "Bütçenin satış hızına göre dağıtımı: talep panelden, kitle ve dönüşüm varsayımdan. Azalt kararında talebin %60'ı esas alındı."
+    },
+    "qty_by_region": {
+     "TR": 196
+    },
+    "planned_qty": null,
+    "flags": [],
+    "failed_regions": [],
+    "showcase": {
+     "shown": 12,
+     "best": 5,
+     "worst": 6,
+     "score": -0.083,
+     "best_pct": 41.7,
+     "worst_pct": 50.0,
+     "rank": 5,
+     "single_rank": 5,
+     "together": 5
+    },
+    "colors": [
+     {
+      "color": "COLOURFUL PRINT",
+      "code": "995",
+      "family": "desenli",
+      "family_label": "Desenli / çok renk",
+      "image": "excel-gorsel/s1-satir5.png",
+      "share": {
+       "value": 100.0,
+       "low": null,
+       "high": null,
+       "basis": "kural varsayımı",
+       "how": "Desenli / çok renk ailesinin kural ağırlığı (0.8), modelin renkleri arasında normalize edildi. Ağırlıklar doğrulanmamış taslaktır; canlıda ERP satış payı kullanılır."
+      },
+      "qty": 196,
+      "qty_by_region": {
+       "TR": 196
+      },
+      "decision": "üret",
+      "decision_source": "sistem",
+      "reasons": []
+     }
+    ],
+    "color_mix": {
+     "value": 0.866,
+     "low": null,
+     "high": null,
+     "basis": "kural varsayımı",
+     "how": "Renk karışımının gücü koleksiyon ortalamasına göre 0.73 kat; bunun %50'ı model talebine yansıtıldı (0.85-1.15 arası)."
+    },
+    "audience": {
+     "value": "kadin",
+     "label": "Kadın",
+     "source": "kullanıcı girdisi",
+     "reason": "Kullanıcı girdisi",
+     "child_gender": null,
+     "child_age_range": null,
+     "raw": "Kadın"
+    }
+   },
+   {
+    "sku": "U03",
+    "name": "Sutyen 2",
+    "category": "SUTYEN",
+    "image": null,
+    "unit_cost_usd": 8.117021276595745,
+    "planned_price_usd": null,
+    "declared_role": null,
+    "regions": [
+     {
+      "region": "TR",
+      "demand": 56,
+      "enthusiast_pct": 33.3,
+      "optimal_price": 22.87,
+      "range_low": 14.78,
+      "range_high": 22.87,
+      "margin_pct": 64.5,
+      "return_pct": 18.5,
+      "demand_units": 457,
+      "price_fit": null,
+      "ipp": 15.3,
+      "zones": [
+       {
+        "key": "too_cheap",
+        "label": "Çok ucuz",
+        "low": 0.0,
+        "high": 14.56
+       },
+       {
+        "key": "cheap",
+        "label": "Ucuz / avantajlı",
+        "low": 14.56,
+        "high": 15.3
+       },
+       {
+        "key": "ideal",
+        "label": "İdeal bölge",
+        "low": 15.3,
+        "high": 21.56
+       },
+       {
+        "key": "expensive",
+        "label": "Pahalı ama kabul edilebilir",
+        "low": 21.56,
+        "high": 22.87
+       },
+       {
+        "key": "too_expensive",
+        "label": "Çok pahalı",
+        "low": 22.87,
+        "high": null
+       }
+      ],
+      "net_margin_pct": 60.3,
+      "objections": [],
+      "confidence": "orta"
+     }
+    ],
+    "appeal": {
+     "value": 56.0,
+     "low": null,
+     "high": null,
+     "basis": "ajan",
+     "how": "Bölgelerdeki talep skorlarının ortalaması (0-100)."
+    },
+    "relative": {
+     "value": 0.38,
+     "low": null,
+     "high": null,
+     "basis": "ajan",
+     "how": "Aynı kişilerin bu ürüne verdiği puanın, o kişinin bütün ürünlere verdiği puanların ortalamasından farkı (standart sapma cinsinden). Kişinin cömertliği ya da titizliği elenir."
+    },
+    "rank": {
+     "value": 3.0,
+     "low": 2.0,
+     "high": 4.0,
+     "basis": "ajan",
+     "how": "Koleksiyon içi sıra. Aralık, panel kişileri yeniden örneklenince sıranın %80 olasılıkla düştüğü bant."
+    },
+    "enthusiast_pct": {
+     "value": 33.3,
+     "low": null,
+     "high": null,
+     "basis": "ajan",
+     "how": "Ürüne 70+ ilgi puanı veren kişi oranı."
+    },
+    "role": "tamamlayıcı",
+    "role_why": "Tek başına ilgi orta/düşük ama vitrinde 10 kez kombin çiftinde seçildi: diğer ürünleri tamamlayan parça",
+    "decision": "üret",
+    "decision_source": "sistem",
+    "decision_reasons": [
+     {
+      "text": "Talep skoru 56/100",
+      "basis": "ajan"
+     },
+     {
+      "text": "Önerilen fiyatta iade sonrası net marj %60.3",
+      "basis": "kural varsayımı"
+     },
+     {
+      "text": "Vitrinde kombin parçası olarak seçiliyor",
+      "basis": "ajan"
+     }
+    ],
+    "recommended_price": {
+     "value": 22.87,
+     "low": 14.78,
+     "high": 22.87,
+     "basis": "ajan",
+     "how": "TR bölgesinde (en çok talep beklenen bölge) panelin fiyat cevaplarından bulunan en kârlı fiyat; aralık panelin kabul edilebilir fiyat aralığı (Van Westendorp). Diğer bölgeler ürün ayrıntısında."
+    },
+    "net_margin": {
+     "value": 60.3,
+     "low": null,
+     "high": null,
+     "basis": "kural varsayımı",
+     "how": "Fiyattan iade (ve %8 ters lojistik) ile maliyet düşülerek; bölgelerin beklenen satışına göre ağırlıklı. Fiyat panelden, iade oranı kural varsayımı."
+    },
+    "recommended_qty": {
+     "value": 462.0,
+     "low": null,
+     "high": null,
+     "basis": "kural varsayımı",
+     "how": "Bütçenin satış hızına göre dağıtımı: talep panelden, kitle ve dönüşüm varsayımdan."
+    },
+    "qty_by_region": {
+     "TR": 462
+    },
+    "planned_qty": null,
+    "flags": [
+     "kanibalizasyon adayı"
+    ],
+    "failed_regions": [],
+    "showcase": {
+     "shown": 12,
+     "best": 9,
+     "worst": 0,
+     "score": 0.75,
+     "best_pct": 75.0,
+     "worst_pct": 0.0,
+     "rank": 1,
+     "single_rank": 3,
+     "together": 10
+    },
+    "colors": [
+     {
+      "color": "GRAY MELANGE",
+      "code": "051",
+      "family": "gri",
+      "family_label": "Gri",
+      "image": "excel-gorsel/s1-satir6.png",
+      "share": {
+       "value": 45.5,
+       "low": null,
+       "high": null,
+       "basis": "kural varsayımı",
+       "how": "Gri ailesinin kural ağırlığı (1), modelin renkleri arasında normalize edildi. Ağırlıklar doğrulanmamış taslaktır; canlıda ERP satış payı kullanılır."
+      },
+      "qty": 210,
+      "qty_by_region": {
+       "TR": 210
+      },
+      "decision": "üret",
+      "decision_source": "sistem",
+      "reasons": []
+     },
+     {
+      "color": "NAVY",
+      "code": "303",
+      "family": "lacivert",
+      "family_label": "Lacivert",
+      "image": "excel-gorsel/s1-satir7.png",
+      "share": {
+       "value": 54.5,
+       "low": null,
+       "high": null,
+       "basis": "kural varsayımı",
+       "how": "Lacivert ailesinin kural ağırlığı (1.2), modelin renkleri arasında normalize edildi. Ağırlıklar doğrulanmamış taslaktır; canlıda ERP satış payı kullanılır."
+      },
+      "qty": 252,
+      "qty_by_region": {
+       "TR": 252
+      },
+      "decision": "üret",
+      "decision_source": "sistem",
+      "reasons": []
+     }
+    ],
+    "color_mix": {
+     "value": 1.008,
+     "low": null,
+     "high": null,
+     "basis": "kural varsayımı",
+     "how": "Renk karışımının gücü koleksiyon ortalamasına göre 1.02 kat; bunun %50'ı model talebine yansıtıldı (0.85-1.15 arası)."
+    },
+    "audience": {
+     "value": "kadin",
+     "label": "Kadın",
+     "source": "kullanıcı girdisi",
+     "reason": "Kullanıcı girdisi",
+     "child_gender": null,
+     "child_age_range": null,
+     "raw": "Kadın"
+    }
+   },
+   {
+    "sku": "U04",
+    "name": "Sutyen 3",
+    "category": "SUTYEN",
+    "image": null,
+    "unit_cost_usd": 7.680851063829787,
+    "planned_price_usd": null,
+    "declared_role": null,
+    "regions": [
+     {
+      "region": "TR",
+      "demand": 53,
+      "enthusiast_pct": 25.0,
+      "optimal_price": 22.9,
+      "range_low": 15.88,
+      "range_high": 22.9,
+      "margin_pct": 66.5,
+      "return_pct": 18.5,
+      "demand_units": 480,
+      "price_fit": null,
+      "ipp": 17.0,
+      "zones": [
+       {
+        "key": "too_cheap",
+        "label": "Çok ucuz",
+        "low": 0.0,
+        "high": 15.88
+       },
+       {
+        "key": "cheap",
+        "label": "Ucuz / avantajlı",
+        "low": 15.88,
+        "high": 17.0
+       },
+       {
+        "key": "ideal",
+        "label": "İdeal bölge",
+        "low": 17.0,
+        "high": 21.32
+       },
+       {
+        "key": "expensive",
+        "label": "Pahalı ama kabul edilebilir",
+        "low": 21.32,
+        "high": 22.9
+       },
+       {
+        "key": "too_expensive",
+        "label": "Çok pahalı",
+        "low": 22.9,
+        "high": null
+       }
+      ],
+      "net_margin_pct": 62.4,
+      "objections": [],
+      "confidence": "orta"
+     }
+    ],
+    "appeal": {
+     "value": 53.0,
+     "low": null,
+     "high": null,
+     "basis": "ajan",
+     "how": "Bölgelerdeki talep skorlarının ortalaması (0-100)."
+    },
+    "relative": {
+     "value": 0.25,
+     "low": null,
+     "high": null,
+     "basis": "ajan",
+     "how": "Aynı kişilerin bu ürüne verdiği puanın, o kişinin bütün ürünlere verdiği puanların ortalamasından farkı (standart sapma cinsinden). Kişinin cömertliği ya da titizliği elenir."
+    },
+    "rank": {
+     "value": 4.0,
+     "low": 2.0,
+     "high": 4.0,
+     "basis": "ajan",
+     "how": "Koleksiyon içi sıra. Aralık, panel kişileri yeniden örneklenince sıranın %80 olasılıkla düştüğü bant."
+    },
+    "enthusiast_pct": {
+     "value": 25.0,
+     "low": null,
+     "high": null,
+     "basis": "ajan",
+     "how": "Ürüne 70+ ilgi puanı veren kişi oranı."
+    },
+    "role": "çekirdek",
+    "role_why": "İlgi ortalamanın üstünde ve kişiler arasında görüş ayrılığı düşük: geniş kitleye güvenli",
+    "decision": "üret",
+    "decision_source": "sistem",
+    "decision_reasons": [
+     {
+      "text": "Talep skoru 53/100",
+      "basis": "ajan"
+     },
+     {
+      "text": "Önerilen fiyatta iade sonrası net marj %62.4",
+      "basis": "kural varsayımı"
+     },
+     {
+      "text": "Aynı müşteriyi daha güçlü Sutyen 2 ile paylaşıyor (kanibalizasyon)",
+      "basis": "ajan"
+     }
+    ],
+    "recommended_price": {
+     "value": 22.9,
+     "low": 15.88,
+     "high": 22.9,
+     "basis": "ajan",
+     "how": "TR bölgesinde (en çok talep beklenen bölge) panelin fiyat cevaplarından bulunan en kârlı fiyat; aralık panelin kabul edilebilir fiyat aralığı (Van Westendorp). Diğer bölgeler ürün ayrıntısında."
+    },
+    "net_margin": {
+     "value": 62.4,
+     "low": null,
+     "high": null,
+     "basis": "kural varsayımı",
+     "how": "Fiyattan iade (ve %8 ters lojistik) ile maliyet düşülerek; bölgelerin beklenen satışına göre ağırlıklı. Fiyat panelden, iade oranı kural varsayımı."
+    },
+    "recommended_qty": {
+     "value": 455.0,
+     "low": null,
+     "high": null,
+     "basis": "kural varsayımı",
+     "how": "Bütçenin satış hızına göre dağıtımı: talep panelden, kitle ve dönüşüm varsayımdan."
+    },
+    "qty_by_region": {
+     "TR": 455
+    },
+    "planned_qty": null,
+    "flags": [
+     "kanibalizasyon adayı"
+    ],
+    "failed_regions": [],
+    "showcase": {
+     "shown": 12,
+     "best": 6,
+     "worst": 2,
+     "score": 0.333,
+     "best_pct": 50.0,
+     "worst_pct": 16.7,
+     "rank": 2,
+     "single_rank": 4,
+     "together": 7
+    },
+    "colors": [
+     {
+      "color": "BURGUNDY",
+      "code": "020",
+      "family": "bordo",
+      "family_label": "Bordo / şarap",
+      "image": "excel-gorsel/s1-satir8.png",
+      "share": {
+       "value": 47.4,
+       "low": null,
+       "high": null,
+       "basis": "kural varsayımı",
+       "how": "Bordo / şarap ailesinin kural ağırlığı (0.9), modelin renkleri arasında normalize edildi. Ağırlıklar doğrulanmamış taslaktır; canlıda ERP satış payı kullanılır."
+      },
+      "qty": 216,
+      "qty_by_region": {
+       "TR": 216
+      },
+      "decision": "üret",
+      "decision_source": "sistem",
+      "reasons": []
+     },
+     {
+      "color": "GRAY MELANGE",
+      "code": "051",
+      "family": "gri",
+      "family_label": "Gri",
+      "image": "excel-gorsel/s1-satir9.png",
+      "share": {
+       "value": 52.6,
+       "low": null,
+       "high": null,
+       "basis": "kural varsayımı",
+       "how": "Gri ailesinin kural ağırlığı (1), modelin renkleri arasında normalize edildi. Ağırlıklar doğrulanmamış taslaktır; canlıda ERP satış payı kullanılır."
+      },
+      "qty": 239,
+      "qty_by_region": {
+       "TR": 239
+      },
+      "decision": "üret",
+      "decision_source": "sistem",
+      "reasons": []
+     }
+    ],
+    "color_mix": {
+     "value": 0.936,
+     "low": null,
+     "high": null,
+     "basis": "kural varsayımı",
+     "how": "Renk karışımının gücü koleksiyon ortalamasına göre 0.87 kat; bunun %50'ı model talebine yansıtıldı (0.85-1.15 arası)."
+    },
+    "audience": {
+     "value": "kadin",
+     "label": "Kadın",
+     "source": "kullanıcı girdisi",
+     "reason": "Kullanıcı girdisi",
+     "child_gender": null,
+     "child_age_range": null,
+     "raw": "Kadın"
+    }
+   },
+   {
+    "sku": "U05",
+    "name": "Sutyen 4",
+    "category": "SUTYEN",
+    "image": null,
+    "unit_cost_usd": 8.085106382978724,
+    "planned_price_usd": null,
+    "declared_role": null,
+    "regions": [
+     {
+      "region": "TR",
+      "demand": 44,
+      "enthusiast_pct": 8.3,
+      "optimal_price": 18.93,
+      "range_low": 14.97,
+      "range_high": 18.93,
+      "margin_pct": 57.3,
+      "return_pct": 21.5,
+      "demand_units": 336,
+      "price_fit": null,
+      "ipp": 15.6,
+      "zones": [
+       {
+        "key": "too_cheap",
+        "label": "Çok ucuz",
+        "low": 0.0,
+        "high": 14.93
+       },
+       {
+        "key": "cheap",
+        "label": "Ucuz / avantajlı",
+        "low": 14.93,
+        "high": 15.6
+       },
+       {
+        "key": "ideal",
+        "label": "İdeal bölge",
+        "low": 15.6,
+        "high": 17.88
+       },
+       {
+        "key": "expensive",
+        "label": "Pahalı ama kabul edilebilir",
+        "low": 17.88,
+        "high": 18.93
+       },
+       {
+        "key": "too_expensive",
+        "label": "Çok pahalı",
+        "low": 18.93,
+        "high": null
+       }
+      ],
+      "net_margin_pct": 51.6,
+      "objections": [],
+      "confidence": "orta"
+     }
+    ],
+    "appeal": {
+     "value": 44.0,
+     "low": null,
+     "high": null,
+     "basis": "ajan",
+     "how": "Bölgelerdeki talep skorlarının ortalaması (0-100)."
+    },
+    "relative": {
+     "value": -0.71,
+     "low": null,
+     "high": null,
+     "basis": "ajan",
+     "how": "Aynı kişilerin bu ürüne verdiği puanın, o kişinin bütün ürünlere verdiği puanların ortalamasından farkı (standart sapma cinsinden). Kişinin cömertliği ya da titizliği elenir."
+    },
+    "rank": {
+     "value": 6.0,
+     "low": 5.0,
+     "high": 7.0,
+     "basis": "ajan",
+     "how": "Koleksiyon içi sıra. Aralık, panel kişileri yeniden örneklenince sıranın %80 olasılıkla düştüğü bant."
+    },
+    "enthusiast_pct": {
+     "value": 8.3,
+     "low": null,
+     "high": null,
+     "basis": "ajan",
+     "how": "Ürüne 70+ ilgi puanı veren kişi oranı."
+    },
+    "role": "destek",
+    "role_why": "Tek tek sıra 6/7 (alt dilim) ama vitrinde sıra 3/7: sinyaller çelişiyor, riskli sayılmadı",
+    "decision": "azalt",
+    "decision_source": "sistem",
+    "decision_reasons": [
+     {
+      "text": "Talep skoru 44/100, temkinli üretim eşiği 50'nin altında",
+      "basis": "ajan"
+     },
+     {
+      "text": "Önerilen fiyatta iade sonrası net marj %51.6",
+      "basis": "kural varsayımı"
+     }
+    ],
+    "recommended_price": {
+     "value": 18.93,
+     "low": 14.97,
+     "high": 18.93,
+     "basis": "ajan",
+     "how": "TR bölgesinde (en çok talep beklenen bölge) panelin fiyat cevaplarından bulunan en kârlı fiyat; aralık panelin kabul edilebilir fiyat aralığı (Van Westendorp). Diğer bölgeler ürün ayrıntısında."
+    },
+    "net_margin": {
+     "value": 51.6,
+     "low": null,
+     "high": null,
+     "basis": "kural varsayımı",
+     "how": "Fiyattan iade (ve %8 ters lojistik) ile maliyet düşülerek; bölgelerin beklenen satışına göre ağırlıklı. Fiyat panelden, iade oranı kural varsayımı."
+    },
+    "recommended_qty": {
+     "value": 217.0,
+     "low": null,
+     "high": null,
+     "basis": "kural varsayımı",
+     "how": "Bütçenin satış hızına göre dağıtımı: talep panelden, kitle ve dönüşüm varsayımdan. Azalt kararında talebin %60'ı esas alındı."
+    },
+    "qty_by_region": {
+     "TR": 217
+    },
+    "planned_qty": null,
+    "flags": [
+     "kanibalizasyon adayı",
+     "vitrinde daha güçlü"
+    ],
+    "failed_regions": [],
+    "showcase": {
+     "shown": 12,
+     "best": 3,
+     "worst": 0,
+     "score": 0.25,
+     "best_pct": 25.0,
+     "worst_pct": 0.0,
+     "rank": 3,
+     "single_rank": 6,
+     "together": 3
+    },
+    "colors": [
+     {
+      "color": "BLACK",
+      "code": "012",
+      "family": "siyah",
+      "family_label": "Siyah",
+      "image": "excel-gorsel/s1-satir10.png",
+      "share": {
+       "value": 46.4,
+       "low": null,
+       "high": null,
+       "basis": "kural varsayımı",
+       "how": "Siyah ailesinin kural ağırlığı (1.6), modelin renkleri arasında normalize edildi. Ağırlıklar doğrulanmamış taslaktır; canlıda ERP satış payı kullanılır."
+      },
+      "qty": 217,
+      "qty_by_region": {
+       "TR": 217
+      },
+      "decision": "üret",
+      "decision_source": "sistem",
+      "reasons": []
+     },
+     {
+      "color": "PINK",
+      "code": "077",
+      "family": "pembe",
+      "family_label": "Pembe",
+      "image": "excel-gorsel/s1-satir11.png",
+      "share": {
+       "value": 21.7,
+       "low": null,
+       "high": null,
+       "basis": "kural varsayımı",
+       "how": "Pembe ailesinin kural ağırlığı (0.75), modelin renkleri arasında normalize edildi. Ağırlıklar doğrulanmamış taslaktır; canlıda ERP satış payı kullanılır."
+      },
+      "qty": 0,
+      "qty_by_region": {},
+      "decision": "üretme",
+      "decision_source": "sistem",
+      "reasons": [
+       {
+        "text": "Payına göre 47 adet düşüyordu; renk başına minimum 100 adedin altında. Adedi modelin diğer renklerine aktarıldı",
+        "basis": "kullanıcı girdisi"
+       }
+      ]
+     },
+     {
+      "color": "NUDE",
+      "code": "272",
+      "family": "bej",
+      "family_label": "Bej / ten",
+      "image": "excel-gorsel/s1-satir12.png",
+      "share": {
+       "value": 31.9,
+       "low": null,
+       "high": null,
+       "basis": "kural varsayımı",
+       "how": "Bej / ten ailesinin kural ağırlığı (1.1), modelin renkleri arasında normalize edildi. Ağırlıklar doğrulanmamış taslaktır; canlıda ERP satış payı kullanılır."
+      },
+      "qty": 0,
+      "qty_by_region": {},
+      "decision": "üretme",
+      "decision_source": "sistem",
+      "reasons": [
+       {
+        "text": "Payına göre 88 adet düşüyordu; renk başına minimum 100 adedin altında. Adedi modelin diğer renklerine aktarıldı",
+        "basis": "kullanıcı girdisi"
+       }
+      ]
+     }
+    ],
+    "color_mix": {
+     "value": 1.075,
+     "low": null,
+     "high": null,
+     "basis": "kural varsayımı",
+     "how": "Renk karışımının gücü koleksiyon ortalamasına göre 1.15 kat; bunun %50'ı model talebine yansıtıldı (0.85-1.15 arası)."
+    },
+    "audience": {
+     "value": "kadin",
+     "label": "Kadın",
+     "source": "kullanıcı girdisi",
+     "reason": "Kullanıcı girdisi",
+     "child_gender": null,
+     "child_age_range": null,
+     "raw": "Kadın"
+    }
+   },
+   {
+    "sku": "U06",
+    "name": "Kulot 1",
+    "category": "KULOT",
+    "image": null,
+    "unit_cost_usd": 2.7872340425531914,
+    "planned_price_usd": null,
+    "declared_role": null,
+    "regions": [
+     {
+      "region": "TR",
+      "demand": 59,
+      "enthusiast_pct": 12.5,
+      "optimal_price": 9.12,
+      "range_low": 6.97,
+      "range_high": 9.12,
+      "margin_pct": 69.4,
+      "return_pct": 18.5,
+      "demand_units": 494,
+      "price_fit": null,
+      "ipp": 7.34,
+      "zones": [
+       {
+        "key": "too_cheap",
+        "label": "Çok ucuz",
+        "low": 0.0,
+        "high": 6.97
+       },
+       {
+        "key": "cheap",
+        "label": "Ucuz / avantajlı",
+        "low": 6.97,
+        "high": 7.34
+       },
+       {
+        "key": "ideal",
+        "label": "İdeal bölge",
+        "low": 7.34,
+        "high": 8.19
+       },
+       {
+        "key": "expensive",
+        "label": "Pahalı ama kabul edilebilir",
+        "low": 8.19,
+        "high": 9.12
+       },
+       {
+        "key": "too_expensive",
+        "label": "Çok pahalı",
+        "low": 9.12,
+        "high": null
+       }
+      ],
+      "net_margin_pct": 65.5,
+      "objections": [],
+      "confidence": "orta"
+     }
+    ],
+    "appeal": {
+     "value": 59.0,
+     "low": null,
+     "high": null,
+     "basis": "ajan",
+     "how": "Bölgelerdeki talep skorlarının ortalaması (0-100)."
+    },
+    "relative": {
+     "value": 0.57,
+     "low": null,
+     "high": null,
+     "basis": "ajan",
+     "how": "Aynı kişilerin bu ürüne verdiği puanın, o kişinin bütün ürünlere verdiği puanların ortalamasından farkı (standart sapma cinsinden). Kişinin cömertliği ya da titizliği elenir."
+    },
+    "rank": {
+     "value": 2.0,
+     "low": 1.0,
+     "high": 4.0,
+     "basis": "ajan",
+     "how": "Koleksiyon içi sıra. Aralık, panel kişileri yeniden örneklenince sıranın %80 olasılıkla düştüğü bant."
+    },
+    "enthusiast_pct": {
+     "value": 12.5,
+     "low": null,
+     "high": null,
+     "basis": "ajan",
+     "how": "Ürüne 70+ ilgi puanı veren kişi oranı."
+    },
+    "role": "hero",
+    "role_why": "Koleksiyonun en üst %20'sinde (sıra 2/7), hevesli kişi oranı %12.5",
+    "decision": "üret",
+    "decision_source": "sistem",
+    "decision_reasons": [
+     {
+      "text": "Talep skoru 59/100",
+      "basis": "ajan"
+     },
+     {
+      "text": "Önerilen fiyatta iade sonrası net marj %65.5",
+      "basis": "kural varsayımı"
+     },
+     {
+      "text": "Vitrinde diğer ürünlerin yanında belirgin zayıflıyor (tek tek sıra 2, vitrin sırası 6)",
+      "basis": "ajan"
+     },
+     {
+      "text": "Koleksiyonun öne çıkan (hero) ürünü",
+      "basis": "kural varsayımı"
+     }
+    ],
+    "recommended_price": {
+     "value": 9.12,
+     "low": 6.97,
+     "high": 9.12,
+     "basis": "ajan",
+     "how": "TR bölgesinde (en çok talep beklenen bölge) panelin fiyat cevaplarından bulunan en kârlı fiyat; aralık panelin kabul edilebilir fiyat aralığı (Van Westendorp). Diğer bölgeler ürün ayrıntısında."
+    },
+    "net_margin": {
+     "value": 65.5,
+     "low": null,
+     "high": null,
+     "basis": "kural varsayımı",
+     "how": "Fiyattan iade (ve %8 ters lojistik) ile maliyet düşülerek; bölgelerin beklenen satışına göre ağırlıklı. Fiyat panelden, iade oranı kural varsayımı."
+    },
+    "recommended_qty": {
+     "value": 469.0,
+     "low": null,
+     "high": null,
+     "basis": "kural varsayımı",
+     "how": "Bütçenin satış hızına göre dağıtımı: talep panelden, kitle ve dönüşüm varsayımdan."
+    },
+    "qty_by_region": {
+     "TR": 469
+    },
+    "planned_qty": null,
+    "flags": [
+     "vitrinde daha zayıf"
+    ],
+    "failed_regions": [],
+    "showcase": {
+     "shown": 12,
+     "best": 0,
+     "worst": 5,
+     "score": -0.417,
+     "best_pct": 0.0,
+     "worst_pct": 41.7,
+     "rank": 6,
+     "single_rank": 2,
+     "together": 1
+    },
+    "colors": [
+     {
+      "color": "BURGUNDY",
+      "code": "020",
+      "family": "bordo",
+      "family_label": "Bordo / şarap",
+      "image": "excel-gorsel/s1-satir13.png",
+      "share": {
+       "value": 47.4,
+       "low": null,
+       "high": null,
+       "basis": "kural varsayımı",
+       "how": "Bordo / şarap ailesinin kural ağırlığı (0.9), modelin renkleri arasında normalize edildi. Ağırlıklar doğrulanmamış taslaktır; canlıda ERP satış payı kullanılır."
+      },
+      "qty": 222,
+      "qty_by_region": {
+       "TR": 222
+      },
+      "decision": "üret",
+      "decision_source": "sistem",
+      "reasons": []
+     },
+     {
+      "color": "GRAY MELANGE",
+      "code": "051",
+      "family": "gri",
+      "family_label": "Gri",
+      "image": "excel-gorsel/s1-satir14.png",
+      "share": {
+       "value": 52.6,
+       "low": null,
+       "high": null,
+       "basis": "kural varsayımı",
+       "how": "Gri ailesinin kural ağırlığı (1), modelin renkleri arasında normalize edildi. Ağırlıklar doğrulanmamış taslaktır; canlıda ERP satış payı kullanılır."
+      },
+      "qty": 247,
+      "qty_by_region": {
+       "TR": 247
+      },
+      "decision": "üret",
+      "decision_source": "sistem",
+      "reasons": []
+     }
+    ],
+    "color_mix": {
+     "value": 0.936,
+     "low": null,
+     "high": null,
+     "basis": "kural varsayımı",
+     "how": "Renk karışımının gücü koleksiyon ortalamasına göre 0.87 kat; bunun %50'ı model talebine yansıtıldı (0.85-1.15 arası)."
+    },
+    "audience": {
+     "value": "kadin",
+     "label": "Kadın",
+     "source": "kullanıcı girdisi",
+     "reason": "Kullanıcı girdisi",
+     "child_gender": null,
+     "child_age_range": null,
+     "raw": "Kadın"
+    }
+   },
+   {
+    "sku": "U07",
+    "name": "Kulot 2",
+    "category": "KULOT",
+    "image": null,
+    "unit_cost_usd": 4.680851063829787,
+    "planned_price_usd": null,
+    "declared_role": null,
+    "regions": [
+     {
+      "region": "TR",
+      "demand": 43,
+      "enthusiast_pct": 0.0,
+      "optimal_price": 15.21,
+      "range_low": 12.22,
+      "range_high": 16.61,
+      "margin_pct": 69.2,
+      "return_pct": 18.5,
+      "demand_units": 444,
+      "price_fit": null,
+      "ipp": 13.32,
+      "zones": [
+       {
+        "key": "too_cheap",
+        "label": "Çok ucuz",
+        "low": 0.0,
+        "high": 12.22
+       },
+       {
+        "key": "cheap",
+        "label": "Ucuz / avantajlı",
+        "low": 12.22,
+        "high": 13.32
+       },
+       {
+        "key": "ideal",
+        "label": "İdeal bölge",
+        "low": 13.32,
+        "high": 14.43
+       },
+       {
+        "key": "expensive",
+        "label": "Pahalı ama kabul edilebilir",
+        "low": 14.43,
+        "high": 16.61
+       },
+       {
+        "key": "too_expensive",
+        "label": "Çok pahalı",
+        "low": 16.61,
+        "high": null
+       }
+      ],
+      "net_margin_pct": 65.3,
+      "objections": [],
+      "confidence": "orta"
+     }
+    ],
+    "appeal": {
+     "value": 43.0,
+     "low": null,
+     "high": null,
+     "basis": "ajan",
+     "how": "Bölgelerdeki talep skorlarının ortalaması (0-100)."
+    },
+    "relative": {
+     "value": -0.79,
+     "low": null,
+     "high": null,
+     "basis": "ajan",
+     "how": "Aynı kişilerin bu ürüne verdiği puanın, o kişinin bütün ürünlere verdiği puanların ortalamasından farkı (standart sapma cinsinden). Kişinin cömertliği ya da titizliği elenir."
+    },
+    "rank": {
+     "value": 7.0,
+     "low": 6.0,
+     "high": 7.0,
+     "basis": "ajan",
+     "how": "Koleksiyon içi sıra. Aralık, panel kişileri yeniden örneklenince sıranın %80 olasılıkla düştüğü bant."
+    },
+    "enthusiast_pct": {
+     "value": 0.0,
+     "low": null,
+     "high": null,
+     "basis": "ajan",
+     "how": "Ürüne 70+ ilgi puanı veren kişi oranı."
+    },
+    "role": "riskli",
+    "role_why": "Koleksiyonun en alt %20'sinde (sıra 7/7)",
+    "decision": "üretme",
+    "decision_source": "sistem",
+    "decision_reasons": [
+     {
+      "text": "Koleksiyonun alt diliminde; müşterisini daha güçlü Sutyen 4 ile paylaşıyor ve panelde ona özgü yeni bir kişiye ulaşmıyor",
+      "basis": "ajan"
+     },
+     {
+      "text": "Talep skoru 43/100, temkinli üretim eşiği 50'nin altında",
+      "basis": "ajan"
+     },
+     {
+      "text": "Panelde ürüne hevesli kişi yok denecek kadar az (70+ puan veren %0); ortalama ilgi kararsız düzeyde",
+      "basis": "ajan"
+     },
+     {
+      "text": "Önerilen fiyatta iade sonrası net marj %65.3",
+      "basis": "kural varsayımı"
+     }
+    ],
+    "recommended_price": {
+     "value": 15.21,
+     "low": 12.22,
+     "high": 16.61,
+     "basis": "ajan",
+     "how": "TR bölgesinde (en çok talep beklenen bölge) panelin fiyat cevaplarından bulunan en kârlı fiyat; aralık panelin kabul edilebilir fiyat aralığı (Van Westendorp). Diğer bölgeler ürün ayrıntısında."
+    },
+    "net_margin": {
+     "value": 65.3,
+     "low": null,
+     "high": null,
+     "basis": "kural varsayımı",
+     "how": "Fiyattan iade (ve %8 ters lojistik) ile maliyet düşülerek; bölgelerin beklenen satışına göre ağırlıklı. Fiyat panelden, iade oranı kural varsayımı."
+    },
+    "recommended_qty": {
+     "value": 0.0,
+     "low": null,
+     "high": null,
+     "basis": "kural varsayımı",
+     "how": "Üretme kararı: bütçe dağıtımına alınmadı."
+    },
+    "qty_by_region": {},
+    "planned_qty": null,
+    "flags": [
+     "kanibalizasyon adayı"
+    ],
+    "failed_regions": [],
+    "showcase": {
+     "shown": 12,
+     "best": 1,
+     "worst": 7,
+     "score": -0.5,
+     "best_pct": 8.3,
+     "worst_pct": 58.3,
+     "rank": 7,
+     "single_rank": 7,
+     "together": 2
+    },
+    "colors": [
+     {
+      "color": "BLACK",
+      "code": "012",
+      "family": "siyah",
+      "family_label": "Siyah",
+      "image": "excel-gorsel/s1-satir15.png",
+      "share": {
+       "value": 46.4,
+       "low": null,
+       "high": null,
+       "basis": "kural varsayımı",
+       "how": "Siyah ailesinin kural ağırlığı (1.6), modelin renkleri arasında normalize edildi. Ağırlıklar doğrulanmamış taslaktır; canlıda ERP satış payı kullanılır."
+      },
+      "qty": 0,
+      "qty_by_region": {},
+      "decision": "üretme",
+      "decision_source": "sistem",
+      "reasons": [
+       {
+        "text": "Model üretilmiyor",
+        "basis": "kural varsayımı"
+       }
+      ]
+     },
+     {
+      "color": "PINK",
+      "code": "077",
+      "family": "pembe",
+      "family_label": "Pembe",
+      "image": "excel-gorsel/s1-satir16.png",
+      "share": {
+       "value": 21.7,
+       "low": null,
+       "high": null,
+       "basis": "kural varsayımı",
+       "how": "Pembe ailesinin kural ağırlığı (0.75), modelin renkleri arasında normalize edildi. Ağırlıklar doğrulanmamış taslaktır; canlıda ERP satış payı kullanılır."
+      },
+      "qty": 0,
+      "qty_by_region": {},
+      "decision": "üretme",
+      "decision_source": "sistem",
+      "reasons": [
+       {
+        "text": "Model üretilmiyor",
+        "basis": "kural varsayımı"
+       }
+      ]
+     },
+     {
+      "color": "NUDE",
+      "code": "272",
+      "family": "bej",
+      "family_label": "Bej / ten",
+      "image": "excel-gorsel/s1-satir17.png",
+      "share": {
+       "value": 31.9,
+       "low": null,
+       "high": null,
+       "basis": "kural varsayımı",
+       "how": "Bej / ten ailesinin kural ağırlığı (1.1), modelin renkleri arasında normalize edildi. Ağırlıklar doğrulanmamış taslaktır; canlıda ERP satış payı kullanılır."
+      },
+      "qty": 0,
+      "qty_by_region": {},
+      "decision": "üretme",
+      "decision_source": "sistem",
+      "reasons": [
+       {
+        "text": "Model üretilmiyor",
+        "basis": "kural varsayımı"
+       }
+      ]
+     }
+    ],
+    "color_mix": {
+     "value": 1.075,
+     "low": null,
+     "high": null,
+     "basis": "kural varsayımı",
+     "how": "Renk karışımının gücü koleksiyon ortalamasına göre 1.15 kat; bunun %50'ı model talebine yansıtıldı (0.85-1.15 arası)."
+    },
+    "audience": {
+     "value": "kadin",
+     "label": "Kadın",
+     "source": "kullanıcı girdisi",
+     "reason": "Kullanıcı girdisi",
+     "child_gender": null,
+     "child_age_range": null,
+     "raw": "Kadın"
+    }
+   }
+  ],
+  "summary": {
+   "n_items": 7,
+   "n_evaluated": 7,
+   "n_failed": 0,
+   "reach": {
+    "value": 50.0,
+    "low": null,
+    "high": null,
+    "basis": "ajan",
+    "how": "Paneldeki 12 kişiden en az bir ürüne 70+ ilgi puanı veren kişilerin oranı."
+   },
+   "reach_by_region": {
+    "TR": 50.0
+   },
+   "reach_curve": [
+    {
+     "k": 1,
+     "sku": "U01",
+     "name": "Body 1",
+     "reach_pct": 50.0,
+     "added_pct": 50.0
+    }
+   ],
+   "roles": {
+    "hero": 2,
+    "çekirdek": 1,
+    "tamamlayıcı": 1,
+    "destek": 2,
+    "riskli": 1,
+    "belirsiz": 0
+   },
+   "decisions": {
+    "üret": 4,
+    "azalt": 2,
+    "üretme": 1
+   },
+   "mean_appeal": {
+    "value": 52.3,
+    "low": null,
+    "high": null,
+    "basis": "ajan",
+    "how": "Ürünlerin talep skoru ortalaması."
+   },
+   "categories": [
+    {
+     "category": "BODY",
+     "count": 1,
+     "roles": {
+      "hero": 1,
+      "çekirdek": 0,
+      "tamamlayıcı": 0,
+      "destek": 0,
+      "riskli": 0
+     },
+     "price_min": 43.28,
+     "price_max": 43.28,
+     "mean_appeal": 63.0,
+     "in_zone": 0,
+     "out_zone": 0
+    },
+    {
+     "category": "KULOT",
+     "count": 2,
+     "roles": {
+      "hero": 1,
+      "çekirdek": 0,
+      "tamamlayıcı": 0,
+      "destek": 0,
+      "riskli": 1
+     },
+     "price_min": 9.12,
+     "price_max": 15.21,
+     "mean_appeal": 51.0,
+     "in_zone": 0,
+     "out_zone": 0
+    },
+    {
+     "category": "SUTYEN",
+     "count": 4,
+     "roles": {
+      "hero": 0,
+      "çekirdek": 1,
+      "tamamlayıcı": 1,
+      "destek": 2,
+      "riskli": 0
+     },
+     "price_min": 18.93,
+     "price_max": 26.86,
+     "mean_appeal": 50.2,
+     "in_zone": 0,
+     "out_zone": 0
+    }
+   ],
+   "cannibal_pairs": [
+    {
+     "a": "U03",
+     "b": "U04",
+     "category": "SUTYEN",
+     "overlap_pct": 100.0,
+     "why": "İkisini de beğenen kişilerin örtüşmesi %100, aynı kategori ve fiyatlar birbirine yakın"
+    },
+    {
+     "a": "U05",
+     "b": "U07",
+     "category": "SUTYEN",
+     "overlap_pct": 25.0,
+     "why": "Vitrinde 3 kişi 'ikisinden birini alırım' dedi"
+    }
+   ],
+   "budget_total_usd": 106382.98,
+   "budget_used_usd": 25446.64,
+   "total_qty": 2408,
+   "expected_units": {
+    "value": 2201.0,
+    "low": null,
+    "high": null,
+    "basis": "kural varsayımı",
+    "how": "120 günde beklenen satış (orta senaryo), önerilen adetlerle sınırlı."
+   },
+   "actions": [
+    {
+     "kind": "azalt",
+     "text": "Sutyen 1: Talep skoru 48/100, temkinli üretim eşiği 50'nin altında. Daha az adetle başlayın (talebin %60'ı esas alındı), satışa göre tekrar sipariş verin.",
+     "skus": [
+      "U02"
+     ],
+     "basis": "ajan"
+    },
+    {
+     "kind": "azalt",
+     "text": "Sutyen 4: Talep skoru 44/100, temkinli üretim eşiği 50'nin altında. Daha az adetle başlayın (talebin %60'ı esas alındı), satışa göre tekrar sipariş verin.",
+     "skus": [
+      "U05"
+     ],
+     "basis": "ajan"
+    },
+    {
+     "kind": "üretme",
+     "text": "Kulot 2: Koleksiyonun alt diliminde; müşterisini daha güçlü Sutyen 4 ile paylaşıyor ve panelde ona özgü yeni bir kişiye ulaşmıyor. Üretmeyin ya da tasarımı/maliyeti gözden geçirin.",
+     "skus": [
+      "U07"
+     ],
+     "basis": "ajan"
+    },
+    {
+     "kind": "kanibalizasyon",
+     "text": "Sutyen 2 ile Sutyen 3 aynı müşteriyi paylaşıyor (örtüşme %100). Birini çıkarmayı ya da fiyat/renkle ayrıştırmayı düşünün.",
+     "skus": [
+      "U03",
+      "U04"
+     ],
+     "basis": "ajan"
+    },
+    {
+     "kind": "kanibalizasyon",
+     "text": "Sutyen 4 ile Kulot 2 aynı müşteriyi paylaşıyor (örtüşme %25). Birini çıkarmayı ya da fiyat/renkle ayrıştırmayı düşünün.",
+     "skus": [
+      "U05",
+      "U07"
+     ],
+     "basis": "ajan"
+    },
+    {
+     "kind": "kombin",
+     "text": "Sutyen 2 ile Sutyen 3 vitrinde 5 kez birlikte seçildi (yan yana gösterildikleri grupların %41.7'si). Birlikte sergileyin, kombin/set önerisi düşünün.",
+     "skus": [
+      "U03",
+      "U04"
+     ],
+     "basis": "ajan"
+    },
+    {
+     "kind": "kombin",
+     "text": "Sutyen 1 ile Sutyen 2 vitrinde 3 kez birlikte seçildi (yan yana gösterildikleri grupların %25'si). Birlikte sergileyin, kombin/set önerisi düşünün.",
+     "skus": [
+      "U02",
+      "U03"
+     ],
+     "basis": "ajan"
+    },
+    {
+     "kind": "kombin",
+     "text": "Body 1 ile Sutyen 1 vitrinde 2 kez birlikte seçildi (yan yana gösterildikleri grupların %16.7'si). Birlikte sergileyin, kombin/set önerisi düşünün.",
+     "skus": [
+      "U01",
+      "U02"
+     ],
+     "basis": "ajan"
+    },
+    {
+     "kind": "vitrin",
+     "text": "Body 1: tek başına sıra 1, koleksiyonun içinde sıra 4. Yanındaki ürünlere kaybediyor; benzer ürünle aynı yerde sergilemeyin.",
+     "skus": [
+      "U01"
+     ],
+     "basis": "ajan"
+    },
+    {
+     "kind": "vitrin",
+     "text": "Sutyen 4: tek başına sıra 6, koleksiyonun içinde sıra 3. Diğer ürünlerin yanında daha çok seçiliyor; vitrinde ve kampanyada öne alın.",
+     "skus": [
+      "U05"
+     ],
+     "basis": "ajan"
+    },
+    {
+     "kind": "vitrin",
+     "text": "Kulot 1: tek başına sıra 2, koleksiyonun içinde sıra 6. Yanındaki ürünlere kaybediyor; benzer ürünle aynı yerde sergilemeyin.",
+     "skus": [
+      "U06"
+     ],
+     "basis": "ajan"
+    },
+    {
+     "kind": "eksik",
+     "text": "SUTYEN kategorisinde öne çıkan (hero) ürün yok ve ilgi koleksiyon ortalamasının altında.",
+     "skus": [],
+     "basis": "kural varsayımı"
+    },
+    {
+     "kind": "renk",
+     "text": "Renk başına minimum 100 adedin altında kalan 2 renk üretilmesin, adedi aynı modelin diğer renklerine aktarıldı (Sutyen 4: PINK; Sutyen 4: NUDE).",
+     "skus": [
+      "U05"
+     ],
+     "basis": "kullanıcı girdisi"
+    }
+   ]
+  },
+  "notes": [
+   "Renk payları kural varsayımıdır (renk ailesi ağırlıkları, doğrulanmamış taslak: panel_data/renk/renk_aileleri.csv). Canlı kullanımda ERP'deki geçmiş renk satışları (RENK_ERP_DOSYASI) kullanılır; ekran aynı kalır. Renk başına minimum adet 100 (kullanıcı girdisi). Renk karışımı model adedini en fazla ±%15 değiştirir; panel renkleri yalnızca yazı olarak gördüğü için bu etki ayrıca eklenir.",
+   "Üretim kararı eşikleri kural varsayımıdır: talep skoru 35 altı ya da önerilen fiyatta iade sonrası net marj %15 altı 'üretme'; talep 50 altı, marj %30 altı, koleksiyon içi zayıflık ya da kanibalizasyon ya da bir bölgede talep 35 altı 'azalt' (bütçeye talebin %60'ı ile girer). Kararı ürün satırından elle değiştirebilirsiniz.",
+   "Panel bir tüketici anketi değil, dil modelinin persona ve güncel bağlamla yaptığı tahmindir; en güvenilir kullanımı koleksiyon içi göreli karşılaştırmadır.",
+   "Roller, erişim ve kanibalizasyon eşikleri kural varsayımıdır (hevesli = 70+ ilgi; örtüşme %60+, fiyat farkı %25 içinde).",
+   "Önerilen satış fiyatı panelin fiyat cevaplarından (Van Westendorp) gelir; ancak panele sorulan fiyat merdiveni maliyet × marka çarpanı etrafında kurulur, bu yüzden fiyat bu merkeze çekilir (bkz. güven kontrolü). Excel'den satış fiyatı okunmaz. Fiyat sekmesinde denenen fiyat yalnızca fiyat uyumunu, marjı ve kararı yeniden hesaplar, panel cevaplarını değiştirmez.",
+   "Önerilen adetlerin mutlak büyüklüğü varsayımdır: bölge başına 120 günde erişilebilir kitle (ör. EU 100.000, TR 50.000 kişi, marka bilinirliğiyle ölçeklenir) × ilgi × %2 dönüşüm tavanı × fiyat kabulü. ERP'deki benzer ürün satışlarıyla kalibre edilene kadar adetler yalnızca ürünler arası oran olarak okunmalı."
+  ],
+  "data_basis": {
+   "persona_version": "v1",
+   "persona_as_of": "2026-10-26",
+   "context_version": "2026-10-taslak",
+   "context_as_of": "2026-10-26",
+   "freshness_warnings": [
+    "TR: bağlam paketi (2026-10-taslak) doğrulanmamış taslak; enflasyon, kur, trend ve rakip fiyatı alanlarını kaynağıyla doldurup verified=true yap.",
+    "TR: persona seti (v1) doğrulanmamış taslak; segment ağırlıkları gerçek müşteri verisiyle (ERP, CRM, pazar araştırması) güncellenmeli.",
+    "TR: hedef kitle dağılımı (v1) doğrulanmamış kural varsayımı; ERP/CRM alıcı verisiyle güncellenmeli."
+   ],
+   "calibration": {
+    "demand_scale": 1.0,
+    "price_scale": 1.0,
+    "sensitivity_scale": 1.0,
+    "trend_scale": 1.0,
+    "n_obs": 0
+   },
+   "peer_round": false,
+   "segments": {
+    "Kentli genç profesyonel": 3,
+    "Sabit gelirli": 3,
+    "Üniversite öğrencisi": 2,
+    "Aile bütçesi": 2,
+    "Markalı ürün alıcısı": 2
+   },
+   "elapsed_s": 257.7
+  },
+  "panel_shared": true,
+  "brand_profile": {
+   "name": "Marka",
+   "positioning": "Marka kendini pazarda 'uzman iç giyim markası' olarak konumlandırır, kalite ve konfor odaklı, ulaşılabilecek lüks sunar.",
+   "price_tier": "upper_mass",
+   "price_multiple": 3.0,
+   "price_sensitivity": 0.7,
+   "brand_pull": 85,
+   "typical_customer": "Kendine değer veren, uzun ömürlü ve kaliteli ürünleri tercih eden genç ve orta yaş kadınlardır.",
+   "margin_norm_pct": 40.0,
+   "regional_strength": {
+    "EU": 20,
+    "MENA": 15,
+    "CIS": 10,
+    "US": 5,
+    "TR": 80
+   },
+   "known_brand": true,
+   "confidence": "high",
+   "source": "user_notes",
+   "edited": false,
+   "warning": "Bu profil modelin genel bilgisinden üretildi; doğrulanmış veri değildir."
+  },
+  "brand_effect": {
+   "name": "Marka",
+   "tier": "üst-kitlesel",
+   "price_multiple": 3.0,
+   "neutral_multiple": 2.7,
+   "price_level_pct": 11.1,
+   "brand_pull": 85,
+   "price_sensitivity": 0.7,
+   "regional_strength": {
+    "TR": 80
+   },
+   "demand_points": {
+    "TR": 15.8
+   },
+   "source": "user_notes",
+   "confidence": "high",
+   "edited": false,
+   "basis": "kullanıcı girdisi",
+   "lines": [
+    "Panele sorulan fiyat merdiveni maliyet × 3 üzerinden kuruldu. Marka yokken kullanılan × 2.7'e göre fiyat seviyesi %+11.1.",
+    "Panel her üründe markayı 'üst-kitlesel' segment ve bölgedeki bilinirliğiyle (TR 80/100) görerek cevap verdi; marka değeri kişilerin kabul ettiği fiyat aralığını doğrudan etkiler.",
+    "Fiyat duyarlılığı 0.70 ve çekim gücü 85/100: fiyat aralığının genişliği ve panel yeterli fiyat cevabı vermezse kullanılan yedek eşikler bunlardan hesaplanır (kural varsayımı)."
+   ],
+   "warning": "Bu profil modelin genel bilgisinden üretildi; doğrulanmış veri değildir."
+  },
+  "showcase": {
+   "n_answers": 12,
+   "n_failed": 0,
+   "n_persons": 12,
+   "block_size": 7,
+   "by_region": {
+    "TR": 12
+   },
+   "together_pairs": [
+    {
+     "a": "U03",
+     "b": "U04",
+     "count": 5,
+     "pct": 41.7
+    },
+    {
+     "a": "U02",
+     "b": "U03",
+     "count": 3,
+     "pct": 25.0
+    },
+    {
+     "a": "U01",
+     "b": "U02",
+     "count": 2,
+     "pct": 16.7
+    },
+    {
+     "a": "U03",
+     "b": "U05",
+     "count": 2,
+     "pct": 16.7
+    }
+   ],
+   "substitute_pairs": [
+    {
+     "a": "U05",
+     "b": "U07",
+     "count": 3,
+     "pct": 25.0
+    },
+    {
+     "a": "U02",
+     "b": "U05",
+     "count": 2,
+     "pct": 16.7
+    }
+   ],
+   "position": [
+    {
+     "position": "ilk",
+     "pick_pct": 6.9,
+     "expected_pct": 14.3
+    },
+    {
+     "position": "orta",
+     "pick_pct": 86.2,
+     "expected_pct": 71.4
+    },
+    {
+     "position": "son",
+     "pick_pct": 6.9,
+     "expected_pct": 14.3
+    }
+   ],
+   "position_warning": null,
+   "mean_n_buy": 2.83,
+   "comments": [],
+   "agreement_pct": 25.0
+  },
+  "color_plan": {
+   "source": "kural varsayımı",
+   "source_note": "Renk payları kural varsayımıdır (renk ailesi ağırlıkları, doğrulanmamış taslak: panel_data/renk/renk_aileleri.csv). Canlı kullanımda ERP'deki geçmiş renk satışları (RENK_ERP_DOSYASI) kullanılır; ekran aynı kalır.",
+   "min_qty": 100,
+   "min_qty_basis": "kullanıcı girdisi",
+   "mix_effect": true,
+   "n_colors": 16,
+   "n_dropped": 2,
+   "families": [
+    {
+     "family": "gri",
+     "label": "Gri",
+     "n_models": 3,
+     "n_colors": 3,
+     "qty": 696,
+     "share_pct": 28.9,
+     "by_region": {
+      "TR": 696
+     },
+     "skus": [
+      "U03",
+      "U04",
+      "U06"
+     ]
+    },
+    {
+     "family": "siyah",
+     "label": "Siyah",
+     "n_models": 3,
+     "n_colors": 3,
+     "qty": 474,
+     "share_pct": 19.7,
+     "by_region": {
+      "TR": 474
+     },
+     "skus": [
+      "U01",
+      "U05",
+      "U07"
+     ]
+    },
+    {
+     "family": "bordo",
+     "label": "Bordo / şarap",
+     "n_models": 2,
+     "n_colors": 2,
+     "qty": 438,
+     "share_pct": 18.2,
+     "by_region": {
+      "TR": 438
+     },
+     "skus": [
+      "U04",
+      "U06"
+     ]
+    },
+    {
+     "family": "lacivert",
+     "label": "Lacivert",
+     "n_models": 1,
+     "n_colors": 1,
+     "qty": 252,
+     "share_pct": 10.5,
+     "by_region": {
+      "TR": 252
+     },
+     "skus": [
+      "U03"
+     ]
+    },
+    {
+     "family": "desenli",
+     "label": "Desenli / çok renk",
+     "n_models": 1,
+     "n_colors": 1,
+     "qty": 196,
+     "share_pct": 8.1,
+     "by_region": {
+      "TR": 196
+     },
+     "skus": [
+      "U02"
+     ]
+    },
+    {
+     "family": "beyaz",
+     "label": "Beyaz / ekru",
+     "n_models": 1,
+     "n_colors": 1,
+     "qty": 192,
+     "share_pct": 8.0,
+     "by_region": {
+      "TR": 192
+     },
+     "skus": [
+      "U01"
+     ]
+    },
+    {
+     "family": "kahve",
+     "label": "Kahverengi",
+     "n_models": 1,
+     "n_colors": 1,
+     "qty": 160,
+     "share_pct": 6.6,
+     "by_region": {
+      "TR": 160
+     },
+     "skus": [
+      "U01"
+     ]
+    },
+    {
+     "family": "pembe",
+     "label": "Pembe",
+     "n_models": 2,
+     "n_colors": 2,
+     "qty": 0,
+     "share_pct": 0.0,
+     "by_region": {},
+     "skus": [
+      "U05",
+      "U07"
+     ]
+    },
+    {
+     "family": "bej",
+     "label": "Bej / ten",
+     "n_models": 2,
+     "n_colors": 2,
+     "qty": 0,
+     "share_pct": 0.0,
+     "by_region": {},
+     "skus": [
+      "U05",
+      "U07"
+     ]
+    }
+   ],
+   "weights": {
+    "siyah": 1.6,
+    "lacivert": 1.2,
+    "beyaz": 1.2,
+    "bej": 1.1,
+    "gri": 1.0,
+    "kahve": 1.0,
+    "bordo": 0.9,
+    "kirmizi": 0.8,
+    "pembe": 0.75,
+    "mavi": 0.85,
+    "yesil": 0.8,
+    "mor": 0.7,
+    "sari": 0.65,
+    "desenli": 0.8,
+    "diger": 1.0
+   }
+  }
+ },
+ "sonuc_beklenen": [
+  {
+   "kural": "kategori_disi_eslesme",
+   "seviye": "hata"
+  },
+  {
+   "kural": "kucuk_orneklem",
+   "seviye": "uyarı"
+  }
+ ],
+ "girdi": {
+  "collection": {
+   "id": "20261112-9624f603",
+   "meta": {
+    "kind": "koleksiyon",
+    "name": "Vaka koleksiyonu",
+    "brand": "Marka",
+    "brand_notes": "",
+    "brand_profile": null,
+    "season": "KIŞ 2027",
+    "total_budget": 5000000.0,
+    "currency": "TRY",
+    "target_regions": [
+     "TR"
+    ],
+    "channel": "online",
+    "launch_month": null,
+    "usd_try_rate": 47.0,
+    "notes": "",
+    "color_min_qty": 100
+   },
+   "items": [
+    {
+     "sku": "U01",
+     "name": "Body 1",
+     "category": "BODY",
+     "subcategory": "BODY",
+     "technical_specs": "",
+     "unit_cost": 1013.0,
+     "planned_price": null,
+     "images": [
+      "0.jpg",
+      "1.jpg",
+      "2.jpg"
+     ],
+     "colors": [
+      "BLACK",
+      "BROWN",
+      "ECRU"
+     ],
+     "sizes": "S, M, L, XL",
+     "planned_qty": null,
+     "declared_role": null,
+     "outfit_group": "",
+     "launch_month": null,
+     "moq": null,
+     "attributes": {
+      "Renk kodu": "012, 019, 036",
+      "Alt Kategori": "TRENDY",
+      "Sezon": "KIŞ",
+      "Yıl": "2027",
+      "Kumaş tipi": "ÖRME"
+     },
+     "target_audience": "Kadın",
+     "color_images": {}
+    },
+    {
+     "sku": "U02",
+     "name": "Sutyen 1",
+     "category": "SUTYEN",
+     "subcategory": "WIRE BRA",
+     "technical_specs": "",
+     "unit_cost": 483.0,
+     "planned_price": null,
+     "images": [
+      "0.jpg"
+     ],
+     "colors": [
+      "COLOURFUL PRINT"
+     ],
+     "sizes": "75, 80, 85, 90",
+     "planned_qty": null,
+     "declared_role": null,
+     "outfit_group": "",
+     "launch_month": null,
+     "moq": null,
+     "attributes": {
+      "Renk kodu": "995",
+      "Alt Kategori": "TRENDY",
+      "Sezon": "KIŞ",
+      "Yıl": "2027",
+      "Kumaş tipi": "ÖRME"
+     },
+     "target_audience": "Kadın",
+     "color_images": {}
+    },
+    {
+     "sku": "U03",
+     "name": "Sutyen 2",
+     "category": "SUTYEN",
+     "subcategory": "PUSH UP",
+     "technical_specs": "",
+     "unit_cost": 381.5,
+     "planned_price": null,
+     "images": [
+      "0.jpg",
+      "1.jpg"
+     ],
+     "colors": [
+      "GRAY MELANGE",
+      "NAVY"
+     ],
+     "sizes": "70, 75, 80, 85",
+     "planned_qty": null,
+     "declared_role": null,
+     "outfit_group": "",
+     "launch_month": null,
+     "moq": null,
+     "attributes": {
+      "Renk kodu": "051, 303",
+      "Alt Kategori": "TRENDY",
+      "Sezon": "KIŞ",
+      "Yıl": "2027",
+      "Kumaş tipi": "ÖRME"
+     },
+     "target_audience": "Kadın",
+     "color_images": {}
+    },
+    {
+     "sku": "U04",
+     "name": "Sutyen 3",
+     "category": "SUTYEN",
+     "subcategory": "ÜÇGEN BRA",
+     "technical_specs": "",
+     "unit_cost": 361.0,
+     "planned_price": null,
+     "images": [
+      "0.jpg",
+      "1.jpg"
+     ],
+     "colors": [
+      "BURGUNDY",
+      "GRAY MELANGE"
+     ],
+     "sizes": "75, 80, 85",
+     "planned_qty": null,
+     "declared_role": null,
+     "outfit_group": "",
+     "launch_month": null,
+     "moq": null,
+     "attributes": {
+      "Renk kodu": "020, 051",
+      "Alt Kategori": "TRENDY",
+      "Sezon": "KIŞ",
+      "Yıl": "2027",
+      "Kumaş tipi": "ÖRME"
+     },
+     "target_audience": "Kadın",
+     "color_images": {}
+    },
+    {
+     "sku": "U05",
+     "name": "Sutyen 4",
+     "category": "SUTYEN",
+     "subcategory": "CROP/BRALET",
+     "technical_specs": "",
+     "unit_cost": 380.0,
+     "planned_price": null,
+     "images": [
+      "0.jpg",
+      "1.jpg",
+      "2.jpg"
+     ],
+     "colors": [
+      "BLACK",
+      "PINK",
+      "NUDE"
+     ],
+     "sizes": "XS, S, M, L, XL",
+     "planned_qty": null,
+     "declared_role": null,
+     "outfit_group": "",
+     "launch_month": null,
+     "moq": null,
+     "attributes": {
+      "Renk kodu": "012, 077, 272",
+      "Alt Kategori": "TRENDY",
+      "Sezon": "KIŞ",
+      "Yıl": "2027",
+      "Kumaş tipi": "ÖRME"
+     },
+     "target_audience": "Kadın",
+     "color_images": {}
+    },
+    {
+     "sku": "U06",
+     "name": "Kulot 1",
+     "category": "KULOT",
+     "subcategory": "SLIP",
+     "technical_specs": "",
+     "unit_cost": 131.0,
+     "planned_price": null,
+     "images": [
+      "0.jpg",
+      "1.jpg"
+     ],
+     "colors": [
+      "BURGUNDY",
+      "GRAY MELANGE"
+     ],
+     "sizes": "S, M, L, XL",
+     "planned_qty": null,
+     "declared_role": null,
+     "outfit_group": "",
+     "launch_month": null,
+     "moq": null,
+     "attributes": {
+      "Renk kodu": "020, 051",
+      "Alt Kategori": "TRENDY",
+      "Sezon": "KIŞ",
+      "Yıl": "2027",
+      "Kumaş tipi": "ÖRME"
+     },
+     "target_audience": "Kadın",
+     "color_images": {}
+    },
+    {
+     "sku": "U07",
+     "name": "Kulot 2",
+     "category": "KULOT",
+     "subcategory": "SLIP",
+     "technical_specs": "",
+     "unit_cost": 220.0,
+     "planned_price": null,
+     "images": [
+      "0.jpg",
+      "1.jpg",
+      "2.jpg"
+     ],
+     "colors": [
+      "BLACK",
+      "PINK",
+      "NUDE"
+     ],
+     "sizes": "XS, S, M, L, XL",
+     "planned_qty": null,
+     "declared_role": null,
+     "outfit_group": "",
+     "launch_month": null,
+     "moq": null,
+     "attributes": {
+      "Renk kodu": "012, 077, 272",
+      "Alt Kategori": "TRENDY",
+      "Sezon": "KIŞ",
+      "Yıl": "2027",
+      "Kumaş tipi": "ÖRME"
+     },
+     "target_audience": "Kadın",
+     "color_images": {}
+    }
+   ],
+   "created": 1794495183.025114,
+   "status": "bitti"
+  },
+  "results": {
+   "U01": {
+    "panel_seed": "koleksiyon:20261112-9624f603",
+    "response": {
+     "regional_breakdown": [
+      {
+       "region": "TR",
+       "demand_score_100": 63,
+       "optimal_sale_price": "43.28",
+       "recommended_production_qty": 549,
+       "estimated_margin_percentage": 50.2,
+       "van_westendorp": {
+        "optimal_price_point": "39.89",
+        "indifference_price_point": "37.43",
+        "acceptable_range_low": "35.48",
+        "acceptable_range_high": "43.28",
+        "zones": [
+         {
+          "key": "too_cheap",
+          "label": "Çok ucuz",
+          "low": "0.00",
+          "high": "35.48",
+          "description": "Çoğu ajan bu fiyatta kaliteden şüphelenir."
+         },
+         {
+          "key": "cheap",
+          "label": "Ucuz / avantajlı",
+          "low": "35.48",
+          "high": "37.43",
+          "description": "Kabul edilebilir ama kâr bırakılıyor; satışı hızlandırır."
+         },
+         {
+          "key": "ideal",
+          "label": "İdeal bölge",
+          "low": "37.43",
+          "high": "39.89",
+          "description": "Ucuz-pahalı dengesi; en az direnç."
+         },
+         {
+          "key": "expensive",
+          "label": "Pahalı ama kabul edilebilir",
+          "low": "39.89",
+          "high": "43.28",
+          "description": "Marjı yüksek, satış hızı düşer; kararsız müşteri artar."
+         },
+         {
+          "key": "too_expensive",
+          "label": "Çok pahalı",
+          "low": "43.28",
+          "high": null,
+          "description": "Çoğu ajan bu fiyatın üstünde almaz."
+         }
+        ],
+        "quality": "high",
+        "quality_note": "12 ajan: örneklem makul; yine de gerçek müşteri verisi değil, simülasyon çıktısıdır."
+       },
+       "allocation": {
+        "objective": "balanced",
+        "demand_units": 548,
+        "net_demand_units": 515,
+        "units_before": 705,
+        "units": 549,
+        "sold_before": 548,
+        "sold": 548,
+        "leftover_before": 157,
+        "leftover": 1,
+        "unmet_before": 0,
+        "unmet": 0,
+        "sell_through_before_pct": 77.7,
+        "sell_through_pct": 99.8,
+        "why": "TR için beklenen 120 günlük talep yaklaşık 548 adet (iade sonrası kalıcı satış ~515). Talebi karşılayacak kadar 549 adet ayrıldı; fazlası stok riski yaratırdı. Eski kâr ağırlıklı dağıtım 705 adet verirdi: ~157 adet stok kalırdı. Hedef: dengeli (satış hızı)."
+       },
+       "returns": {
+        "rate_pct": 20.0,
+        "low_pct": 15.0,
+        "high_pct": 26.0,
+        "base_pct": 17.0,
+        "drivers": [
+         {
+          "label": "Bölge taban oranı (TR)",
+          "points": 0.0,
+          "detail": "Taban %17. Kolay iade ve değişim beklentisi yüksek; kapıda ödeme payı var.",
+          "basis": "kural varsayımı"
+         },
+         {
+          "label": "Vücuda oturan kalıp",
+          "points": 3.5,
+          "detail": "Dar/oturan kesimde beden ve kalıp uyumsuzluğu iade nedenlerinin başında gelir.",
+          "basis": "kural varsayımı"
+         },
+         {
+          "label": "Bölgesel beden uyumu",
+          "points": 1.0,
+          "detail": "Bölgesel kalıp beklentisi farkı küçük bir ek beden riski yaratır.",
+          "basis": "kural varsayımı"
+         },
+         {
+          "label": "Esnek kumaş",
+          "points": -1.5,
+          "detail": "Esneyen kumaş küçük beden farklarını tolere eder.",
+          "basis": "kural varsayımı"
+         }
+        ],
+        "gross_margin_pct": 50.2,
+        "net_margin_pct": 44.5,
+        "return_cost_per_sale": "1.99",
+        "net_qty_if_sold_out": 439,
+        "basis": "kural tabanlı varsayım (ajan cevabı değil)"
+       },
+       "confidence": {
+        "level": "orta",
+        "reasons": [
+         "2 ajanın bazı fiyat eşikleri tahmin edildi.",
+         "Panel gerçek satış verisiyle kalibre edilmedi (en fazla 'orta' güven).",
+         "Persona seti ya da bağlam paketi doğrulanmamış taslak.",
+         "Hedef kitle büyüklüğü varsayım (satış tahmini buna bağlı)."
+        ]
+       },
+       "raw_answers": [
+        {
+         "agent": 1,
+         "status": "json",
+         "segment": "Kentli genç profesyonel",
+         "interest": 75.0,
+         "who": "Kadın, 27",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 2,
+         "status": "json",
+         "segment": "Kentli genç profesyonel",
+         "interest": 55.0,
+         "who": "Erkek, 27 (yakını için)",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 3,
+         "status": "json",
+         "segment": "Kentli genç profesyonel",
+         "interest": 78.0,
+         "who": "Kadın, 28",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 4,
+         "status": "json",
+         "segment": "Sabit gelirli",
+         "interest": 55.0,
+         "who": "Kadın, 35",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 5,
+         "status": "json",
+         "segment": "Sabit gelirli",
+         "interest": 55.0,
+         "who": "Kadın, 40",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 6,
+         "status": "json",
+         "segment": "Sabit gelirli",
+         "interest": 45.0,
+         "who": "Kadın, 43",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 7,
+         "status": "json",
+         "segment": "Üniversite öğrencisi",
+         "interest": 75.0,
+         "who": "Kadın, 22",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 8,
+         "status": "json",
+         "segment": "Üniversite öğrencisi",
+         "interest": 82.0,
+         "who": "Kadın, 23",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 9,
+         "status": "json",
+         "segment": "Aile bütçesi",
+         "interest": 20.0,
+         "who": "Kadın, 46",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 10,
+         "status": "json",
+         "segment": "Aile bütçesi",
+         "interest": 65.0,
+         "who": "Kadın, 50",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 11,
+         "status": "json",
+         "segment": "Markalı ürün alıcısı",
+         "interest": 75.0,
+         "who": "Kadın, 60",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 12,
+         "status": "json",
+         "segment": "Markalı ürün alıcısı",
+         "interest": 75.0,
+         "who": "Kadın, 60",
+         "audience": "kadin",
+         "weight": null
+        }
+       ],
+       "data_basis": {
+        "persona_version": "v1",
+        "context_version": "2026-10-taslak"
+       },
+       "audience_panel": {
+        "value": "kadin",
+        "label": "Kadın",
+        "source": "kullanıcı girdisi",
+        "reason": "Kullanıcı girdisi",
+        "child_gender": null,
+        "child_age_range": null,
+        "method": "kota",
+        "note": "Panel kişileri bu dağılıma göre seçildi (kota).",
+        "n_eff": null,
+        "composition": {
+         "n": 12,
+         "n_female": 11,
+         "n_male": 1,
+         "n_unknown": 0,
+         "female_pct": 92,
+         "target_female_pct": 88,
+         "gender_known_pct": 100,
+         "age_bands": [
+          {
+           "band": "18-24",
+           "target_pct": 17,
+           "pct": 17,
+           "n": 2
+          },
+          {
+           "band": "25-34",
+           "target_pct": 25,
+           "pct": 25,
+           "n": 3
+          },
+          {
+           "band": "35-44",
+           "target_pct": 23,
+           "pct": 25,
+           "n": 3
+          },
+          {
+           "band": "45-54",
+           "target_pct": 19,
+           "pct": 17,
+           "n": 2
+          },
+          {
+           "band": "55-70",
+           "target_pct": 16,
+           "pct": 17,
+           "n": 2
+          }
+         ],
+         "roles": {
+          "kendisi": 11,
+          "hediye": 1
+         }
+        },
+        "calibration": {
+         "version": "v1",
+         "as_of": "2026-11-12",
+         "verified": false,
+         "region_specific": true,
+         "source": "TR: yetişkin nüfus 18-70 yaş dağılımı kabaca (TÜİK ADNKS), nüfus EU'dan genç (medyan ~34); alıcı cinsiyet payları varsayım.",
+         "basis": "kural varsayımı"
+        },
+        "warnings": [
+         "TR: hedef kitle dağılımı (v1) doğrulanmamış kural varsayımı; ERP/CRM alıcı verisiyle güncellenmeli."
+        ]
+       },
+       "key_objections": []
+      }
+     ],
+     "failed_regions": [],
+     "target_audience": {
+      "value": "kadin",
+      "label": "Kadın",
+      "source": "kullanıcı girdisi",
+      "reason": "Kullanıcı girdisi",
+      "child_gender": null,
+      "child_age_range": null,
+      "raw": "Kadın"
+     },
+     "brand_profile": {
+      "name": "Marka",
+      "positioning": "Marka kendini pazarda 'uzman iç giyim markası' olarak konumlandırır, kalite ve konfor odaklı, ulaşılabilecek lüks sunar.",
+      "price_tier": "upper_mass",
+      "price_multiple": 3.0,
+      "price_sensitivity": 0.7,
+      "brand_pull": 85,
+      "typical_customer": "Kendine değer veren, uzun ömürlü ve kaliteli ürünleri tercih eden genç ve orta yaş kadınlardır.",
+      "margin_norm_pct": 40.0,
+      "regional_strength": {
+       "EU": 20,
+       "MENA": 15,
+       "CIS": 10,
+       "US": 5,
+       "TR": 80
+      },
+      "known_brand": true,
+      "confidence": "high",
+      "source": "user_notes",
+      "edited": false,
+      "warning": "Bu profil modelin genel bilgisinden üretildi; doğrulanmış veri değildir."
+     }
+    }
+   },
+   "U02": {
+    "panel_seed": "koleksiyon:20261112-9624f603",
+    "response": {
+     "regional_breakdown": [
+      {
+       "region": "TR",
+       "demand_score_100": 48,
+       "optimal_sale_price": "26.86",
+       "recommended_production_qty": 370,
+       "estimated_margin_percentage": 61.7,
+       "van_westendorp": {
+        "optimal_price_point": "25.99",
+        "indifference_price_point": "18.66",
+        "acceptable_range_low": "18.04",
+        "acceptable_range_high": "26.86",
+        "zones": [
+         {
+          "key": "too_cheap",
+          "label": "Çok ucuz",
+          "low": "0.00",
+          "high": "17.77",
+          "description": "Çoğu ajan bu fiyatta kaliteden şüphelenir."
+         },
+         {
+          "key": "cheap",
+          "label": "Ucuz / avantajlı",
+          "low": "17.77",
+          "high": "18.66",
+          "description": "Kabul edilebilir ama kâr bırakılıyor; satışı hızlandırır."
+         },
+         {
+          "key": "ideal",
+          "label": "İdeal bölge",
+          "low": "18.66",
+          "high": "25.99",
+          "description": "Ucuz-pahalı dengesi; en az direnç."
+         },
+         {
+          "key": "expensive",
+          "label": "Pahalı ama kabul edilebilir",
+          "low": "25.99",
+          "high": "26.88",
+          "description": "Marjı yüksek, satış hızı düşer; kararsız müşteri artar."
+         },
+         {
+          "key": "too_expensive",
+          "label": "Çok pahalı",
+          "low": "26.88",
+          "high": null,
+          "description": "Çoğu ajan bu fiyatın üstünde almaz."
+         }
+        ],
+        "quality": "high",
+        "quality_note": "12 ajan: örneklem makul; yine de gerçek müşteri verisi değil, simülasyon çıktısıdır."
+       },
+       "allocation": {
+        "objective": "balanced",
+        "demand_units": 369,
+        "net_demand_units": 346,
+        "units_before": 1478,
+        "units": 370,
+        "sold_before": 369,
+        "sold": 369,
+        "leftover_before": 1109,
+        "leftover": 1,
+        "unmet_before": 0,
+        "unmet": 0,
+        "sell_through_before_pct": 25.0,
+        "sell_through_pct": 99.7,
+        "why": "TR için beklenen 120 günlük talep yaklaşık 369 adet (iade sonrası kalıcı satış ~346). Talebi karşılayacak kadar 370 adet ayrıldı; fazlası stok riski yaratırdı. Eski kâr ağırlıklı dağıtım 1,478 adet verirdi: ~1,109 adet stok kalırdı. Hedef: dengeli (satış hızı)."
+       },
+       "returns": {
+        "rate_pct": 20.5,
+        "low_pct": 15.4,
+        "high_pct": 26.7,
+        "base_pct": 17.0,
+        "drivers": [
+         {
+          "label": "Bölge taban oranı (TR)",
+          "points": 0.0,
+          "detail": "Taban %17. Kolay iade ve değişim beklentisi yüksek; kapıda ödeme payı var.",
+          "basis": "kural varsayımı"
+         },
+         {
+          "label": "Bölgesel beden uyumu",
+          "points": 1.0,
+          "detail": "Bölgesel kalıp beklentisi farkı küçük bir ek beden riski yaratır.",
+          "basis": "kural varsayımı"
+         },
+         {
+          "label": "Esnek kumaş",
+          "points": -1.5,
+          "detail": "Esneyen kumaş küçük beden farklarını tolere eder.",
+          "basis": "kural varsayımı"
+         },
+         {
+          "label": "Hassas/kırışan kumaş",
+          "points": 2.0,
+          "detail": "İpek, saten, keten gibi kumaşlarda doku ve kırışma beklentisi tutmayabilir.",
+          "basis": "kural varsayımı"
+         },
+         {
+          "label": "Görsel-gerçek renk/parlaklık farkı",
+          "points": 2.0,
+          "detail": "Parlak/sentetik yüzeyler fotoğrafta ve gerçekte farklı görünür.",
+          "basis": "kural varsayımı"
+         }
+        ],
+        "gross_margin_pct": 61.7,
+        "net_margin_pct": 56.7,
+        "return_cost_per_sale": "1.07",
+        "net_qty_if_sold_out": 294,
+        "basis": "kural tabanlı varsayım (ajan cevabı değil)"
+       },
+       "confidence": {
+        "level": "orta",
+        "reasons": [
+         "1 ajanın bazı fiyat eşikleri tahmin edildi.",
+         "Panel gerçek satış verisiyle kalibre edilmedi (en fazla 'orta' güven).",
+         "Persona seti ya da bağlam paketi doğrulanmamış taslak.",
+         "Hedef kitle büyüklüğü varsayım (satış tahmini buna bağlı)."
+        ]
+       },
+       "raw_answers": [
+        {
+         "agent": 1,
+         "status": "json",
+         "segment": "Kentli genç profesyonel",
+         "interest": 55.0,
+         "who": "Kadın, 27",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 2,
+         "status": "json",
+         "segment": "Kentli genç profesyonel",
+         "interest": 45.0,
+         "who": "Erkek, 27 (yakını için)",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 3,
+         "status": "json",
+         "segment": "Kentli genç profesyonel",
+         "interest": 55.0,
+         "who": "Kadın, 28",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 4,
+         "status": "json",
+         "segment": "Sabit gelirli",
+         "interest": 55.0,
+         "who": "Kadın, 35",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 5,
+         "status": "json",
+         "segment": "Sabit gelirli",
+         "interest": 25.0,
+         "who": "Kadın, 40",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 6,
+         "status": "json",
+         "segment": "Sabit gelirli",
+         "interest": 25.0,
+         "who": "Kadın, 43",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 7,
+         "status": "json",
+         "segment": "Üniversite öğrencisi",
+         "interest": 78.0,
+         "who": "Kadın, 22",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 8,
+         "status": "json",
+         "segment": "Üniversite öğrencisi",
+         "interest": 43.0,
+         "who": "Kadın, 23",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 9,
+         "status": "json",
+         "segment": "Aile bütçesi",
+         "interest": 35.0,
+         "who": "Kadın, 46",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 10,
+         "status": "json",
+         "segment": "Aile bütçesi",
+         "interest": 35.0,
+         "who": "Kadın, 50",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 11,
+         "status": "json",
+         "segment": "Markalı ürün alıcısı",
+         "interest": 65.0,
+         "who": "Kadın, 60",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 12,
+         "status": "json",
+         "segment": "Markalı ürün alıcısı",
+         "interest": 65.0,
+         "who": "Kadın, 60",
+         "audience": "kadin",
+         "weight": null
+        }
+       ],
+       "data_basis": {
+        "persona_version": "v1",
+        "context_version": "2026-10-taslak"
+       },
+       "audience_panel": {
+        "value": "kadin",
+        "label": "Kadın",
+        "source": "kullanıcı girdisi",
+        "reason": "Kullanıcı girdisi",
+        "child_gender": null,
+        "child_age_range": null,
+        "method": "kota",
+        "note": "Panel kişileri bu dağılıma göre seçildi (kota).",
+        "n_eff": null,
+        "composition": {
+         "n": 12,
+         "n_female": 11,
+         "n_male": 1,
+         "n_unknown": 0,
+         "female_pct": 92,
+         "target_female_pct": 88,
+         "gender_known_pct": 100,
+         "age_bands": [
+          {
+           "band": "18-24",
+           "target_pct": 17,
+           "pct": 17,
+           "n": 2
+          },
+          {
+           "band": "25-34",
+           "target_pct": 25,
+           "pct": 25,
+           "n": 3
+          },
+          {
+           "band": "35-44",
+           "target_pct": 23,
+           "pct": 25,
+           "n": 3
+          },
+          {
+           "band": "45-54",
+           "target_pct": 19,
+           "pct": 17,
+           "n": 2
+          },
+          {
+           "band": "55-70",
+           "target_pct": 16,
+           "pct": 17,
+           "n": 2
+          }
+         ],
+         "roles": {
+          "kendisi": 11,
+          "hediye": 1
+         }
+        },
+        "calibration": {
+         "version": "v1",
+         "as_of": "2026-11-12",
+         "verified": false,
+         "region_specific": true,
+         "source": "TR: yetişkin nüfus 18-70 yaş dağılımı kabaca (TÜİK ADNKS), nüfus EU'dan genç (medyan ~34); alıcı cinsiyet payları varsayım.",
+         "basis": "kural varsayımı"
+        },
+        "warnings": [
+         "TR: hedef kitle dağılımı (v1) doğrulanmamış kural varsayımı; ERP/CRM alıcı verisiyle güncellenmeli."
+        ]
+       },
+       "key_objections": []
+      }
+     ],
+     "failed_regions": [],
+     "target_audience": {
+      "value": "kadin",
+      "label": "Kadın",
+      "source": "kullanıcı girdisi",
+      "reason": "Kullanıcı girdisi",
+      "child_gender": null,
+      "child_age_range": null,
+      "raw": "Kadın"
+     },
+     "brand_profile": {
+      "name": "Marka",
+      "positioning": "Marka kendini pazarda 'uzman iç giyim markası' olarak konumlandırır, kalite ve konfor odaklı, ulaşılabilecek lüks sunar.",
+      "price_tier": "upper_mass",
+      "price_multiple": 3.0,
+      "price_sensitivity": 0.7,
+      "brand_pull": 85,
+      "typical_customer": "Kendine değer veren, uzun ömürlü ve kaliteli ürünleri tercih eden genç ve orta yaş kadınlardır.",
+      "margin_norm_pct": 40.0,
+      "regional_strength": {
+       "EU": 20,
+       "MENA": 15,
+       "CIS": 10,
+       "US": 5,
+       "TR": 80
+      },
+      "known_brand": true,
+      "confidence": "high",
+      "source": "user_notes",
+      "edited": false,
+      "warning": "Bu profil modelin genel bilgisinden üretildi; doğrulanmış veri değildir."
+     }
+    }
+   },
+   "U03": {
+    "panel_seed": "koleksiyon:20261112-9624f603",
+    "response": {
+     "regional_breakdown": [
+      {
+       "region": "TR",
+       "demand_score_100": 56,
+       "optimal_sale_price": "22.87",
+       "recommended_production_qty": 459,
+       "estimated_margin_percentage": 64.5,
+       "van_westendorp": {
+        "optimal_price_point": "21.56",
+        "indifference_price_point": "15.30",
+        "acceptable_range_low": "14.78",
+        "acceptable_range_high": "22.87",
+        "zones": [
+         {
+          "key": "too_cheap",
+          "label": "Çok ucuz",
+          "low": "0.00",
+          "high": "14.56",
+          "description": "Çoğu ajan bu fiyatta kaliteden şüphelenir."
+         },
+         {
+          "key": "cheap",
+          "label": "Ucuz / avantajlı",
+          "low": "14.56",
+          "high": "15.30",
+          "description": "Kabul edilebilir ama kâr bırakılıyor; satışı hızlandırır."
+         },
+         {
+          "key": "ideal",
+          "label": "İdeal bölge",
+          "low": "15.30",
+          "high": "21.56",
+          "description": "Ucuz-pahalı dengesi; en az direnç."
+         },
+         {
+          "key": "expensive",
+          "label": "Pahalı ama kabul edilebilir",
+          "low": "21.56",
+          "high": "22.87",
+          "description": "Marjı yüksek, satış hızı düşer; kararsız müşteri artar."
+         },
+         {
+          "key": "too_expensive",
+          "label": "Çok pahalı",
+          "low": "22.87",
+          "high": null,
+          "description": "Çoğu ajan bu fiyatın üstünde almaz."
+         }
+        ],
+        "quality": "high",
+        "quality_note": "12 ajan: örneklem makul; yine de gerçek müşteri verisi değil, simülasyon çıktısıdır."
+       },
+       "allocation": {
+        "objective": "balanced",
+        "demand_units": 457,
+        "net_demand_units": 431,
+        "units_before": 1871,
+        "units": 459,
+        "sold_before": 457,
+        "sold": 457,
+        "leftover_before": 1414,
+        "leftover": 2,
+        "unmet_before": 0,
+        "unmet": 0,
+        "sell_through_before_pct": 24.4,
+        "sell_through_pct": 99.6,
+        "why": "TR için beklenen 120 günlük talep yaklaşık 457 adet (iade sonrası kalıcı satış ~431). Talebi karşılayacak kadar 459 adet ayrıldı; fazlası stok riski yaratırdı. Eski kâr ağırlıklı dağıtım 1,871 adet verirdi: ~1,414 adet stok kalırdı. Hedef: dengeli (satış hızı)."
+       },
+       "returns": {
+        "rate_pct": 18.5,
+        "low_pct": 13.9,
+        "high_pct": 24.1,
+        "base_pct": 17.0,
+        "drivers": [
+         {
+          "label": "Bölge taban oranı (TR)",
+          "points": 0.0,
+          "detail": "Taban %17. Kolay iade ve değişim beklentisi yüksek; kapıda ödeme payı var.",
+          "basis": "kural varsayımı"
+         },
+         {
+          "label": "Bölgesel beden uyumu",
+          "points": 1.0,
+          "detail": "Bölgesel kalıp beklentisi farkı küçük bir ek beden riski yaratır.",
+          "basis": "kural varsayımı"
+         },
+         {
+          "label": "Esnek kumaş",
+          "points": -1.5,
+          "detail": "Esneyen kumaş küçük beden farklarını tolere eder.",
+          "basis": "kural varsayımı"
+         },
+         {
+          "label": "Görsel-gerçek renk/parlaklık farkı",
+          "points": 2.0,
+          "detail": "Parlak/sentetik yüzeyler fotoğrafta ve gerçekte farklı görünür.",
+          "basis": "kural varsayımı"
+         }
+        ],
+        "gross_margin_pct": 64.5,
+        "net_margin_pct": 60.3,
+        "return_cost_per_sale": "0.79",
+        "net_qty_if_sold_out": 374,
+        "basis": "kural tabanlı varsayım (ajan cevabı değil)"
+       },
+       "confidence": {
+        "level": "orta",
+        "reasons": [
+         "3 ajanın bazı fiyat eşikleri tahmin edildi.",
+         "Panel gerçek satış verisiyle kalibre edilmedi (en fazla 'orta' güven).",
+         "Persona seti ya da bağlam paketi doğrulanmamış taslak.",
+         "Hedef kitle büyüklüğü varsayım (satış tahmini buna bağlı)."
+        ]
+       },
+       "raw_answers": [
+        {
+         "agent": 1,
+         "status": "json",
+         "segment": "Kentli genç profesyonel",
+         "interest": 78.0,
+         "who": "Kadın, 27",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 2,
+         "status": "json",
+         "segment": "Kentli genç profesyonel",
+         "interest": 45.0,
+         "who": "Erkek, 27 (yakını için)",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 3,
+         "status": "json",
+         "segment": "Kentli genç profesyonel",
+         "interest": 75.0,
+         "who": "Kadın, 28",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 4,
+         "status": "json",
+         "segment": "Sabit gelirli",
+         "interest": 55.0,
+         "who": "Kadın, 35",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 5,
+         "status": "json",
+         "segment": "Sabit gelirli",
+         "interest": 55.0,
+         "who": "Kadın, 40",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 6,
+         "status": "json",
+         "segment": "Sabit gelirli",
+         "interest": 45.0,
+         "who": "Kadın, 43",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 7,
+         "status": "json",
+         "segment": "Üniversite öğrencisi",
+         "interest": 78.0,
+         "who": "Kadın, 22",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 8,
+         "status": "json",
+         "segment": "Üniversite öğrencisi",
+         "interest": 34.0,
+         "who": "Kadın, 23",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 9,
+         "status": "json",
+         "segment": "Aile bütçesi",
+         "interest": 35.0,
+         "who": "Kadın, 46",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 10,
+         "status": "json",
+         "segment": "Aile bütçesi",
+         "interest": 55.0,
+         "who": "Kadın, 50",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 11,
+         "status": "json",
+         "segment": "Markalı ürün alıcısı",
+         "interest": 35.0,
+         "who": "Kadın, 60",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 12,
+         "status": "json",
+         "segment": "Markalı ürün alıcısı",
+         "interest": 78.0,
+         "who": "Kadın, 60",
+         "audience": "kadin",
+         "weight": null
+        }
+       ],
+       "data_basis": {
+        "persona_version": "v1",
+        "context_version": "2026-10-taslak"
+       },
+       "audience_panel": {
+        "value": "kadin",
+        "label": "Kadın",
+        "source": "kullanıcı girdisi",
+        "reason": "Kullanıcı girdisi",
+        "child_gender": null,
+        "child_age_range": null,
+        "method": "kota",
+        "note": "Panel kişileri bu dağılıma göre seçildi (kota).",
+        "n_eff": null,
+        "composition": {
+         "n": 12,
+         "n_female": 11,
+         "n_male": 1,
+         "n_unknown": 0,
+         "female_pct": 92,
+         "target_female_pct": 88,
+         "gender_known_pct": 100,
+         "age_bands": [
+          {
+           "band": "18-24",
+           "target_pct": 17,
+           "pct": 17,
+           "n": 2
+          },
+          {
+           "band": "25-34",
+           "target_pct": 25,
+           "pct": 25,
+           "n": 3
+          },
+          {
+           "band": "35-44",
+           "target_pct": 23,
+           "pct": 25,
+           "n": 3
+          },
+          {
+           "band": "45-54",
+           "target_pct": 19,
+           "pct": 17,
+           "n": 2
+          },
+          {
+           "band": "55-70",
+           "target_pct": 16,
+           "pct": 17,
+           "n": 2
+          }
+         ],
+         "roles": {
+          "kendisi": 11,
+          "hediye": 1
+         }
+        },
+        "calibration": {
+         "version": "v1",
+         "as_of": "2026-11-12",
+         "verified": false,
+         "region_specific": true,
+         "source": "TR: yetişkin nüfus 18-70 yaş dağılımı kabaca (TÜİK ADNKS), nüfus EU'dan genç (medyan ~34); alıcı cinsiyet payları varsayım.",
+         "basis": "kural varsayımı"
+        },
+        "warnings": [
+         "TR: hedef kitle dağılımı (v1) doğrulanmamış kural varsayımı; ERP/CRM alıcı verisiyle güncellenmeli."
+        ]
+       },
+       "key_objections": []
+      }
+     ],
+     "failed_regions": [],
+     "target_audience": {
+      "value": "kadin",
+      "label": "Kadın",
+      "source": "kullanıcı girdisi",
+      "reason": "Kullanıcı girdisi",
+      "child_gender": null,
+      "child_age_range": null,
+      "raw": "Kadın"
+     },
+     "brand_profile": {
+      "name": "Marka",
+      "positioning": "Marka kendini pazarda 'uzman iç giyim markası' olarak konumlandırır, kalite ve konfor odaklı, ulaşılabilecek lüks sunar.",
+      "price_tier": "upper_mass",
+      "price_multiple": 3.0,
+      "price_sensitivity": 0.7,
+      "brand_pull": 85,
+      "typical_customer": "Kendine değer veren, uzun ömürlü ve kaliteli ürünleri tercih eden genç ve orta yaş kadınlardır.",
+      "margin_norm_pct": 40.0,
+      "regional_strength": {
+       "EU": 20,
+       "MENA": 15,
+       "CIS": 10,
+       "US": 5,
+       "TR": 80
+      },
+      "known_brand": true,
+      "confidence": "high",
+      "source": "user_notes",
+      "edited": false,
+      "warning": "Bu profil modelin genel bilgisinden üretildi; doğrulanmış veri değildir."
+     }
+    }
+   },
+   "U04": {
+    "panel_seed": "koleksiyon:20261112-9624f603",
+    "response": {
+     "regional_breakdown": [
+      {
+       "region": "TR",
+       "demand_score_100": 53,
+       "optimal_sale_price": "22.90",
+       "recommended_production_qty": 483,
+       "estimated_margin_percentage": 66.5,
+       "van_westendorp": {
+        "optimal_price_point": "21.32",
+        "indifference_price_point": "17.00",
+        "acceptable_range_low": "15.88",
+        "acceptable_range_high": "22.90",
+        "zones": [
+         {
+          "key": "too_cheap",
+          "label": "Çok ucuz",
+          "low": "0.00",
+          "high": "15.88",
+          "description": "Çoğu ajan bu fiyatta kaliteden şüphelenir."
+         },
+         {
+          "key": "cheap",
+          "label": "Ucuz / avantajlı",
+          "low": "15.88",
+          "high": "17.00",
+          "description": "Kabul edilebilir ama kâr bırakılıyor; satışı hızlandırır."
+         },
+         {
+          "key": "ideal",
+          "label": "İdeal bölge",
+          "low": "17.00",
+          "high": "21.32",
+          "description": "Ucuz-pahalı dengesi; en az direnç."
+         },
+         {
+          "key": "expensive",
+          "label": "Pahalı ama kabul edilebilir",
+          "low": "21.32",
+          "high": "22.90",
+          "description": "Marjı yüksek, satış hızı düşer; kararsız müşteri artar."
+         },
+         {
+          "key": "too_expensive",
+          "label": "Çok pahalı",
+          "low": "22.90",
+          "high": null,
+          "description": "Çoğu ajan bu fiyatın üstünde almaz."
+         }
+        ],
+        "quality": "high",
+        "quality_note": "12 ajan: örneklem makul; yine de gerçek müşteri verisi değil, simülasyon çıktısıdır."
+       },
+       "allocation": {
+        "objective": "balanced",
+        "demand_units": 480,
+        "net_demand_units": 454,
+        "units_before": 1978,
+        "units": 483,
+        "sold_before": 480,
+        "sold": 480,
+        "leftover_before": 1498,
+        "leftover": 3,
+        "unmet_before": 0,
+        "unmet": 0,
+        "sell_through_before_pct": 24.3,
+        "sell_through_pct": 99.4,
+        "why": "TR için beklenen 120 günlük talep yaklaşık 480 adet (iade sonrası kalıcı satış ~454). Talebi karşılayacak kadar 483 adet ayrıldı; fazlası stok riski yaratırdı. Eski kâr ağırlıklı dağıtım 1,978 adet verirdi: ~1,498 adet stok kalırdı. Hedef: dengeli (satış hızı)."
+       },
+       "returns": {
+        "rate_pct": 18.5,
+        "low_pct": 13.9,
+        "high_pct": 24.1,
+        "base_pct": 17.0,
+        "drivers": [
+         {
+          "label": "Bölge taban oranı (TR)",
+          "points": 0.0,
+          "detail": "Taban %17. Kolay iade ve değişim beklentisi yüksek; kapıda ödeme payı var.",
+          "basis": "kural varsayımı"
+         },
+         {
+          "label": "Bölgesel beden uyumu",
+          "points": 1.0,
+          "detail": "Bölgesel kalıp beklentisi farkı küçük bir ek beden riski yaratır.",
+          "basis": "kural varsayımı"
+         },
+         {
+          "label": "Esnek kumaş",
+          "points": -1.5,
+          "detail": "Esneyen kumaş küçük beden farklarını tolere eder.",
+          "basis": "kural varsayımı"
+         },
+         {
+          "label": "Görsel-gerçek renk/parlaklık farkı",
+          "points": 2.0,
+          "detail": "Parlak/sentetik yüzeyler fotoğrafta ve gerçekte farklı görünür.",
+          "basis": "kural varsayımı"
+         }
+        ],
+        "gross_margin_pct": 66.5,
+        "net_margin_pct": 62.4,
+        "return_cost_per_sale": "0.77",
+        "net_qty_if_sold_out": 393,
+        "basis": "kural tabanlı varsayım (ajan cevabı değil)"
+       },
+       "confidence": {
+        "level": "orta",
+        "reasons": [
+         "4 ajanın bazı fiyat eşikleri tahmin edildi.",
+         "Panel gerçek satış verisiyle kalibre edilmedi (en fazla 'orta' güven).",
+         "Persona seti ya da bağlam paketi doğrulanmamış taslak.",
+         "Hedef kitle büyüklüğü varsayım (satış tahmini buna bağlı)."
+        ]
+       },
+       "raw_answers": [
+        {
+         "agent": 1,
+         "status": "json",
+         "segment": "Kentli genç profesyonel",
+         "interest": 78.0,
+         "who": "Kadın, 27",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 2,
+         "status": "json",
+         "segment": "Kentli genç profesyonel",
+         "interest": 55.0,
+         "who": "Erkek, 27 (yakını için)",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 3,
+         "status": "json",
+         "segment": "Kentli genç profesyonel",
+         "interest": 75.0,
+         "who": "Kadın, 28",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 4,
+         "status": "json",
+         "segment": "Sabit gelirli",
+         "interest": 65.0,
+         "who": "Kadın, 35",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 5,
+         "status": "json",
+         "segment": "Sabit gelirli",
+         "interest": 55.0,
+         "who": "Kadın, 40",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 6,
+         "status": "json",
+         "segment": "Sabit gelirli",
+         "interest": 35.0,
+         "who": "Kadın, 43",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 7,
+         "status": "json",
+         "segment": "Üniversite öğrencisi",
+         "interest": 78.0,
+         "who": "Kadın, 22",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 8,
+         "status": "json",
+         "segment": "Üniversite öğrencisi",
+         "interest": 43.0,
+         "who": "Kadın, 23",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 9,
+         "status": "json",
+         "segment": "Aile bütçesi",
+         "interest": 35.0,
+         "who": "Kadın, 46",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 10,
+         "status": "json",
+         "segment": "Aile bütçesi",
+         "interest": 45.0,
+         "who": "Kadın, 50",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 11,
+         "status": "json",
+         "segment": "Markalı ürün alıcısı",
+         "interest": 35.0,
+         "who": "Kadın, 60",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 12,
+         "status": "json",
+         "segment": "Markalı ürün alıcısı",
+         "interest": 35.0,
+         "who": "Kadın, 60",
+         "audience": "kadin",
+         "weight": null
+        }
+       ],
+       "data_basis": {
+        "persona_version": "v1",
+        "context_version": "2026-10-taslak"
+       },
+       "audience_panel": {
+        "value": "kadin",
+        "label": "Kadın",
+        "source": "kullanıcı girdisi",
+        "reason": "Kullanıcı girdisi",
+        "child_gender": null,
+        "child_age_range": null,
+        "method": "kota",
+        "note": "Panel kişileri bu dağılıma göre seçildi (kota).",
+        "n_eff": null,
+        "composition": {
+         "n": 12,
+         "n_female": 11,
+         "n_male": 1,
+         "n_unknown": 0,
+         "female_pct": 92,
+         "target_female_pct": 88,
+         "gender_known_pct": 100,
+         "age_bands": [
+          {
+           "band": "18-24",
+           "target_pct": 17,
+           "pct": 17,
+           "n": 2
+          },
+          {
+           "band": "25-34",
+           "target_pct": 25,
+           "pct": 25,
+           "n": 3
+          },
+          {
+           "band": "35-44",
+           "target_pct": 23,
+           "pct": 25,
+           "n": 3
+          },
+          {
+           "band": "45-54",
+           "target_pct": 19,
+           "pct": 17,
+           "n": 2
+          },
+          {
+           "band": "55-70",
+           "target_pct": 16,
+           "pct": 17,
+           "n": 2
+          }
+         ],
+         "roles": {
+          "kendisi": 11,
+          "hediye": 1
+         }
+        },
+        "calibration": {
+         "version": "v1",
+         "as_of": "2026-11-12",
+         "verified": false,
+         "region_specific": true,
+         "source": "TR: yetişkin nüfus 18-70 yaş dağılımı kabaca (TÜİK ADNKS), nüfus EU'dan genç (medyan ~34); alıcı cinsiyet payları varsayım.",
+         "basis": "kural varsayımı"
+        },
+        "warnings": [
+         "TR: hedef kitle dağılımı (v1) doğrulanmamış kural varsayımı; ERP/CRM alıcı verisiyle güncellenmeli."
+        ]
+       },
+       "key_objections": []
+      }
+     ],
+     "failed_regions": [],
+     "target_audience": {
+      "value": "kadin",
+      "label": "Kadın",
+      "source": "kullanıcı girdisi",
+      "reason": "Kullanıcı girdisi",
+      "child_gender": null,
+      "child_age_range": null,
+      "raw": "Kadın"
+     },
+     "brand_profile": {
+      "name": "Marka",
+      "positioning": "Marka kendini pazarda 'uzman iç giyim markası' olarak konumlandırır, kalite ve konfor odaklı, ulaşılabilecek lüks sunar.",
+      "price_tier": "upper_mass",
+      "price_multiple": 3.0,
+      "price_sensitivity": 0.7,
+      "brand_pull": 85,
+      "typical_customer": "Kendine değer veren, uzun ömürlü ve kaliteli ürünleri tercih eden genç ve orta yaş kadınlardır.",
+      "margin_norm_pct": 40.0,
+      "regional_strength": {
+       "EU": 20,
+       "MENA": 15,
+       "CIS": 10,
+       "US": 5,
+       "TR": 80
+      },
+      "known_brand": true,
+      "confidence": "high",
+      "source": "user_notes",
+      "edited": false,
+      "warning": "Bu profil modelin genel bilgisinden üretildi; doğrulanmış veri değildir."
+     }
+    }
+   },
+   "U05": {
+    "panel_seed": "koleksiyon:20261112-9624f603",
+    "response": {
+     "regional_breakdown": [
+      {
+       "region": "TR",
+       "demand_score_100": 44,
+       "optimal_sale_price": "18.93",
+       "recommended_production_qty": 339,
+       "estimated_margin_percentage": 57.3,
+       "van_westendorp": {
+        "optimal_price_point": "17.88",
+        "indifference_price_point": "15.60",
+        "acceptable_range_low": "14.97",
+        "acceptable_range_high": "18.93",
+        "zones": [
+         {
+          "key": "too_cheap",
+          "label": "Çok ucuz",
+          "low": "0.00",
+          "high": "14.93",
+          "description": "Çoğu ajan bu fiyatta kaliteden şüphelenir."
+         },
+         {
+          "key": "cheap",
+          "label": "Ucuz / avantajlı",
+          "low": "14.93",
+          "high": "15.60",
+          "description": "Kabul edilebilir ama kâr bırakılıyor; satışı hızlandırır."
+         },
+         {
+          "key": "ideal",
+          "label": "İdeal bölge",
+          "low": "15.60",
+          "high": "17.88",
+          "description": "Ucuz-pahalı dengesi; en az direnç."
+         },
+         {
+          "key": "expensive",
+          "label": "Pahalı ama kabul edilebilir",
+          "low": "17.88",
+          "high": "18.93",
+          "description": "Marjı yüksek, satış hızı düşer; kararsız müşteri artar."
+         },
+         {
+          "key": "too_expensive",
+          "label": "Çok pahalı",
+          "low": "18.93",
+          "high": null,
+          "description": "Çoğu ajan bu fiyatın üstünde almaz."
+         }
+        ],
+        "quality": "medium",
+        "quality_note": "12 ajan: örneklem makul; yine de gerçek müşteri verisi değil, simülasyon çıktısıdır. Panelin en uygun fiyatı, sorulan fiyat merdiveninin merkezine (maliyet × marka çarpanı, $17) çok yakın (oran 1,05). Bu fiyat panelin bağımsız görüşünden çok kurulumun merkezini yansıtıyor olabilir; rakip ya da geçmiş satış fiyatıyla karşılaştırın."
+       },
+       "allocation": {
+        "objective": "balanced",
+        "demand_units": 336,
+        "net_demand_units": 314,
+        "units_before": 1878,
+        "units": 339,
+        "sold_before": 336,
+        "sold": 336,
+        "leftover_before": 1542,
+        "leftover": 3,
+        "unmet_before": 0,
+        "unmet": 0,
+        "sell_through_before_pct": 17.9,
+        "sell_through_pct": 99.1,
+        "why": "TR için beklenen 120 günlük talep yaklaşık 336 adet (iade sonrası kalıcı satış ~314). Talebi karşılayacak kadar 339 adet ayrıldı; fazlası stok riski yaratırdı. Eski kâr ağırlıklı dağıtım 1,878 adet verirdi: ~1,542 adet stok kalırdı. Hedef: dengeli (satış hızı)."
+       },
+       "returns": {
+        "rate_pct": 21.5,
+        "low_pct": 16.1,
+        "high_pct": 27.9,
+        "base_pct": 17.0,
+        "drivers": [
+         {
+          "label": "Bölge taban oranı (TR)",
+          "points": 0.0,
+          "detail": "Taban %17. Kolay iade ve değişim beklentisi yüksek; kapıda ödeme payı var.",
+          "basis": "kural varsayımı"
+         },
+         {
+          "label": "Bölgesel beden uyumu",
+          "points": 1.0,
+          "detail": "Bölgesel kalıp beklentisi farkı küçük bir ek beden riski yaratır.",
+          "basis": "kural varsayımı"
+         },
+         {
+          "label": "Esnek kumaş",
+          "points": -1.5,
+          "detail": "Esneyen kumaş küçük beden farklarını tolere eder.",
+          "basis": "kural varsayımı"
+         },
+         {
+          "label": "Görsel-gerçek renk/parlaklık farkı",
+          "points": 2.0,
+          "detail": "Parlak/sentetik yüzeyler fotoğrafta ve gerçekte farklı görünür.",
+          "basis": "kural varsayımı"
+         },
+         {
+          "label": "Açık kesim (dekolte/kolsuz/transparan)",
+          "points": 3.0,
+          "detail": "Bu kesim TR pazarında örtünme normlarıyla çelişebilir; iade ve vazgeçme artar.",
+          "basis": "kural varsayımı"
+         }
+        ],
+        "gross_margin_pct": 57.3,
+        "net_margin_pct": 51.6,
+        "return_cost_per_sale": "0.85",
+        "net_qty_if_sold_out": 266,
+        "basis": "kural tabanlı varsayım (ajan cevabı değil)"
+       },
+       "confidence": {
+        "level": "orta",
+        "reasons": [
+         "3 ajanın bazı fiyat eşikleri tahmin edildi.",
+         "Panel gerçek satış verisiyle kalibre edilmedi (en fazla 'orta' güven).",
+         "Persona seti ya da bağlam paketi doğrulanmamış taslak.",
+         "Hedef kitle büyüklüğü varsayım (satış tahmini buna bağlı)."
+        ]
+       },
+       "raw_answers": [
+        {
+         "agent": 1,
+         "status": "json",
+         "segment": "Kentli genç profesyonel",
+         "interest": 55.0,
+         "who": "Kadın, 27",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 2,
+         "status": "json",
+         "segment": "Kentli genç profesyonel",
+         "interest": 55.0,
+         "who": "Erkek, 27 (yakını için)",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 3,
+         "status": "json",
+         "segment": "Kentli genç profesyonel",
+         "interest": 55.0,
+         "who": "Kadın, 28",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 4,
+         "status": "json",
+         "segment": "Sabit gelirli",
+         "interest": 35.0,
+         "who": "Kadın, 35",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 5,
+         "status": "json",
+         "segment": "Sabit gelirli",
+         "interest": 25.0,
+         "who": "Kadın, 40",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 6,
+         "status": "json",
+         "segment": "Sabit gelirli",
+         "interest": 25.0,
+         "who": "Kadın, 43",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 7,
+         "status": "json",
+         "segment": "Üniversite öğrencisi",
+         "interest": 75.0,
+         "who": "Kadın, 22",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 8,
+         "status": "json",
+         "segment": "Üniversite öğrencisi",
+         "interest": 27.0,
+         "who": "Kadın, 23",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 9,
+         "status": "json",
+         "segment": "Aile bütçesi",
+         "interest": 15.0,
+         "who": "Kadın, 46",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 10,
+         "status": "json",
+         "segment": "Aile bütçesi",
+         "interest": 25.0,
+         "who": "Kadın, 50",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 11,
+         "status": "json",
+         "segment": "Markalı ürün alıcısı",
+         "interest": 65.0,
+         "who": "Kadın, 60",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 12,
+         "status": "json",
+         "segment": "Markalı ürün alıcısı",
+         "interest": 65.0,
+         "who": "Kadın, 60",
+         "audience": "kadin",
+         "weight": null
+        }
+       ],
+       "data_basis": {
+        "persona_version": "v1",
+        "context_version": "2026-10-taslak"
+       },
+       "audience_panel": {
+        "value": "kadin",
+        "label": "Kadın",
+        "source": "kullanıcı girdisi",
+        "reason": "Kullanıcı girdisi",
+        "child_gender": null,
+        "child_age_range": null,
+        "method": "kota",
+        "note": "Panel kişileri bu dağılıma göre seçildi (kota).",
+        "n_eff": null,
+        "composition": {
+         "n": 12,
+         "n_female": 11,
+         "n_male": 1,
+         "n_unknown": 0,
+         "female_pct": 92,
+         "target_female_pct": 88,
+         "gender_known_pct": 100,
+         "age_bands": [
+          {
+           "band": "18-24",
+           "target_pct": 17,
+           "pct": 17,
+           "n": 2
+          },
+          {
+           "band": "25-34",
+           "target_pct": 25,
+           "pct": 25,
+           "n": 3
+          },
+          {
+           "band": "35-44",
+           "target_pct": 23,
+           "pct": 25,
+           "n": 3
+          },
+          {
+           "band": "45-54",
+           "target_pct": 19,
+           "pct": 17,
+           "n": 2
+          },
+          {
+           "band": "55-70",
+           "target_pct": 16,
+           "pct": 17,
+           "n": 2
+          }
+         ],
+         "roles": {
+          "kendisi": 11,
+          "hediye": 1
+         }
+        },
+        "calibration": {
+         "version": "v1",
+         "as_of": "2026-11-12",
+         "verified": false,
+         "region_specific": true,
+         "source": "TR: yetişkin nüfus 18-70 yaş dağılımı kabaca (TÜİK ADNKS), nüfus EU'dan genç (medyan ~34); alıcı cinsiyet payları varsayım.",
+         "basis": "kural varsayımı"
+        },
+        "warnings": [
+         "TR: hedef kitle dağılımı (v1) doğrulanmamış kural varsayımı; ERP/CRM alıcı verisiyle güncellenmeli."
+        ]
+       },
+       "key_objections": []
+      }
+     ],
+     "failed_regions": [],
+     "target_audience": {
+      "value": "kadin",
+      "label": "Kadın",
+      "source": "kullanıcı girdisi",
+      "reason": "Kullanıcı girdisi",
+      "child_gender": null,
+      "child_age_range": null,
+      "raw": "Kadın"
+     },
+     "brand_profile": {
+      "name": "Marka",
+      "positioning": "Marka kendini pazarda 'uzman iç giyim markası' olarak konumlandırır, kalite ve konfor odaklı, ulaşılabilecek lüks sunar.",
+      "price_tier": "upper_mass",
+      "price_multiple": 3.0,
+      "price_sensitivity": 0.7,
+      "brand_pull": 85,
+      "typical_customer": "Kendine değer veren, uzun ömürlü ve kaliteli ürünleri tercih eden genç ve orta yaş kadınlardır.",
+      "margin_norm_pct": 40.0,
+      "regional_strength": {
+       "EU": 20,
+       "MENA": 15,
+       "CIS": 10,
+       "US": 5,
+       "TR": 80
+      },
+      "known_brand": true,
+      "confidence": "high",
+      "source": "user_notes",
+      "edited": false,
+      "warning": "Bu profil modelin genel bilgisinden üretildi; doğrulanmış veri değildir."
+     }
+    }
+   },
+   "U06": {
+    "panel_seed": "koleksiyon:20261112-9624f603",
+    "response": {
+     "regional_breakdown": [
+      {
+       "region": "TR",
+       "demand_score_100": 59,
+       "optimal_sale_price": "9.12",
+       "recommended_production_qty": 500,
+       "estimated_margin_percentage": 69.4,
+       "van_westendorp": {
+        "optimal_price_point": "8.19",
+        "indifference_price_point": "7.34",
+        "acceptable_range_low": "6.97",
+        "acceptable_range_high": "9.12",
+        "zones": [
+         {
+          "key": "too_cheap",
+          "label": "Çok ucuz",
+          "low": "0.00",
+          "high": "6.97",
+          "description": "Çoğu ajan bu fiyatta kaliteden şüphelenir."
+         },
+         {
+          "key": "cheap",
+          "label": "Ucuz / avantajlı",
+          "low": "6.97",
+          "high": "7.34",
+          "description": "Kabul edilebilir ama kâr bırakılıyor; satışı hızlandırır."
+         },
+         {
+          "key": "ideal",
+          "label": "İdeal bölge",
+          "low": "7.34",
+          "high": "8.19",
+          "description": "Ucuz-pahalı dengesi; en az direnç."
+         },
+         {
+          "key": "expensive",
+          "label": "Pahalı ama kabul edilebilir",
+          "low": "8.19",
+          "high": "9.12",
+          "description": "Marjı yüksek, satış hızı düşer; kararsız müşteri artar."
+         },
+         {
+          "key": "too_expensive",
+          "label": "Çok pahalı",
+          "low": "9.12",
+          "high": null,
+          "description": "Çoğu ajan bu fiyatın üstünde almaz."
+         }
+        ],
+        "quality": "medium",
+        "quality_note": "8 ajan: eğriler hafif yumuşatıldı; bölge sınırları ±%10-15 oynayabilir."
+       },
+       "allocation": {
+        "objective": "balanced",
+        "demand_units": 494,
+        "net_demand_units": 466,
+        "units_before": 5446,
+        "units": 500,
+        "sold_before": 494,
+        "sold": 494,
+        "leftover_before": 4952,
+        "leftover": 6,
+        "unmet_before": 0,
+        "unmet": 0,
+        "sell_through_before_pct": 9.1,
+        "sell_through_pct": 98.8,
+        "why": "TR için beklenen 120 günlük talep yaklaşık 494 adet (iade sonrası kalıcı satış ~466). Talebi karşılayacak kadar 500 adet ayrıldı; fazlası stok riski yaratırdı. Eski kâr ağırlıklı dağıtım 5,446 adet verirdi: ~4,952 adet stok kalırdı. Hedef: dengeli (satış hızı)."
+       },
+       "returns": {
+        "rate_pct": 18.5,
+        "low_pct": 13.9,
+        "high_pct": 24.1,
+        "base_pct": 17.0,
+        "drivers": [
+         {
+          "label": "Bölge taban oranı (TR)",
+          "points": 0.0,
+          "detail": "Taban %17. Kolay iade ve değişim beklentisi yüksek; kapıda ödeme payı var.",
+          "basis": "kural varsayımı"
+         },
+         {
+          "label": "Bölgesel beden uyumu",
+          "points": 1.0,
+          "detail": "Bölgesel kalıp beklentisi farkı küçük bir ek beden riski yaratır.",
+          "basis": "kural varsayımı"
+         },
+         {
+          "label": "Esnek kumaş",
+          "points": -1.5,
+          "detail": "Esneyen kumaş küçük beden farklarını tolere eder.",
+          "basis": "kural varsayımı"
+         },
+         {
+          "label": "Görsel-gerçek renk/parlaklık farkı",
+          "points": 2.0,
+          "detail": "Parlak/sentetik yüzeyler fotoğrafta ve gerçekte farklı görünür.",
+          "basis": "kural varsayımı"
+         }
+        ],
+        "gross_margin_pct": 69.4,
+        "net_margin_pct": 65.5,
+        "return_cost_per_sale": "0.29",
+        "net_qty_if_sold_out": 407,
+        "basis": "kural tabanlı varsayım (ajan cevabı değil)"
+       },
+       "confidence": {
+        "level": "orta",
+        "reasons": [
+         "1 ajanın bazı fiyat eşikleri tahmin edildi.",
+         "Bazı ajanlar zaman aşımı/bozuk cevap yüzünden hesaba katılmadı.",
+         "Panel gerçek satış verisiyle kalibre edilmedi (en fazla 'orta' güven).",
+         "Persona seti ya da bağlam paketi doğrulanmamış taslak.",
+         "Hedef kitle büyüklüğü varsayım (satış tahmini buna bağlı)."
+        ]
+       },
+       "raw_answers": [
+        {
+         "agent": 1,
+         "status": "json",
+         "segment": "Kentli genç profesyonel",
+         "interest": 65.0,
+         "who": "Kadın, 27",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 2,
+         "status": "json",
+         "segment": "Kentli genç profesyonel",
+         "interest": 65.0,
+         "who": "Erkek, 27 (yakını için)",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 3,
+         "status": "json",
+         "segment": "Kentli genç profesyonel",
+         "interest": 65.0,
+         "who": "Kadın, 28",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 4,
+         "status": "json",
+         "segment": "Sabit gelirli",
+         "interest": 55.0,
+         "who": "Kadın, 35",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 5,
+         "status": "json",
+         "segment": "Sabit gelirli",
+         "interest": 35.0,
+         "who": "Kadın, 40",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 6,
+         "status": "json",
+         "segment": "Sabit gelirli",
+         "interest": 45.0,
+         "who": "Kadın, 43",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 7,
+         "status": "json",
+         "segment": "Üniversite öğrencisi",
+         "interest": 78.0,
+         "who": "Kadın, 22",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 8,
+         "status": "error",
+         "segment": "Üniversite öğrencisi",
+         "interest": null,
+         "who": "Kadın, 23",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 9,
+         "status": "error",
+         "segment": "Aile bütçesi",
+         "interest": null,
+         "who": "Kadın, 46",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 10,
+         "status": "json",
+         "segment": "Aile bütçesi",
+         "interest": 65.0,
+         "who": "Kadın, 50",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 11,
+         "status": "error",
+         "segment": "Markalı ürün alıcısı",
+         "interest": null,
+         "who": "Kadın, 60",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 12,
+         "status": "error",
+         "segment": "Markalı ürün alıcısı",
+         "interest": null,
+         "who": "Kadın, 60",
+         "audience": "kadin",
+         "weight": null
+        }
+       ],
+       "data_basis": {
+        "persona_version": "v1",
+        "context_version": "2026-10-taslak"
+       },
+       "audience_panel": {
+        "value": "kadin",
+        "label": "Kadın",
+        "source": "kullanıcı girdisi",
+        "reason": "Kullanıcı girdisi",
+        "child_gender": null,
+        "child_age_range": null,
+        "method": "kota",
+        "note": "Panel kişileri bu dağılıma göre seçildi (kota).",
+        "n_eff": null,
+        "composition": {
+         "n": 12,
+         "n_female": 11,
+         "n_male": 1,
+         "n_unknown": 0,
+         "female_pct": 92,
+         "target_female_pct": 88,
+         "gender_known_pct": 100,
+         "age_bands": [
+          {
+           "band": "18-24",
+           "target_pct": 17,
+           "pct": 17,
+           "n": 2
+          },
+          {
+           "band": "25-34",
+           "target_pct": 25,
+           "pct": 25,
+           "n": 3
+          },
+          {
+           "band": "35-44",
+           "target_pct": 23,
+           "pct": 25,
+           "n": 3
+          },
+          {
+           "band": "45-54",
+           "target_pct": 19,
+           "pct": 17,
+           "n": 2
+          },
+          {
+           "band": "55-70",
+           "target_pct": 16,
+           "pct": 17,
+           "n": 2
+          }
+         ],
+         "roles": {
+          "kendisi": 11,
+          "hediye": 1
+         }
+        },
+        "calibration": {
+         "version": "v1",
+         "as_of": "2026-11-12",
+         "verified": false,
+         "region_specific": true,
+         "source": "TR: yetişkin nüfus 18-70 yaş dağılımı kabaca (TÜİK ADNKS), nüfus EU'dan genç (medyan ~34); alıcı cinsiyet payları varsayım.",
+         "basis": "kural varsayımı"
+        },
+        "warnings": [
+         "TR: hedef kitle dağılımı (v1) doğrulanmamış kural varsayımı; ERP/CRM alıcı verisiyle güncellenmeli."
+        ]
+       },
+       "key_objections": []
+      }
+     ],
+     "failed_regions": [],
+     "target_audience": {
+      "value": "kadin",
+      "label": "Kadın",
+      "source": "kullanıcı girdisi",
+      "reason": "Kullanıcı girdisi",
+      "child_gender": null,
+      "child_age_range": null,
+      "raw": "Kadın"
+     },
+     "brand_profile": {
+      "name": "Marka",
+      "positioning": "Marka kendini pazarda 'uzman iç giyim markası' olarak konumlandırır, kalite ve konfor odaklı, ulaşılabilecek lüks sunar.",
+      "price_tier": "upper_mass",
+      "price_multiple": 3.0,
+      "price_sensitivity": 0.7,
+      "brand_pull": 85,
+      "typical_customer": "Kendine değer veren, uzun ömürlü ve kaliteli ürünleri tercih eden genç ve orta yaş kadınlardır.",
+      "margin_norm_pct": 40.0,
+      "regional_strength": {
+       "EU": 20,
+       "MENA": 15,
+       "CIS": 10,
+       "US": 5,
+       "TR": 80
+      },
+      "known_brand": true,
+      "confidence": "high",
+      "source": "user_notes",
+      "edited": false,
+      "warning": "Bu profil modelin genel bilgisinden üretildi; doğrulanmış veri değildir."
+     }
+    }
+   },
+   "U07": {
+    "panel_seed": "koleksiyon:20261112-9624f603",
+    "response": {
+     "regional_breakdown": [
+      {
+       "region": "TR",
+       "demand_score_100": 43,
+       "optimal_sale_price": "15.21",
+       "recommended_production_qty": 450,
+       "estimated_margin_percentage": 69.2,
+       "van_westendorp": {
+        "optimal_price_point": "14.43",
+        "indifference_price_point": "13.32",
+        "acceptable_range_low": "12.22",
+        "acceptable_range_high": "16.61",
+        "zones": [
+         {
+          "key": "too_cheap",
+          "label": "Çok ucuz",
+          "low": "0.00",
+          "high": "12.22",
+          "description": "Çoğu ajan bu fiyatta kaliteden şüphelenir."
+         },
+         {
+          "key": "cheap",
+          "label": "Ucuz / avantajlı",
+          "low": "12.22",
+          "high": "13.32",
+          "description": "Kabul edilebilir ama kâr bırakılıyor; satışı hızlandırır."
+         },
+         {
+          "key": "ideal",
+          "label": "İdeal bölge",
+          "low": "13.32",
+          "high": "14.43",
+          "description": "Ucuz-pahalı dengesi; en az direnç."
+         },
+         {
+          "key": "expensive",
+          "label": "Pahalı ama kabul edilebilir",
+          "low": "14.43",
+          "high": "16.61",
+          "description": "Marjı yüksek, satış hızı düşer; kararsız müşteri artar."
+         },
+         {
+          "key": "too_expensive",
+          "label": "Çok pahalı",
+          "low": "16.61",
+          "high": null,
+          "description": "Çoğu ajan bu fiyatın üstünde almaz."
+         }
+        ],
+        "quality": "high",
+        "quality_note": "12 ajan: örneklem makul; yine de gerçek müşteri verisi değil, simülasyon çıktısıdır."
+       },
+       "allocation": {
+        "objective": "balanced",
+        "demand_units": 444,
+        "net_demand_units": 420,
+        "units_before": 3247,
+        "units": 450,
+        "sold_before": 444,
+        "sold": 444,
+        "leftover_before": 2803,
+        "leftover": 6,
+        "unmet_before": 0,
+        "unmet": 0,
+        "sell_through_before_pct": 13.7,
+        "sell_through_pct": 98.7,
+        "why": "TR için beklenen 120 günlük talep yaklaşık 444 adet (iade sonrası kalıcı satış ~420). Talebi karşılayacak kadar 450 adet ayrıldı; fazlası stok riski yaratırdı. Eski kâr ağırlıklı dağıtım 3,247 adet verirdi: ~2,803 adet stok kalırdı. Hedef: dengeli (satış hızı)."
+       },
+       "returns": {
+        "rate_pct": 18.5,
+        "low_pct": 13.9,
+        "high_pct": 24.1,
+        "base_pct": 17.0,
+        "drivers": [
+         {
+          "label": "Bölge taban oranı (TR)",
+          "points": 0.0,
+          "detail": "Taban %17. Kolay iade ve değişim beklentisi yüksek; kapıda ödeme payı var.",
+          "basis": "kural varsayımı"
+         },
+         {
+          "label": "Bölgesel beden uyumu",
+          "points": 1.0,
+          "detail": "Bölgesel kalıp beklentisi farkı küçük bir ek beden riski yaratır.",
+          "basis": "kural varsayımı"
+         },
+         {
+          "label": "Esnek kumaş",
+          "points": -1.5,
+          "detail": "Esneyen kumaş küçük beden farklarını tolere eder.",
+          "basis": "kural varsayımı"
+         },
+         {
+          "label": "Görsel-gerçek renk/parlaklık farkı",
+          "points": 2.0,
+          "detail": "Parlak/sentetik yüzeyler fotoğrafta ve gerçekte farklı görünür.",
+          "basis": "kural varsayımı"
+         }
+        ],
+        "gross_margin_pct": 69.2,
+        "net_margin_pct": 65.3,
+        "return_cost_per_sale": "0.48",
+        "net_qty_if_sold_out": 366,
+        "basis": "kural tabanlı varsayım (ajan cevabı değil)"
+       },
+       "confidence": {
+        "level": "orta",
+        "reasons": [
+         "6 ajanın bazı fiyat eşikleri tahmin edildi.",
+         "Panel gerçek satış verisiyle kalibre edilmedi (en fazla 'orta' güven).",
+         "Persona seti ya da bağlam paketi doğrulanmamış taslak.",
+         "Hedef kitle büyüklüğü varsayım (satış tahmini buna bağlı)."
+        ]
+       },
+       "raw_answers": [
+        {
+         "agent": 1,
+         "status": "json",
+         "segment": "Kentli genç profesyonel",
+         "interest": 55.0,
+         "who": "Kadın, 27",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 2,
+         "status": "json",
+         "segment": "Kentli genç profesyonel",
+         "interest": 55.0,
+         "who": "Erkek, 27 (yakını için)",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 3,
+         "status": "json",
+         "segment": "Kentli genç profesyonel",
+         "interest": 55.0,
+         "who": "Kadın, 28",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 4,
+         "status": "json",
+         "segment": "Sabit gelirli",
+         "interest": 35.0,
+         "who": "Kadın, 35",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 5,
+         "status": "json",
+         "segment": "Sabit gelirli",
+         "interest": 25.0,
+         "who": "Kadın, 40",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 6,
+         "status": "json",
+         "segment": "Sabit gelirli",
+         "interest": 35.0,
+         "who": "Kadın, 43",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 7,
+         "status": "json",
+         "segment": "Üniversite öğrencisi",
+         "interest": 55.0,
+         "who": "Kadın, 22",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 8,
+         "status": "json",
+         "segment": "Üniversite öğrencisi",
+         "interest": 45.0,
+         "who": "Kadın, 23",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 9,
+         "status": "json",
+         "segment": "Aile bütçesi",
+         "interest": 15.0,
+         "who": "Kadın, 46",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 10,
+         "status": "json",
+         "segment": "Aile bütçesi",
+         "interest": 35.0,
+         "who": "Kadın, 50",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 11,
+         "status": "json",
+         "segment": "Markalı ürün alıcısı",
+         "interest": 65.0,
+         "who": "Kadın, 60",
+         "audience": "kadin",
+         "weight": null
+        },
+        {
+         "agent": 12,
+         "status": "json",
+         "segment": "Markalı ürün alıcısı",
+         "interest": 45.0,
+         "who": "Kadın, 60",
+         "audience": "kadin",
+         "weight": null
+        }
+       ],
+       "data_basis": {
+        "persona_version": "v1",
+        "context_version": "2026-10-taslak"
+       },
+       "audience_panel": {
+        "value": "kadin",
+        "label": "Kadın",
+        "source": "kullanıcı girdisi",
+        "reason": "Kullanıcı girdisi",
+        "child_gender": null,
+        "child_age_range": null,
+        "method": "kota",
+        "note": "Panel kişileri bu dağılıma göre seçildi (kota).",
+        "n_eff": null,
+        "composition": {
+         "n": 12,
+         "n_female": 11,
+         "n_male": 1,
+         "n_unknown": 0,
+         "female_pct": 92,
+         "target_female_pct": 88,
+         "gender_known_pct": 100,
+         "age_bands": [
+          {
+           "band": "18-24",
+           "target_pct": 17,
+           "pct": 17,
+           "n": 2
+          },
+          {
+           "band": "25-34",
+           "target_pct": 25,
+           "pct": 25,
+           "n": 3
+          },
+          {
+           "band": "35-44",
+           "target_pct": 23,
+           "pct": 25,
+           "n": 3
+          },
+          {
+           "band": "45-54",
+           "target_pct": 19,
+           "pct": 17,
+           "n": 2
+          },
+          {
+           "band": "55-70",
+           "target_pct": 16,
+           "pct": 17,
+           "n": 2
+          }
+         ],
+         "roles": {
+          "kendisi": 11,
+          "hediye": 1
+         }
+        },
+        "calibration": {
+         "version": "v1",
+         "as_of": "2026-11-12",
+         "verified": false,
+         "region_specific": true,
+         "source": "TR: yetişkin nüfus 18-70 yaş dağılımı kabaca (TÜİK ADNKS), nüfus EU'dan genç (medyan ~34); alıcı cinsiyet payları varsayım.",
+         "basis": "kural varsayımı"
+        },
+        "warnings": [
+         "TR: hedef kitle dağılımı (v1) doğrulanmamış kural varsayımı; ERP/CRM alıcı verisiyle güncellenmeli."
+        ]
+       },
+       "key_objections": []
+      }
+     ],
+     "failed_regions": [],
+     "target_audience": {
+      "value": "kadin",
+      "label": "Kadın",
+      "source": "kullanıcı girdisi",
+      "reason": "Kullanıcı girdisi",
+      "child_gender": null,
+      "child_age_range": null,
+      "raw": "Kadın"
+     },
+     "brand_profile": {
+      "name": "Marka",
+      "positioning": "Marka kendini pazarda 'uzman iç giyim markası' olarak konumlandırır, kalite ve konfor odaklı, ulaşılabilecek lüks sunar.",
+      "price_tier": "upper_mass",
+      "price_multiple": 3.0,
+      "price_sensitivity": 0.7,
+      "brand_pull": 85,
+      "typical_customer": "Kendine değer veren, uzun ömürlü ve kaliteli ürünleri tercih eden genç ve orta yaş kadınlardır.",
+      "margin_norm_pct": 40.0,
+      "regional_strength": {
+       "EU": 20,
+       "MENA": 15,
+       "CIS": 10,
+       "US": 5,
+       "TR": 80
+      },
+      "known_brand": true,
+      "confidence": "high",
+      "source": "user_notes",
+      "edited": false,
+      "warning": "Bu profil modelin genel bilgisinden üretildi; doğrulanmış veri değildir."
+     }
+    }
+   }
+  },
+  "showcase": {
+   "TR": [
+    {
+     "key": "1|0",
+     "region": "TR",
+     "person": 1,
+     "segment": "Kentli genç profesyonel",
+     "block": 0,
+     "audience": "kadin",
+     "order": [
+      "U07",
+      "U06",
+      "U02",
+      "U03",
+      "U05",
+      "U04",
+      "U01"
+     ],
+     "letters": {
+      "A": "U07",
+      "B": "U06",
+      "C": "U02",
+      "D": "U03",
+      "E": "U05",
+      "F": "U04",
+      "G": "U01"
+     },
+     "status": "json",
+     "answer": {
+      "best": [
+       "C",
+       "D",
+       "E"
+      ],
+      "worst": [
+       "A",
+       "G"
+      ],
+      "together": [
+       [
+        "D",
+        "F"
+       ]
+      ],
+      "substitutes": [
+       [
+        "C",
+        "E"
+       ]
+      ],
+      "n_buy": 3
+     }
+    },
+    {
+     "key": "2|0",
+     "region": "TR",
+     "person": 2,
+     "segment": "Kentli genç profesyonel",
+     "block": 0,
+     "audience": "kadin",
+     "order": [
+      "U06",
+      "U02",
+      "U03",
+      "U05",
+      "U04",
+      "U01",
+      "U07"
+     ],
+     "letters": {
+      "A": "U06",
+      "B": "U02",
+      "C": "U03",
+      "D": "U05",
+      "E": "U04",
+      "F": "U01",
+      "G": "U07"
+     },
+     "status": "json",
+     "answer": {
+      "best": [
+       "C",
+       "E",
+       "F"
+      ],
+      "worst": [
+       "B",
+       "G"
+      ],
+      "together": [
+       [
+        "C",
+        "E"
+       ]
+      ],
+      "substitutes": [
+       [
+        "B",
+        "D"
+       ]
+      ],
+      "n_buy": 3
+     }
+    },
+    {
+     "key": "3|0",
+     "region": "TR",
+     "person": 3,
+     "segment": "Kentli genç profesyonel",
+     "block": 0,
+     "audience": "kadin",
+     "order": [
+      "U02",
+      "U03",
+      "U05",
+      "U04",
+      "U01",
+      "U07",
+      "U06"
+     ],
+     "letters": {
+      "A": "U02",
+      "B": "U03",
+      "C": "U05",
+      "D": "U04",
+      "E": "U01",
+      "F": "U07",
+      "G": "U06"
+     },
+     "status": "json",
+     "answer": {
+      "best": [
+       "B",
+       "D",
+       "F"
+      ],
+      "worst": [
+       "A",
+       "E"
+      ],
+      "together": [
+       [
+        "B",
+        "D"
+       ],
+       [
+        "F",
+        "G"
+       ]
+      ],
+      "substitutes": [
+       [
+        "B",
+        "D"
+       ]
+      ],
+      "n_buy": 5
+     }
+    },
+    {
+     "key": "4|0",
+     "region": "TR",
+     "person": 4,
+     "segment": "Sabit gelirli",
+     "block": 0,
+     "audience": "kadin",
+     "order": [
+      "U03",
+      "U05",
+      "U04",
+      "U01",
+      "U07",
+      "U06",
+      "U02"
+     ],
+     "letters": {
+      "A": "U03",
+      "B": "U05",
+      "C": "U04",
+      "D": "U01",
+      "E": "U07",
+      "F": "U06",
+      "G": "U02"
+     },
+     "status": "json",
+     "answer": {
+      "best": [
+       "G",
+       "D",
+       "A"
+      ],
+      "worst": [
+       "F",
+       "E"
+      ],
+      "together": [
+       [
+        "D",
+        "G"
+       ]
+      ],
+      "substitutes": [
+       [
+        "B",
+        "D"
+       ]
+      ],
+      "n_buy": 3
+     }
+    },
+    {
+     "key": "5|0",
+     "region": "TR",
+     "person": 5,
+     "segment": "Sabit gelirli",
+     "block": 0,
+     "audience": "kadin",
+     "order": [
+      "U05",
+      "U04",
+      "U01",
+      "U07",
+      "U06",
+      "U02",
+      "U03"
+     ],
+     "letters": {
+      "A": "U05",
+      "B": "U04",
+      "C": "U01",
+      "D": "U07",
+      "E": "U06",
+      "F": "U02",
+      "G": "U03"
+     },
+     "status": "json",
+     "answer": {
+      "best": [
+       "C",
+       "F"
+      ],
+      "worst": [
+       "B",
+       "E"
+      ],
+      "together": [
+       [
+        "C",
+        "D"
+       ],
+       [
+        "F",
+        "G"
+       ]
+      ],
+      "substitutes": [
+       [
+        "D",
+        "E"
+       ]
+      ],
+      "n_buy": 3
+     }
+    },
+    {
+     "key": "6|0",
+     "region": "TR",
+     "person": 6,
+     "segment": "Sabit gelirli",
+     "block": 0,
+     "audience": "kadin",
+     "order": [
+      "U04",
+      "U01",
+      "U07",
+      "U06",
+      "U02",
+      "U03",
+      "U05"
+     ],
+     "letters": {
+      "A": "U04",
+      "B": "U01",
+      "C": "U07",
+      "D": "U06",
+      "E": "U02",
+      "F": "U03",
+      "G": "U05"
+     },
+     "status": "json",
+     "answer": {
+      "best": [
+       "F",
+       "G"
+      ],
+      "worst": [
+       "B",
+       "E"
+      ],
+      "together": [
+       [
+        "F",
+        "G"
+       ]
+      ],
+      "substitutes": [
+       [
+        "F",
+        "G"
+       ]
+      ],
+      "n_buy": 2
+     }
+    },
+    {
+     "key": "7|0",
+     "region": "TR",
+     "person": 7,
+     "segment": "Üniversite öğrencisi",
+     "block": 0,
+     "audience": "kadin",
+     "order": [
+      "U01",
+      "U07",
+      "U06",
+      "U02",
+      "U03",
+      "U05",
+      "U04"
+     ],
+     "letters": {
+      "A": "U01",
+      "B": "U07",
+      "C": "U06",
+      "D": "U02",
+      "E": "U03",
+      "F": "U05",
+      "G": "U04"
+     },
+     "status": "json",
+     "answer": {
+      "best": [
+       "A",
+       "E"
+      ],
+      "worst": [
+       "C",
+       "G"
+      ],
+      "together": [
+       [
+        "A",
+        "D"
+       ],
+       [
+        "E",
+        "F"
+       ]
+      ],
+      "substitutes": [
+       [
+        "B",
+        "F"
+       ]
+      ],
+      "n_buy": 3
+     }
+    },
+    {
+     "key": "8|0",
+     "region": "TR",
+     "person": 8,
+     "segment": "Üniversite öğrencisi",
+     "block": 0,
+     "audience": "kadin",
+     "order": [
+      "U01",
+      "U04",
+      "U05",
+      "U03",
+      "U02",
+      "U06",
+      "U07"
+     ],
+     "letters": {
+      "A": "U01",
+      "B": "U04",
+      "C": "U05",
+      "D": "U03",
+      "E": "U02",
+      "F": "U06",
+      "G": "U07"
+     },
+     "status": "json",
+     "answer": {
+      "best": [
+       "D",
+       "E"
+      ],
+      "worst": [
+       "F",
+       "G"
+      ],
+      "together": [
+       [
+        "D",
+        "E"
+       ]
+      ],
+      "substitutes": [
+       [
+        "D",
+        "E"
+       ]
+      ],
+      "n_buy": 2
+     }
+    },
+    {
+     "key": "9|0",
+     "region": "TR",
+     "person": 9,
+     "segment": "Aile bütçesi",
+     "block": 0,
+     "audience": "kadin",
+     "order": [
+      "U07",
+      "U01",
+      "U04",
+      "U05",
+      "U03",
+      "U02",
+      "U06"
+     ],
+     "letters": {
+      "A": "U07",
+      "B": "U01",
+      "C": "U04",
+      "D": "U05",
+      "E": "U03",
+      "F": "U02",
+      "G": "U06"
+     },
+     "status": "json",
+     "answer": {
+      "best": [
+       "C",
+       "E"
+      ],
+      "worst": [
+       "A",
+       "F"
+      ],
+      "together": [
+       [
+        "C",
+        "E"
+       ]
+      ],
+      "substitutes": [],
+      "n_buy": 2
+     }
+    },
+    {
+     "key": "10|0",
+     "region": "TR",
+     "person": 10,
+     "segment": "Aile bütçesi",
+     "block": 0,
+     "audience": "kadin",
+     "order": [
+      "U06",
+      "U07",
+      "U01",
+      "U04",
+      "U05",
+      "U03",
+      "U02"
+     ],
+     "letters": {
+      "A": "U06",
+      "B": "U07",
+      "C": "U01",
+      "D": "U04",
+      "E": "U05",
+      "F": "U03",
+      "G": "U02"
+     },
+     "status": "json",
+     "answer": {
+      "best": [
+       "D",
+       "F"
+      ],
+      "worst": [
+       "B",
+       "G"
+      ],
+      "together": [
+       [
+        "D",
+        "F"
+       ]
+      ],
+      "substitutes": [
+       [
+        "B",
+        "E"
+       ]
+      ],
+      "n_buy": 2
+     }
+    },
+    {
+     "key": "11|0",
+     "region": "TR",
+     "person": 11,
+     "segment": "Markalı ürün alıcısı",
+     "block": 0,
+     "audience": "kadin",
+     "order": [
+      "U02",
+      "U06",
+      "U07",
+      "U01",
+      "U04",
+      "U05",
+      "U03"
+     ],
+     "letters": {
+      "A": "U02",
+      "B": "U06",
+      "C": "U07",
+      "D": "U01",
+      "E": "U04",
+      "F": "U05",
+      "G": "U03"
+     },
+     "status": "json",
+     "answer": {
+      "best": [
+       "F",
+       "E"
+      ],
+      "worst": [
+       "A",
+       "D"
+      ],
+      "together": [
+       [
+        "E",
+        "F"
+       ]
+      ],
+      "substitutes": [
+       [
+        "C",
+        "F"
+       ]
+      ],
+      "n_buy": 2
+     }
+    },
+    {
+     "key": "12|0",
+     "region": "TR",
+     "person": 12,
+     "segment": "Markalı ürün alıcısı",
+     "block": 0,
+     "audience": "kadin",
+     "order": [
+      "U03",
+      "U02",
+      "U06",
+      "U07",
+      "U01",
+      "U04",
+      "U05"
+     ],
+     "letters": {
+      "A": "U03",
+      "B": "U02",
+      "C": "U06",
+      "D": "U07",
+      "E": "U01",
+      "F": "U04",
+      "G": "U05"
+     },
+     "status": "json",
+     "answer": {
+      "best": [
+       "F",
+       "E",
+       "B"
+      ],
+      "worst": [
+       "C",
+       "D"
+      ],
+      "together": [
+       [
+        "E",
+        "F"
+       ],
+       [
+        "A",
+        "B"
+       ]
+      ],
+      "substitutes": [
+       [
+        "E",
+        "F"
+       ]
+      ],
+      "n_buy": 4
+     }
+    }
+   ]
+  },
+  "fx_rate": 47.0
+ },
+ "girdi_olmamali": [
+  {
+   "kural": "kategori_disi_eslesme",
+   "seviye": "hata"
+  },
+  {
+   "kural": "kucuk_orneklem",
+   "seviye": "hata"
+  }
+ ],
+ "girdi_beklenen": [
+  {
+   "kural": "kucuk_orneklem",
+   "seviye": "uyarı",
+   "icerir": "3/3 kişi"
+  },
+  {
+   "kural": "kategori_disi_eslesme",
+   "seviye": "uyarı",
+   "icerir": "Vitrin"
+  }
+ ]
+}

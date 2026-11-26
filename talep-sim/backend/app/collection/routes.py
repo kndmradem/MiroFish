@@ -358,6 +358,19 @@ async def export(cid: str, store: CollectionStore = Depends(get_store)) -> Respo
                 rs.append([f.label, f.n_models, f.n_colors, f.qty, f.share_pct] + [f.by_region.get(r) for r in res.regions])
             rs.append([])
             rs.append([cp.source_note])
+    dn = res.denetim
+    if dn is not None:
+        ds = wb.create_sheet("Denetim", 0 if dn.durum == "incelenmeli" else None)
+        ds.append([f"Mantık denetimi: {dn.durum.upper()}", dn.ozet])
+        ds["A1"].font = Font(bold=True)
+        ds.append([])
+        ds.append(["Seviye", "Kural", "Bulgu", "Ürünler", "Bölge", "Dayanak"])
+        for c in ds[3]:
+            c.font = Font(bold=True)
+        for b in dn.bulgular:
+            ds.append([b.seviye, b.baslik, b.mesaj, ", ".join(b.skus), b.bolge or "", b.dayanak])
+        ds.append([])
+        ds.append([dn.sinir])
     notes = wb.create_sheet("Notlar")
     for a in res.summary.actions:
         notes.append([a.kind, a.text, a.basis])

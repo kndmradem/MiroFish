@@ -7,6 +7,7 @@ from typing import Dict, List, Literal, Optional
 from pydantic import BaseModel, Field, field_validator
 
 from .audience import AudienceInfo
+from .denetim.model import DenetimRaporu
 
 Region = Literal["EU", "MENA", "CIS", "US", "TR"]
 
@@ -448,3 +449,4 @@ class PredictionResponse(BaseModel):
     disclaimer: str = "Bu çıktılar model tabanlı tahmindir, ölçülmüş satış verisi değildir. Her bölüm dayanağını (ajan cevabı, kural varsayımı, kullanıcı girdisi) belirtir; varsayımları kendi verinle değiştir."
     regional_breakdown: List[RegionPredictionResult]
     failed_regions: List[FailedRegion] = []
+    denetim: Optional[DenetimRaporu] = Field(None, description="Mantık denetimi: sonucun kendi içinde tutarlılığı (hata / uyarı / bilgi)")
