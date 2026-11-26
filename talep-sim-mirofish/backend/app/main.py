@@ -27,6 +27,7 @@ from .takvim import data as takvim_data, fit as takvim_fit, plan as takvim_plan
 from .returns import estimate_returns
 from .pricing import analyze, anchor_note, purchase_probability, steps_from_answers, steps_from_votes
 from .config import Settings, settings
+from .denetim import denetle_tahmin
 from .services.brand_profiler import BrandProfiler
 from .services.llm import LLMClient, LLMError
 from .services.mirofish_client import MiroFishError
@@ -413,7 +414,7 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
     if failed:
         notes.append("Hesaplanamayan bölgeler (" + ", ".join(f.region for f in failed) +
                      ") dağıtıma katılmadı; bütçe yalnızca hesaplanan bölgeler arasında paylaştırıldı.")
-    return PredictionResponse(
+    resp = PredictionResponse(
         session_id=str(uuid.uuid4()),
         total_produced_qty=sum(a.quantity for a in allocations.values()),
         unallocated_budget=unallocated,
@@ -429,6 +430,8 @@ async def run_prediction(req: PredictionRequest, engine: SimulationEngine, profi
         regional_breakdown=breakdown,
         failed_regions=failed,
     )
+    resp.denetim = denetle_tahmin(resp, unit_cost=float(req.unit_cost), budget=float(req.total_production_budget))
+    return resp
 
 
 @app.post("/api/predict", response_model=PredictionResponse)
@@ -534,3 +537,7 @@ app.include_router(collection_router)
 from .mallprofile.routes import router as mall_router  # noqa: E402
 
 app.include_router(mall_router)
+
+from .denetim.routes import router as denetim_router  # noqa: E402
+
+app.include_router(denetim_router)

@@ -16,6 +16,7 @@ from typing import Dict, List, Optional, Set, Tuple
 from .. import brand as brandlib
 from ..allocation import DEMAND_SCENARIOS, STOP_P, p_sells
 from ..audience import AudienceInfo
+from ..denetim import denetle_koleksiyon
 from ..models import BrandProfile
 from . import colors as colorlib
 from .importer import norm
@@ -1047,7 +1048,10 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
                               how="120 günde beklenen satış (orta senaryo), önerilen adetlerle sınırlı."),
         actions=actions)
     regions = sorted({r.region for rs in per_item_regions.values() for r in rs}) or list(col.meta.target_regions)
-    return CollectionResult(collection_id=col.id, name=col.meta.name, kind=col.meta.kind, currency=cur, fx_rate=fx_rate, regions=regions,
-                            items=out_items, summary=summary, notes=notes, data_basis=data_basis, panel_shared=shared,
-                            brand_profile=brand, brand_effect=brand_effect(brand, col, regions), showcase=sc_summary,
-                            color_plan=color_plan)
+    res = CollectionResult(collection_id=col.id, name=col.meta.name, kind=col.meta.kind, currency=cur, fx_rate=fx_rate, regions=regions,
+                           items=out_items, summary=summary, notes=notes, data_basis=data_basis, panel_shared=shared,
+                           brand_profile=brand, brand_effect=brand_effect(brand, col, regions), showcase=sc_summary,
+                           color_plan=color_plan)
+    # mantık denetimi her hesaplamada (ilk sonuç ve her 'ne olur' denemesi) çalışır
+    res.denetim = denetle_koleksiyon(res)
+    return res
