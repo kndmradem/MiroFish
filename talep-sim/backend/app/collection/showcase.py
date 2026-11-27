@@ -156,6 +156,23 @@ def parse(text: str, letters: List[str]) -> Optional[dict]:
     return None
 
 
+def showcase_audience(cards: Dict[str, dict], region: str, root=None):
+    """Vitrin turu tek bir panelle yapılır: ürünlerin çoğunluk hedef kitlesi (eşitlikte unisex).
+
+    Hepsi aynı kitledeyse tek tek turdaki kişilerle aynı panel olur; karışık koleksiyonda çoğunluk kitlesi kullanılır.
+    """
+    from collections import Counter
+    from ..panel.engine import audience_plan
+    infos = [c.get("target_audience") for c in cards.values() if c.get("target_audience")]
+    if not infos:
+        return None
+    cnt = Counter(i["value"] for i in infos).most_common()
+    top = cnt[0][0] if len(cnt) == 1 or cnt[0][1] > cnt[1][1] else "unisex"
+    pick = next((i for i in infos if i["value"] == top), None) or {
+        "value": "unisex", "label": "Unisex", "source": "tahmin", "reason": "koleksiyonda kitleler eşit dağılıyor"}
+    return audience_plan({"target_audience": pick}, region, root)
+
+
 async def run_region(engine, region: str, panel_seed: str, brand: Optional[BrandProfile], cards: Dict[str, dict],
                      prices_usd: Dict[str, Optional[float]], try_rate: Optional[float], block_size: int,
                      done: Dict[str, dict], save: Callable[[dict], None], note: Callable[[str], None]) -> List[dict]:
@@ -164,7 +181,8 @@ async def run_region(engine, region: str, panel_seed: str, brand: Optional[Brand
     ctx = engine.store.context(region, engine.as_of)
     cal = engine.calibration.for_region(region)
     seed = f"{panel_seed}|{brand.name if brand else ''}|{region}"     # tek tek turla aynı kişiler
-    members = sample_panel(lib, engine.panel_size, seed, cal.sensitivity_scale, cal.trend_scale)
+    plan = showcase_audience(cards, region, engine.store.root)
+    members = sample_panel(lib, engine.panel_size, seed, cal.sensitivity_scale, cal.trend_scale, audience=plan)
     skus = sorted(cards)
     jobs = []
     for m in members:
@@ -182,6 +200,7 @@ async def run_region(engine, region: str, panel_seed: str, brand: Optional[Brand
                                         schema(letters), lambda t: parse(t, letters),
                                         seed=int(hashlib.sha256(f"{seed}|{m.index}|{bi}|vitrin".encode()).hexdigest()[:8], 16))
         rec = {"key": f"{m.index}|{bi}", "region": region, "person": m.index, "segment": m.segment.label, "block": bi,
+               "audience": m.audience or None,
                "order": block, "letters": dict(zip(letters, block)), "status": rep.status,
                "answer": rep.answer, "text": (rep.text or rep.error)[:800]}
         out.append(rec)

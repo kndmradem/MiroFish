@@ -61,6 +61,19 @@ async def list_collections(kind: Optional[str] = None, store: CollectionStore = 
             for c in store.list() if not kind or c.meta.kind == kind]
 
 
+@router.delete("/{cid}")
+async def delete_collection(cid: str, store: CollectionStore = Depends(get_store)) -> dict:
+    """Koleksiyonu ve ona ait her şeyi (sonuçlar, ajan cevapları, görseller) kalıcı olarak siler."""
+    if runner.running(cid):
+        raise HTTPException(409, "Koleksiyon şu an çalışıyor; önce durdurun, sonra silin.")
+    try:
+        store.delete(cid)
+    except KeyError:
+        raise HTTPException(404, "Koleksiyon bulunamadı")
+    runner.tasks.pop(cid, None)
+    return {"deleted": cid}
+
+
 @router.get("/template.xlsx")
 async def template() -> Response:
     return Response(template_bytes(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -298,7 +311,7 @@ async def export(cid: str, store: CollectionStore = Depends(get_store)) -> Respo
     ws.title = "Ürünler"
     rate = res.fx_rate if res.currency == "TRY" else 1.0
     indep = res.kind == "bagimsiz"
-    head = ["SKU", "Ürün", "Kategori", "Karar", "Karar kaynağı", "Karar gerekçesi (dayanak)", "Talep skoru (ajan)",
+    head = ["SKU", "Ürün", "Kategori", "Hedef kitle (dayanak)", "Karar", "Karar kaynağı", "Karar gerekçesi (dayanak)", "Talep skoru (ajan)",
             f"Önerilen fiyat ({res.currency}, ajan)", f"Kabul aralığı ({res.currency}, ajan)", "Net marj % (kural)"]
     if not indep:
         head += ["Sıra", "Sıra aralığı", "Koleksiyon içi fark (ajan)", "Hevesli % (ajan)", "Rol (kural)", "Rol nedeni", "Hedef rol"]
@@ -311,7 +324,8 @@ async def export(cid: str, store: CollectionStore = Depends(get_store)) -> Respo
     for it in res.items:
         reg = {x.region: x for x in it.regions}
         rp = it.recommended_price
-        row = [it.sku, it.name, it.category, it.decision or "", it.decision_source if it.decision else "",
+        a = it.audience
+        row = [it.sku, it.name, it.category, f"{a.label} ({a.source})" if a else "", it.decision or "", it.decision_source if it.decision else "",
                "; ".join(f"{x.text} ({x.basis})" for x in it.decision_reasons), it.appeal.value,
                round(rp.value * rate, 2) if rp.value else None,
                f"{round(rp.low * rate):,} - {round(rp.high * rate):,}" if rp.low is not None else "", it.net_margin.value]
@@ -344,6 +358,19 @@ async def export(cid: str, store: CollectionStore = Depends(get_store)) -> Respo
                 rs.append([f.label, f.n_models, f.n_colors, f.qty, f.share_pct] + [f.by_region.get(r) for r in res.regions])
             rs.append([])
             rs.append([cp.source_note])
+    dn = res.denetim
+    if dn is not None:
+        ds = wb.create_sheet("Denetim", 0 if dn.durum == "incelenmeli" else None)
+        ds.append([f"Mantık denetimi: {dn.durum.upper()}", dn.ozet])
+        ds["A1"].font = Font(bold=True)
+        ds.append([])
+        ds.append(["Seviye", "Kural", "Bulgu", "Ürünler", "Bölge", "Dayanak"])
+        for c in ds[3]:
+            c.font = Font(bold=True)
+        for b in dn.bulgular:
+            ds.append([b.seviye, b.baslik, b.mesaj, ", ".join(b.skus), b.bolge or "", b.dayanak])
+        ds.append([])
+        ds.append([dn.sinir])
     notes = wb.create_sheet("Notlar")
     for a in res.summary.actions:
         notes.append([a.kind, a.text, a.basis])

@@ -67,7 +67,9 @@ class Config:
         if not cls.LLM_API_KEY:
             errors.append("LLM_API_KEY 未配置")
         if not cls.ZEP_API_KEY:
-            errors.append("ZEP_API_KEY 未配置")
+            # Zep'siz çalışma: yalnızca /api/graph/local ile verilen kişi listeleri kullanılabilir.
+            import warnings
+            warnings.warn("ZEP_API_KEY yok: yalnızca yerel kişi listesi (Zep'siz) modu çalışır", RuntimeWarning)
         if os.environ.get("ZEP_API_URL"):
             errors.append("ZEP_API_URL 不受支持；MiroFish 仅连接 Zep Cloud")
         if cls.DEBUG:

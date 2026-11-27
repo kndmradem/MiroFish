@@ -1,5 +1,6 @@
 // Koleksiyon modu API istemcisi (/api/collections). Tekli ürün API'si (api.ts) değişmez.
-import { normalizePrediction, try_, usd, type BrandProfile, type PredictionResponse, type RegionCode } from "@/lib/api";
+import type { DenetimRaporu } from "./denetim";
+import { normalizePrediction, try_, usd, type AudienceInfo, type BrandProfile, type PredictionResponse, type RegionCode } from "@/lib/api";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -29,6 +30,8 @@ export interface CollectionItem {
   moq: number | null;
   attributes: Record<string, string>;
   color_images?: Record<string, string>;
+  /** Excel hedef_kitle sütunu; boşsa tahmin edilir */
+  target_audience?: string | null;
 }
 
 export interface CollectionMeta {
@@ -49,7 +52,7 @@ export interface CollectionMeta {
 }
 
 export interface Issue { level: "hata" | "uyarı" | "bilgi"; sku: string | null; row: number | null; message: string }
-export interface ItemPreview { row: number; item: CollectionItem; status: "ok" | "uyarı" | "hata" | "belirsiz"; match_rule: string; candidates: string[] }
+export interface ItemPreview { row: number; item: CollectionItem; status: "ok" | "uyarı" | "hata" | "belirsiz"; match_rule: string; candidates: string[]; audience?: AudienceInfo | null }
 export interface OrphanImage { file: string; suggestion: string | null; candidates: string[] }
 export interface ImportPreview {
   collection_id: string;
@@ -102,6 +105,8 @@ export interface ItemRegion {
 }
 
 export interface ItemResult {
+  /** Hedef kitle ve dayanağı (kullanıcı girdisi / tahmin) */
+  audience?: AudienceInfo | null;
   sku: string;
   name: string;
   category: string;
@@ -160,8 +165,12 @@ export interface ShowcaseSummary {
   agreement_pct: number | null;
 }
 
-export interface ReachPoint { k: number; sku: string; name: string; reach_pct: number; added_pct: number }
-export interface CannibalPair { a: string; b: string; category: string; overlap_pct: number; why: string }
+export interface ReachPoint {
+  k: number; sku: string; name: string; reach_pct: number; added_pct: number;
+  /** hevesli (70+) kişi sayısı, eklediği yeni kişi, panel büyüklüğü, hevesli kişilerini zaten kapsayan ürünler */
+  enthusiasts?: number; added?: number; panel_n?: number; overlap_with?: string[];
+}
+export interface CannibalPair { a: string; b: string; category: string; overlap_pct: number; why: string; source?: string; basis?: string; shared?: number; base?: number; panel_n?: number }
 export interface CategorySummary { category: string; count: number; roles: Record<string, number>; price_min: number | null; price_max: number | null; mean_appeal: number; in_zone: number; out_zone: number }
 export interface Action { kind: string; text: string; skus: string[]; basis: Basis }
 
@@ -217,6 +226,8 @@ export interface CollectionResult {
   brand_effect: BrandEffect | null;
   showcase: ShowcaseSummary | null;
   color_plan: ColorPlan | null;
+  /** Mantık denetimi (her hesaplamada, 'ne olur' denemeleri dahil). */
+  denetim?: DenetimRaporu | null;
 }
 
 export interface WhatIf {
@@ -241,6 +252,7 @@ async function json<T>(res: Response): Promise<T> {
 
 export const templateUrl = `${API_URL}/api/collections/template.xlsx`;
 export const exportUrl = (cid: string) => `${API_URL}/api/collections/${cid}/export.xlsx`;
+export const auditReportUrl = (cid: string) => `${API_URL}/api/denetim/koleksiyon/${cid}?bicim=html`;
 export const imageUrl = (cid: string, path: string) =>
   `${API_URL}/api/collections/${cid}/images/${path.split("/").map(encodeURIComponent).join("/")}`;
 
@@ -263,6 +275,8 @@ export async function importCollection(sheet: File, images: File[], collectionId
 
 export const listCollections = async (kind?: Kind): Promise<CollectionListRow[]> =>
   json(await fetch(`${API_URL}/api/collections${kind ? `?kind=${kind}` : ""}`));
+export const deleteCollection = async (cid: string): Promise<{ deleted: string }> =>
+  json(await fetch(`${API_URL}/api/collections/${cid}`, { method: "DELETE" }));
 export const getCollection = async (cid: string): Promise<Collection> => json(await fetch(`${API_URL}/api/collections/${cid}`));
 export const getPreview = async (cid: string): Promise<ImportPreview> => json(await fetch(`${API_URL}/api/collections/${cid}/preview`));
 

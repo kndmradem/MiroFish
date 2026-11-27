@@ -152,7 +152,8 @@ def test_model_recommendations_used_when_valid_else_rules(isolated_app):
 def test_interview_prompt_contains_brand_block():
     card = {"product_name": "Kaban", "features": {}}
     prompt = build_interview_prompt(card, "MENA", LUXURY, 25.0)
-    assert "LuxA" in prompt and "lüks segment" in prompt and "$250" in prompt and "95/100" in prompt
+    assert "LuxA" in prompt and "lüks segment" in prompt and "95/100" in prompt
+    assert "$250" not in prompt          # beklenen fiyat (maliyet x çarpan) ajana söylenmez
     assert "Marka:" not in build_interview_prompt(card, "MENA")
 
 

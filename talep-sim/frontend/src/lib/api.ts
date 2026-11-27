@@ -1,3 +1,4 @@
+import type { DenetimRaporu } from "./denetim";
 export const REGIONS = [
   { code: "EU", label: "Avrupa (EU)" },
   { code: "MENA", label: "Körfez (MENA)" },
@@ -216,6 +217,43 @@ export interface PredictionRequest {
   usd_try_rate?: number;
   reset_world?: boolean;
   allocation_objective?: "balanced" | "profit" | "blended";
+  /** kadın / erkek / çocuk / unisex (kız çocuk, erkek çocuk, bebek); boşsa ad/kategoriden tahmin */
+  target_audience?: string;
+}
+
+export type AudienceValue = "kadin" | "erkek" | "cocuk" | "unisex";
+
+/** Ürünün hedef kitlesi ve dayanağı. */
+export interface AudienceInfo {
+  value: AudienceValue;
+  label: string;
+  source: "kullanıcı girdisi" | "tahmin";
+  reason: string;
+  child_gender?: "kız" | "erkek" | null;
+  child_age_range?: [number, number] | null;
+  raw?: string;
+}
+
+/** Bir bölgede kime soruldu: hedef ve gerçekleşen cinsiyet/yaş dağılımı. */
+export interface AudiencePanel {
+  value: AudienceValue;
+  label: string;
+  source: "kullanıcı girdisi" | "tahmin";
+  reason: string;
+  child_gender: "kız" | "erkek" | null;
+  child_age_range: [number, number] | null;
+  method: "kota" | "ağırlık" | "gösterim";
+  note: string;
+  n_eff: number | null;
+  unweighted_demand?: number;
+  composition: {
+    n: number; n_female: number; n_male: number; n_unknown: number;
+    female_pct: number; target_female_pct: number; gender_known_pct: number;
+    age_bands: { band: string; target_pct: number; pct: number; n: number }[];
+    roles: Record<string, number>;
+  };
+  calibration: { version: string; as_of: string; verified: boolean; region_specific: boolean; source: string; basis: string };
+  warnings: string[];
 }
 
 export interface PricePoint {
@@ -296,6 +334,8 @@ export interface RegionPredictionResult {
   raw_answers?: RawAnswer[];
   /** Panel motoru: hangi persona/bağlam sürümüyle, hangi tarih itibarıyla hesaplandı. */
   data_basis?: DataBasis | null;
+  /** Bu bölgede kime soruldu (hedef kitleye göre panel). */
+  audience_panel?: AudiencePanel | null;
   local_currency?: string | null;
   local_price?: string | null;
   fx_rate?: number | null;
@@ -319,6 +359,9 @@ export interface RawAnswer {
   text: string;
   segment?: string | null;
   interest?: number | null;
+  who?: string | null;
+  audience?: string | null;
+  weight?: number | null;
 }
 
 export interface PredictionResponse {
@@ -329,6 +372,8 @@ export interface PredictionResponse {
   allocation_objective: string;
   allocation_note: string;
   product_card: Record<string, unknown>;
+  /** Ürünün hedef kitlesi (kullanıcı girdisi ya da tahmin). */
+  target_audience?: AudienceInfo | null;
   engine: string;
   brand_profile: BrandProfile | null;
   recommendations: Recommendation[];
@@ -339,6 +384,8 @@ export interface PredictionResponse {
   failed_regions: { region: string; reason: string; raw_answers?: RawAnswer[] }[];
   /** Eski bir API sürümü açıklama/öneri alanlarını göndermediyse true (istemci tarafında eklenir). */
   api_outdated?: boolean;
+  /** Mantık denetimi: sonucun kendi içinde tutarlılığı. */
+  denetim?: DenetimRaporu | null;
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -531,6 +578,7 @@ export interface NewStoreEstimate {
   features_used: string[];
   profile_source: string;
   assumptions: string[];
+  synthetic_data?: boolean;
   basis: string;
 }
 

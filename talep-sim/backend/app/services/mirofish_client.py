@@ -65,6 +65,14 @@ class MiroFishClient:
         )
         return data["project_id"]
 
+    async def create_local_project(self, requirement: str, document: str, people: List[Dict[str, Any]],
+                                   project_name: str) -> str:
+        """Zep'siz proje: kişileri MiroFish'e doğrudan verir (graf kurulmaz). Dönüş: project_id."""
+        data = await self._call("POST", "/api/graph/local", json={
+            "project_name": project_name, "simulation_requirement": requirement, "document": document,
+            "people": people}, timeout=self.build_timeout)
+        return data["project_id"]
+
     async def build_graph(self, project_id: str) -> str:
         data = await self._call("POST", "/api/graph/build", json={"project_id": project_id}, timeout=self.build_timeout)
         return data["task_id"]

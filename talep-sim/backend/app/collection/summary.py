@@ -15,15 +15,20 @@ from typing import Dict, List, Optional, Set, Tuple
 
 from .. import brand as brandlib
 from ..allocation import DEMAND_SCENARIOS, STOP_P, p_sells
+from ..audience import AudienceInfo
+from ..denetim import denetle_koleksiyon
 from ..models import BrandProfile
 from . import colors as colorlib
 from .importer import norm
+from .importer import item_audience
 from .models import (Action, ColorFamilySummary, ColorLine, ColorPlan, Reason, BrandEffect, PairCount, PositionBias, ShowcaseItem, ShowcaseSummary, CannibalPair, CategorySummary, Collection, CollectionResult, CollectionSummary,
                      ItemRegion, ItemResult, Metric, ReachPoint, WhatIf)
 
 ENTHUSIAST = 70          # ilgi puanı bu ve üstü: "hevesli" (prompttaki ölçek: hevesli 70-95)
 CANNIBAL_OVERLAP = 0.6   # hevesli kişilerin örtüşmesi (küçük kümeye göre)
 CANNIBAL_PRICE = 0.25    # fiyatlar birbirinin ±%25'i içinde
+CANNIBAL_MIN_PEOPLE = 3  # en az bu kadar kişinin ortak sinyali (daha azı tesadüf sayılır)
+CANNIBAL_SC_PCT = 20     # vitrinde birlikte görenlerin en az bu yüzdesi "ikisinden biri" demeli
 BOOTSTRAP = 200
 REVERSE_LOGISTICS_PCT = 8.0
 MIN_PERSON_SD = 5.0      # kişi içi normalizasyonda en küçük dağılım (puan): herkese aynı puanı veren kişinin tek sapması büyütülmesin
@@ -37,7 +42,7 @@ MARGIN_REDUCE = 30.0     # bunun altındaysa: azalt
 REDUCE_FACTOR = 0.6      # "azalt" kararında bütçe dağıtımına giren talep oranı
 ENTHUSIAST_MIN = 0.05    # hevesli (70+) kişi oranı bunun altındaysa: azalt (kimse gerçekten istemiyorsa tam üretim yok)
 
-Person = Tuple[str, int]  # (bölge, kişi no)
+Person = Tuple[str, str]  # (bölge, "hedef kitle:kişi no"): farklı kitleli ürünlere farklı kişiler bakar
 
 
 def _pct(x: float) -> float:
@@ -50,6 +55,56 @@ def _net_margin(price: float, return_pct: float, cost: Optional[float]) -> Optio
         return None
     net = price * (1 - return_pct / 100 * (1 + REVERSE_LOGISTICS_PCT / 100))
     return round(100 * (net - cost) / price, 1)
+
+
+# Güven kontrolleri: çıktının ajandan mı yoksa kurulumdan (maliyet çarpanı, kitle varsayımı) mı geldiğini ölçer
+ANCHOR_CV = 0.06         # ürünlerin "önerilen fiyat / maliyet" oranlarının değişim katsayısı bunun altındaysa fiyat maliyetten türemiş sayılır
+UNITS_CV = 0.05          # ürünlerin bölge talep adetleri bu kadar az değişiyorsa adetler ürünü ayırt etmiyor
+MIN_CHECK_ITEMS = 3
+
+
+def _cv(vals: List[float]) -> Optional[float]:
+    vals = [v for v in vals if v and v > 0]
+    if len(vals) < MIN_CHECK_ITEMS:
+        return None
+    m = statistics.fmean(vals)
+    return statistics.pstdev(vals) / m if m else None
+
+
+def trust_checks(per_item_regions: Dict[str, List["ItemRegion"]], cost_usd: Dict[str, float]) -> List[Tuple[str, str]]:
+    """Fiyat ve adet çıktılarının ürünleri gerçekten ayırt edip etmediğini ölçer. (anahtar, metin) listesi döner.
+
+    - Fiyat çapası: fiyat merdiveni maliyet x marka çarpanı etrafında kurulur. Bütün ürünlerde önerilen fiyat / maliyet
+      oranı neredeyse aynıysa önerilen fiyat panelin bağımsız görüşü değil, maliyet artı sabit kârdır.
+    - Adet ölçeği: bölge talep adedi erişilebilir kitle (varsayım) x ilgi x dönüşüm tavanından gelir. Ürünler arasında
+      neredeyse aynıysa önerilen adetler ürünü ayırt etmiyor, yalnızca varsayılan kitle büyüklüğünü yansıtıyor.
+    """
+    out: List[Tuple[str, str]] = []
+    regions = sorted({r.region for rs in per_item_regions.values() for r in rs})
+    for reg in regions:
+        ratios, units = [], []
+        for s, rs in per_item_regions.items():
+            r = next((x for x in rs if x.region == reg), None)
+            if r is None:
+                continue
+            if cost_usd.get(s):
+                ratios.append(r.optimal_price / cost_usd[s])
+            units.append(float(r.demand_units))
+        cv = _cv(ratios)
+        if cv is not None and cv < ANCHOR_CV:
+            k = statistics.fmean(ratios)
+            k_txt = f"{k:.2f}".replace(".", ",")
+            out.append(("fiyat", f"{reg}: önerilen fiyat bütün ürünlerde maliyetin yaklaşık {k_txt} katı (ürünler arası fark %{cv * 100:.0f}). "
+                                 "Fiyat merdiveni maliyet × marka çarpanı etrafında kurulduğu için bu fiyat panelin bağımsız görüşü değil, "
+                                 "maliyet artı sabit kârdır; marj eşiği de bu yüzden hiçbir ürünü elemez. Fiyatı karar olarak sunmayın; "
+                                 "rakip/ERP fiyatıyla karşılaştırın."))
+        ucv = _cv(units)
+        if ucv is not None and ucv < UNITS_CV:
+            u_txt = f"{statistics.fmean(units):,.0f}".replace(",", ".")
+            out.append(("adet", f"{reg}: ürünlerin talep adedi neredeyse aynı (ortalama {u_txt}, fark %{ucv * 100:.0f}). "
+                                "Adetler ürünü ayırt etmiyor; erişilebilir kitle varsayımından geliyor. Adetleri ERP'deki benzer ürün "
+                                "satışlarıyla ölçeklemeden üretim adedi olarak sunmayın."))
+    return out
 
 
 def _item_regions(resp: dict, planned_usd: Optional[float], cost_usd: Optional[float] = None
@@ -65,7 +120,7 @@ def _item_regions(resp: dict, planned_usd: Optional[float], cost_usd: Optional[f
         own = {}
         for a in rb.get("raw_answers") or []:
             if a.get("interest") is not None:
-                own[(r, int(a["agent"]))] = float(a["interest"])
+                own[(r, f"{a.get('audience') or ''}:{int(a['agent'])}")] = float(a["interest"])
         interests.update(own)
         alloc = rb.get("allocation") or {}
         ret = rb.get("returns") or {}
@@ -88,6 +143,15 @@ def _item_regions(resp: dict, planned_usd: Optional[float], cost_usd: Optional[f
             confidence=(rb.get("confidence") or {}).get("level", "")))
         basis = basis or rb.get("data_basis")
     return regions, interests, basis
+
+
+def _resp_audience(res: Optional[dict]):
+    """Koşuda kullanılan hedef kitle (yanıtta saklı); eski sonuçlarda yok."""
+    a = ((res or {}).get("response") or {}).get("target_audience")
+    try:
+        return AudienceInfo.model_validate(a) if a else None
+    except ValueError:
+        return None
 
 
 def _relative(per_item: Dict[str, Dict[Person, float]]) -> Tuple[Dict[str, float], Dict[Person, Dict[str, float]]]:
@@ -205,7 +269,7 @@ def brand_effect(used: Optional[dict], col: Collection, regions: List[str]) -> O
     basis = "kullanıcı girdisi" if b.edited else "LLM tahmini" if b.source == "llm_knowledge" else \
         "kullanıcı girdisi" if b.source == "user_notes" else "kural varsayımı"
     lines = [
-        f"Fiyat merdiveni ve panele söylenen 'bu marka genelde şu fiyata satar' bilgisi maliyet × {b.price_multiple:g} "
+        f"Panele sorulan fiyat merdiveni maliyet × {b.price_multiple:g} "
         f"üzerinden kuruldu. Marka yokken kullanılan × {neutral:g}'e göre fiyat seviyesi %{level:+g}.",
         f"Panel her üründe markayı '{brandlib.TIER_LABEL[b.price_tier]}' segment ve bölgedeki bilinirliğiyle "
         f"({', '.join(f'{r} {brandlib.region_strength(b, r)}/100' for r in regions)}) görerek cevap verdi; marka değeri "
@@ -572,11 +636,22 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
             covered |= ent[best]
             k += 1
             reach_curve.append(ReachPoint(k=k, sku=best, name=next(i.name for i in evaluated if i.sku == best),
-                                          reach_pct=_pct(len(covered) / len(persons)), added_pct=_pct(add / len(persons))))
+                                          reach_pct=_pct(len(covered) / len(persons)), added_pct=_pct(add / len(persons)),
+                                          enthusiasts=len(ent[best]), added=add, panel_n=len(persons)))
             left.discard(best)
+        # Yeni kişi eklemeyen ürünler de eğrinin sonunda (eklediği 0) gösterilir; neden eklemediği kişi sayısıyla yazılır:
+        # ya hevesli kişisi hiç yok ya da hevesli kişilerinin hepsi eğride önce gelen ürünleri de seviyor.
+        reach_now = _pct(len(covered) / len(persons))
+        for s_ in sorted(left, key=lambda x: (-len(ent[x]), x)):
+            k += 1
+            prev = [p.sku for p in reach_curve if p.added > 0 and ent[s_] & ent[p.sku]]
+            reach_curve.append(ReachPoint(k=k, sku=s_, name=next(i.name for i in evaluated if i.sku == s_),
+                                          reach_pct=reach_now, added_pct=0.0, enthusiasts=len(ent[s_]), added=0,
+                                          panel_n=len(persons), overlap_with=prev))
         allent = set().union(*ent.values()) if ent else set()
         reach = Metric(value=_pct(len(allent) / len(persons)), basis="ajan",
-                       how=f"Paneldeki {len(persons)} kişiden en az bir ürüne {ENTHUSIAST}+ ilgi puanı veren kişilerin oranı.")
+                       how=f"Paneldeki {len(persons)} kişiden {len(allent)} kişi en az bir ürüne {ENTHUSIAST}+ ilgi puanı verdi "
+                           f"(eşik kural varsayımı)." + (f" Az kişiye dayanıyor ({len(allent)} kişi)." if len(allent) < 10 else ""))
         for r in sorted({p[0] for p in persons}):
             pr = {p for p in persons if p[0] == r}
             reach_by_region[r] = _pct(len(allent & pr) / len(pr)) if pr else 0.0
@@ -587,32 +662,52 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
         planned = w.planned_prices.get(it.sku, it.planned_price)
         regs = per_item_regions[it.sku]
         price_of[it.sku] = to_usd(planned) if planned else (statistics.fmean(r.optimal_price for r in regs) if regs else 0)
+    # Müşteri paylaşımı yalnızca aynı kategorideki ürünler arasında aranır (kategori kullanıcının Excel/ERP
+    # verisinden gelir; sabit liste yok). Farklı kategoriler (ör. sütyen ve külot) birbirinin yerine geçmez,
+    # birlikte alınır; o sinyal "birlikte alınanlar"da kalır.
+    item_by = {i.sku: i for i in evaluated}
+
+    def same_cat(x, y) -> bool:
+        return bool(x.category) and norm(x.category) == norm(y.category)
+
     pairs: List[CannibalPair] = []
     if have_panel:
         for i, a in enumerate(evaluated):
             for b in evaluated[i + 1:]:
-                if not a.category or norm(a.category) != norm(b.category):
+                if not same_cat(a, b):
                     continue
                 ea, eb = ent[a.sku], ent[b.sku]
-                if len(ea) < 2 or len(eb) < 2:
+                n_both, base = len(ea & eb), min(len(ea), len(eb))
+                if n_both < CANNIBAL_MIN_PEOPLE:
                     continue
-                ov = len(ea & eb) / min(len(ea), len(eb))
+                ov = n_both / base
                 pa, pb = price_of[a.sku], price_of[b.sku]
                 close = pa > 0 and pb > 0 and abs(pa - pb) / max(pa, pb) <= CANNIBAL_PRICE
                 if ov >= CANNIBAL_OVERLAP and close:
-                    pairs.append(CannibalPair(a=a.sku, b=b.sku, category=a.category, overlap_pct=_pct(ov),
-                                              why=f"İkisini de beğenen kişilerin örtüşmesi %{_pct(ov):g}, aynı kategori ve fiyatlar birbirine yakın"))
-        pairs.sort(key=lambda p: -p.overlap_pct)
+                    pairs.append(CannibalPair(
+                        a=a.sku, b=b.sku, category=a.category, overlap_pct=_pct(ov), source="ilgi", basis="ajan",
+                        shared=n_both, base=base, panel_n=len(persons),
+                        why=(f"{len(persons)} kişilik panelde {a.name} ürününe {len(ea)}, {b.name} ürününe {len(eb)} kişi "
+                             f"{ENTHUSIAST}+ ilgi verdi; az olan {base} kişinin {n_both}'ü ikisini de seviyor. "
+                             f"Aynı kategori, fiyatlar ±%{int(CANNIBAL_PRICE * 100)} içinde (eşikler kural varsayımı).")))
+        pairs.sort(key=lambda p: (-p.overlap_pct, -p.shared))
     if sc_summary:
         have = {tuple(sorted((p.a, p.b))) for p in pairs}
-        cat = {i.sku: i.category for i in evaluated}
         for sp in sc_summary.substitute_pairs:
-            if (sp.a, sp.b) not in have and sp.pct >= 20:
-                pairs.append(CannibalPair(a=sp.a, b=sp.b, category=cat.get(sp.a, ""), overlap_pct=sp.pct,
-                                          why=f"Vitrinde {sp.count} kişi 'ikisinden birini alırım' dedi"))
+            a, b = item_by.get(sp.a), item_by.get(sp.b)
+            if a is None or b is None or not same_cat(a, b):
+                continue
+            if tuple(sorted((sp.a, sp.b))) in have or sp.pct < CANNIBAL_SC_PCT or sp.count < CANNIBAL_MIN_PEOPLE:
+                continue
+            seen = round(sp.count * 100 / sp.pct) if sp.pct else sp.count
+            pairs.append(CannibalPair(
+                a=sp.a, b=sp.b, category=a.category, overlap_pct=sp.pct, source="vitrin", basis="ajan",
+                shared=sp.count, base=seen, panel_n=seen,
+                why=(f"Vitrin turunda ikisini yan yana gören {seen} kişiden {sp.count}'ü 'ikisinden birini alırım' dedi. "
+                     "Aynı kategori (eşikler kural varsayımı).")))
 
     # üretim kararı: üret / azalt / üretme. Sinyaller ajandan, eşikler kural varsayımı.
-    in_curve = {p.sku for p in reach_curve}
+    in_curve = {p.sku for p in reach_curve if p.added > 0}
     name_by = {i.sku: i.name for i in evaluated}
     decision: Dict[str, str] = {}
     source: Dict[str, str] = {}
@@ -758,7 +853,8 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
                 enthusiast_pct=Metric(value=None, basis="ajan"), role="belirsiz",
                 role_why=(res or {}).get("error") or "Henüz değerlendirilmedi",
                 recommended_qty=Metric(value=None, basis="kural varsayımı"), planned_qty=it.planned_qty,
-                flags=["değerlendirilmedi"] if not res else ["hata"], failed_regions=failed))
+                flags=["değerlendirilmedi"] if not res else ["hata"], failed_regions=failed,
+                audience=item_audience(it)))
             continue
         s = it.sku
         regs = per_item_regions[s]
@@ -828,6 +924,7 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
             decision_reasons=decisive[s] + context[s], recommended_price=rec_price, net_margin=nm_metric,
             recommended_qty=qty_metric,
             qty_by_region=qty_item.get(s, {}), planned_qty=it.planned_qty, flags=flags, failed_regions=failed,
+            audience=_resp_audience(res) or item_audience(it),
             showcase=sc_items.get(s), colors=clines, color_mix=cmix))
 
     # kategori özeti
@@ -847,6 +944,13 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
 
     # öneriler
     actions: List[Action] = []
+    checks = trust_checks({s: per_item_regions[s] for s in skus},
+                          {it.sku: to_usd(it.unit_cost) for it in evaluated if it.unit_cost})
+    for key, text in checks:
+        actions.append(Action(kind="veri", skus=[], basis="kural varsayımı", text="Güven kontrolü: " + text))
+    if checks:
+        notes.insert(0, "Güven kontrolü uyarısı var (öneriler listesinin başında). Bu koşudaki fiyat ve/veya adetler ürünleri "
+                        "ayırt etmiyor; demoda karar olarak değil, kurulumun sonucu olarak anlatılmalı.")
     for r in out_items:
         if r.decision in ("üretme", "azalt") and r.sku in decisive:
             why_ = "; ".join(x.text for x in decisive[r.sku][:3])
@@ -858,7 +962,7 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
         na = next(i.name for i in out_items if i.sku == p.a)
         nb = next(i.name for i in out_items if i.sku == p.b)
         actions.append(Action(kind="kanibalizasyon", skus=[p.a, p.b], basis="ajan",
-                              text=f"{na} ile {nb} aynı müşteriyi paylaşıyor (örtüşme %{p.overlap_pct:g}). Birini çıkarmayı ya da fiyat/renkle ayrıştırmayı düşünün."))
+                              text=f"{na} ile {nb} aynı müşteriyi paylaşıyor (örtüşme %{p.overlap_pct:g}, {p.shared}/{p.base} kişi). Birini çıkarmayı ya da fiyat/renkle ayrıştırmayı düşünün."))
     over_p = [r for r in out_items if "fiyat aralığın üstünde" in r.flags]
     under_p = [r for r in out_items if "fiyat aralığın altında" in r.flags]
     if len(over_p) > 3:
@@ -924,9 +1028,12 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
     if not indep:
         notes.append("Roller, erişim ve kanibalizasyon eşikleri kural varsayımıdır (hevesli = 70+ ilgi; örtüşme %60+, fiyat farkı %25 içinde).")
     notes += [
-        "Önerilen satış fiyatı panelin fiyat cevaplarından (Van Westendorp) gelir; Excel'den satış fiyatı okunmaz. Fiyat sekmesinde "
+        "Önerilen satış fiyatı panelin fiyat cevaplarından (Van Westendorp) gelir; ancak panele sorulan fiyat merdiveni maliyet × marka "
+        "çarpanı etrafında kurulur, bu yüzden fiyat bu merkeze çekilir (bkz. güven kontrolü). Excel'den satış fiyatı okunmaz. Fiyat sekmesinde "
         "denenen fiyat yalnızca fiyat uyumunu, marjı ve kararı yeniden hesaplar, panel cevaplarını değiştirmez.",
-        "Önerilen adetler ERP ile kalibre edilene kadar varsayımdır.",
+        "Önerilen adetlerin mutlak büyüklüğü varsayımdır: bölge başına 120 günde erişilebilir kitle (ör. EU 100.000, TR 50.000 kişi, "
+        "marka bilinirliğiyle ölçeklenir) × ilgi × %2 dönüşüm tavanı × fiyat kabulü. ERP'deki benzer ürün satışlarıyla kalibre edilene "
+        "kadar adetler yalnızca ürünler arası oran olarak okunmalı.",
     ]
     summary = CollectionSummary(
         n_items=len(items), n_evaluated=len(evaluated), n_failed=sum(1 for i in items if i.sku in results and not results[i.sku].get("response")),
@@ -941,7 +1048,10 @@ def summarize(col: Collection, results: Dict[str, dict], fx_rate: float, whatif:
                               how="120 günde beklenen satış (orta senaryo), önerilen adetlerle sınırlı."),
         actions=actions)
     regions = sorted({r.region for rs in per_item_regions.values() for r in rs}) or list(col.meta.target_regions)
-    return CollectionResult(collection_id=col.id, name=col.meta.name, kind=col.meta.kind, currency=cur, fx_rate=fx_rate, regions=regions,
-                            items=out_items, summary=summary, notes=notes, data_basis=data_basis, panel_shared=shared,
-                            brand_profile=brand, brand_effect=brand_effect(brand, col, regions), showcase=sc_summary,
-                            color_plan=color_plan)
+    res = CollectionResult(collection_id=col.id, name=col.meta.name, kind=col.meta.kind, currency=cur, fx_rate=fx_rate, regions=regions,
+                           items=out_items, summary=summary, notes=notes, data_basis=data_basis, panel_shared=shared,
+                           brand_profile=brand, brand_effect=brand_effect(brand, col, regions), showcase=sc_summary,
+                           color_plan=color_plan)
+    # mantık denetimi her hesaplamada (ilk sonuç ve her 'ne olur' denemesi) çalışır
+    res.denetim = denetle_koleksiyon(res)
+    return res

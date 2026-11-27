@@ -1,0 +1,8 @@
+pandas>=2.1
+numpy>=1.26
+pydantic>=2.7
+scikit-learn>=1.4
+Pillow>=10
+pytest>=8
+# Opsiyonel: CLIP görsel gömme (python -m tahmin ... --gorsel-modeli clip)
+# open_clip_torch>=2.24

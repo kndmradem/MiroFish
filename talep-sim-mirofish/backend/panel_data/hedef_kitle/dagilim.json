@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "version": "v1",
+  "as_of": "2026-11-12",
+  "review_by": "2027-03-31",
+  "verified": false,
+  "owner": "talep-sim varsayılanı (müşteri kendi sahibini yazmalı)",
+  "source": "Başlangıç taslağı, kural varsayımı. Yaş bantları bölgenin yetişkin nüfus yapısından kabaca türetildi (EU: Eurostat nüfus piramidi, TR: TÜİK ADNKS; değerler yuvarlak ve doğrulanmadı). Cinsiyet payları 'bu ürünü kim satın alır' varsayımıdır (ör. erkek giyiminin bir kısmını kadınlar eş/aile için alır). Müşterinin ERP/CRM satış verisi (alıcı cinsiyeti ve yaşı) ile değiştirilmeli.",
+  "notes": "female_share: panelde kadın alıcı payı. age_bands: [alt yaş, üst yaş, ağırlık]. cocuk: panel ebeveynlerden oluşur; female_share anne payı, age_bands ebeveyn yaşı, child_age_range çocuğun yaşı.",
+  "regions": {
+    "EU": {
+      "source": "EU: yetişkin nüfus 18-70 yaş dağılımı kabaca (Eurostat), medyan yaş yüksek (~44); alıcı cinsiyet payları varsayım.",
+      "kadin":  {"female_share": 0.85, "age_bands": [[18, 24, 0.12], [25, 34, 0.21], [35, 44, 0.22], [45, 54, 0.22], [55, 70, 0.23]]},
+      "erkek":  {"female_share": 0.30, "age_bands": [[18, 24, 0.13], [25, 34, 0.22], [35, 44, 0.22], [45, 54, 0.22], [55, 70, 0.21]]},
+      "unisex": {"female_share": 0.55, "age_bands": [[18, 24, 0.14], [25, 34, 0.22], [35, 44, 0.22], [45, 54, 0.21], [55, 70, 0.21]]},
+      "cocuk":  {"female_share": 0.70, "age_bands": [[25, 34, 0.30], [35, 44, 0.48], [45, 55, 0.22]], "child_age_range": [2, 12]}
+    },
+    "TR": {
+      "source": "TR: yetişkin nüfus 18-70 yaş dağılımı kabaca (TÜİK ADNKS), nüfus EU'dan genç (medyan ~34); alıcı cinsiyet payları varsayım.",
+      "kadin":  {"female_share": 0.88, "age_bands": [[18, 24, 0.17], [25, 34, 0.25], [35, 44, 0.23], [45, 54, 0.19], [55, 70, 0.16]]},
+      "erkek":  {"female_share": 0.35, "age_bands": [[18, 24, 0.18], [25, 34, 0.25], [35, 44, 0.23], [45, 54, 0.18], [55, 70, 0.16]]},
+      "unisex": {"female_share": 0.55, "age_bands": [[18, 24, 0.19], [25, 34, 0.25], [35, 44, 0.22], [45, 54, 0.18], [55, 70, 0.16]]},
+      "cocuk":  {"female_share": 0.75, "age_bands": [[22, 29, 0.25], [30, 39, 0.50], [40, 50, 0.25]], "child_age_range": [2, 12]}
+    },
+    "_varsayilan": {
+      "source": "Bu bölge için ayrı kalibrasyon yok: genel varsayım kullanıldı (EU ve TR dışındaki bölgeler).",
+      "kadin":  {"female_share": 0.85, "age_bands": [[18, 24, 0.15], [25, 34, 0.24], [35, 44, 0.23], [45, 54, 0.20], [55, 70, 0.18]]},
+      "erkek":  {"female_share": 0.30, "age_bands": [[18, 24, 0.16], [25, 34, 0.24], [35, 44, 0.23], [45, 54, 0.20], [55, 70, 0.17]]},
+      "unisex": {"female_share": 0.55, "age_bands": [[18, 24, 0.16], [25, 34, 0.24], [35, 44, 0.23], [45, 54, 0.20], [55, 70, 0.17]]},
+      "cocuk":  {"female_share": 0.70, "age_bands": [[25, 34, 0.35], [35, 44, 0.45], [45, 55, 0.20]], "child_age_range": [2, 12]}
+    }
+  }
+}

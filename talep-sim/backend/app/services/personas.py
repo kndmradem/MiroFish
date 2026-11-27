@@ -145,6 +145,51 @@ SEED_CONSUMERS: Dict[str, List[str]] = {
     ],
 }
 
+# Seed kişilerin cinsiyeti (K/E). Seed dokümana yazılmaz (dünya yeniden kurulmasın diye); MiroFish cinsiyeti addan
+# çıkarır, biz de aynısını burada açıkça tutarız. Belirsiz ad (ör. Deniz) bilinmiyor sayılır ve ağırlığı 1 kalır.
+SEED_GENDER: Dict[str, Optional[str]] = {
+    "Lena Hoffmann": "K", "Jonas Weber": "E", "Camille Laurent": "K", "Sofia Rossi": "K", "Pieter de Vries": "E",
+    "Anna Kowalski": "K", "Mats Eriksson": "E", "Isabel Moreno": "K", "Tomás Silva": "E", "Greta Novak": "K",
+    "Fatima Al Mansoori": "K", "Omar Haddad": "E", "Layla Nasser": "K", "Khalid Al Farsi": "E", "Noor Saleh": "K",
+    "Mariam Al Hashimi": "K", "Yousef Karim": "E", "Huda Al Qahtani": "K", "Tariq Mansour": "E", "Salma Benali": "K",
+    "Aigerim Seitkali": "K", "Dmitri Volkov": "E", "Nino Beridze": "K", "Rustam Aliyev": "E", "Olga Smirnova": "K",
+    "Anton Petrov": "E", "Madina Karimova": "K", "Vladislav Kovalenko": "E", "Zarina Akhmetova": "K",
+    "Giorgi Kapanadze": "E",
+    "Emily Carter": "K", "Marcus Johnson": "E", "Ashley Nguyen": "K", "Daniel Brooks": "E", "Rachel Kim": "K",
+    "Jessica Martinez": "K", "Tyler Anderson": "E", "Priya Patel": "K", "Robert Miller": "E", "Olivia Thompson": "K",
+    "Elif Demir": "K", "Mehmet Yılmaz": "E", "Zeynep Kaya": "K", "Burak Şahin": "E", "Ayşe Çelik": "K",
+    "Can Özdemir": "E", "Selin Arslan": "K", "Hasan Koç": "E", "Deniz Aydın": None, "Merve Polat": "K",
+}
+
+
+def seed_person(line: str) -> dict:
+    """'Ad Soyad, 31, Şehir, meslek; ...' satırından ad, yaş ve cinsiyet."""
+    parts = [p.strip() for p in line.split(",")]
+    name = parts[0]
+    try:
+        age = int(parts[1])
+    except (IndexError, ValueError):
+        age = None
+    g = SEED_GENDER.get(name)
+    return {"name": name, "age": age, "female": None if g is None else g == "K"}
+
+
+def person_of(profile_text: str, region: Optional[str] = None) -> Optional[dict]:
+    """Ajan profil metninden seed kişiyi bulur (tam ad, yoksa soyad); bulunamazsa None."""
+    text = profile_text.lower()
+    regions = [region] if region in SEED_CONSUMERS else list(SEED_CONSUMERS)
+    for r in regions:
+        for line in SEED_CONSUMERS[r]:
+            if line.split(",")[0].lower() in text:
+                return seed_person(line)
+    for r in regions:
+        for line in SEED_CONSUMERS[r]:
+            last = line.split(",")[0].split()[-1].lower()
+            if len(last) > 3 and re.search(rf"\b{re.escape(last)}\b", text):
+                return seed_person(line)
+    return None
+
+
 def simulation_requirement(regions: Optional[Sequence[str]] = None) -> str:
     regions = list(regions or SEED_CONSUMERS)
     return (

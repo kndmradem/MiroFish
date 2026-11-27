@@ -1,0 +1,16 @@
+magaza_kodu,kanal,ulke,sehir,lokasyon_tipi,metrekare,acilis_tarihi,kapanis_tarihi,para_birimi
+ORNEK-IST-01,magaza,TR,Istanbul,avm,520,2021-03-01,,TRY
+ORNEK-IST-02,magaza,TR,Istanbul,cadde,300,2022-05-01,,TRY
+ORNEK-IST-03,magaza,TR,Istanbul,outlet,700,2020-09-01,,TRY
+ORNEK-ANK-01,magaza,TR,Ankara,avm,450,2021-10-01,,TRY
+ORNEK-IZM-01,magaza,TR,Izmir,avm,400,2022-02-01,,TRY
+ORNEK-IZM-02,magaza,TR,Izmir,cadde,250,2023-04-01,,TRY
+ORNEK-ANT-01,magaza,TR,Antalya,avm,380,2022-06-01,,TRY
+ORNEK-BUR-01,magaza,TR,Bursa,avm,350,2023-01-15,2025-09-30,TRY
+ORNEK-BER-01,magaza,DE,Berlin,cadde,280,2022-09-01,,EUR
+ORNEK-AMS-01,magaza,NL,Amsterdam,cadde,220,2023-03-01,,EUR
+ORNEK-DXB-01,magaza,AE,Dubai,avm,500,2021-11-01,,USD
+ORNEK-RUH-01,magaza,SA,Riyadh,avm,450,2022-10-01,,USD
+ORNEK-ALA-01,magaza,KZ,Almaty,avm,360,2023-02-01,,USD
+ORNEK-BAK-01,magaza,AZ,Baku,avm,320,2023-05-01,,USD
+ORNEK-WEB-TR,online,TR,Istanbul,online,,2020-01-01,,TRY

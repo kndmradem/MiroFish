@@ -81,6 +81,7 @@ class NewStoreEstimate(BaseModel):
     features_used: List[str]
     profile_source: str = ""
     assumptions: List[str] = []
+    synthetic_data: bool = Field(False, description="Mağaza satışları sentetik örnek klasörden geldi (gerçek ERP değil)")
     basis: str = ("benzer mağaza eşleştirmesi: tahmin müşterinin mevcut mağazalarının cirosundan, dış veri lokasyon "
                   "profilinden; ölçülmüş satış değil")
 
@@ -101,7 +102,8 @@ class StoreStat:
 
 
 def _norm(s: str) -> str:
-    return (s or "").strip().lower().translate(str.maketrans("ıİşŞğĞüÜöÖçÇ", "iissgguuoocc"))
+    # önce Türkçe harfleri çevir: "İ".lower() birleşik nokta (i̇) üretir, "İstanbul" profille eşleşmezdi
+    return (s or "").strip().translate(str.maketrans("ıİşŞğĞüÜöÖçÇ", "iissgguuoocc")).lower()
 
 
 def load_profiles(path: Path) -> Dict[Tuple[str, str], LocationProfile]:

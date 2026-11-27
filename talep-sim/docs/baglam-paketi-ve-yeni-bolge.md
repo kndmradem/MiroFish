@@ -131,6 +131,8 @@ Kod: `backend/app/newstore.py`, ekran: `http://localhost:3100/yeni-magaza`.
 
 ```
 NEWSTORE_ERP_DIR=/yol/erp_csv            # magazalar.csv, satislar.csv, (varsa) doviz_kurlari.csv
+# NEWSTORE_ERP_DIR boşsa backend/panel_data/ornek_erp kullanılır: SENTETİK örnek veri (ORNEK-* mağazaları,
+# scripts/ornek_erp_uret.py ile üretildi). Sonuç ekranında kırmızı "sentetik veri" uyarısı çıkar.
 NEWSTORE_PROFILES=/yol/lokasyon_profilleri.csv   # boşsa panel_data/lokasyon_profilleri.ornek.csv
 NEWSTORE_FIXED_RATES=USD=42,EUR=48       # doviz_kurlari.csv yoksa sabit kur (varsayım, ekranda belirtilir)
 ```

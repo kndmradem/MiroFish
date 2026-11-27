@@ -110,7 +110,10 @@ def test_template_is_readable_by_importer():
     assert not prev.ignored_columns
     first = prev.items[0].item
     assert first.unit_cost == 420 and first.technical_specs.startswith("%100 keten") and first.planned_price is None
-    assert first.attributes["Hedef kitle"] == "kadın" and first.attributes["yaka"] == "klasik"
+    assert first.target_audience == "kadın" and first.attributes["yaka"] == "klasik"
+    a1, a3 = prev.items[0].audience, prev.items[2].audience
+    assert (a1.value, a1.source) == ("kadin", "kullanıcı girdisi")
+    assert (a3.value, a3.source) == ("kadin", "tahmin") and "elbise" in a3.reason   # boş sütun: addan tahmin
     wb = load_workbook(io.BytesIO(template_bytes()))
     heads = [c.value for c in wb["Ürünler"][1]]
     assert not any("fiyat" in h and "maliyet" not in h for h in heads)          # satış fiyatı sütunu yok
@@ -266,7 +269,12 @@ def test_api_import_confirm_run_result_export(client):
     res = client.get(f"/api/collections/{cid}/result").json()
     assert res["summary"]["n_evaluated"] == 4 and res["currency"] == "TRY"
     assert {r["region"] for r in res["items"][0]["regions"]} == {"TR", "EU"}
-    assert client.get(f"/api/collections/{cid}/items/SW27-001/prediction").json()["regional_breakdown"]
+    pred = client.get(f"/api/collections/{cid}/items/SW27-001/prediction").json()
+    assert pred["regional_breakdown"]
+    # hedef kitle sütunu yok: her ürün için tahmin edilir, etiketlenir ve panele/sonuca taşınır
+    assert all(i["audience"]["source"] == "tahmin" for i in res["items"])
+    assert pred["target_audience"] == next(i["audience"] for i in res["items"] if i["sku"] == "SW27-001")
+    assert all(r["audience_panel"]["value"] == pred["target_audience"]["value"] for r in pred["regional_breakdown"])
 
     # ikinci koşu: girdiler değişmedi, önceki sonuçlar kullanılır
     client.post(f"/api/collections/{cid}/run", json={})
@@ -751,3 +759,49 @@ def test_identical_price_answers_lower_quality():
     from app.pricing import AgentPriceAnswer as A, analyze
     r, _ = analyze([A(10, 20, 40, 60)] * 11 + [A(12, 22, 44, 70)], 15)
     assert r.quality == "low" and "aynı fiyat" in r.quality_note
+
+
+def test_delete_collection_removes_everything(client):
+    prev = _upload(client).json()
+    cid = prev["collection_id"]
+    client.post(f"/api/collections/{cid}/confirm", json={"meta": prev["meta"], "items": [p["item"] for p in prev["items"]]})
+    assert any(c["id"] == cid for c in client.get("/api/collections").json())
+    r = client.delete(f"/api/collections/{cid}")
+    assert r.status_code == 200 and r.json() == {"deleted": cid}
+    assert all(c["id"] != cid for c in client.get("/api/collections").json())
+    assert client.get(f"/api/collections/{cid}").status_code == 404
+    assert client.delete(f"/api/collections/{cid}").status_code == 404
+    assert client.delete("/api/collections/../etc").status_code in (404, 405)
+
+
+# ---------- müşteri paylaşımı yalnızca aynı kategoride ----------
+
+def test_cannibal_pairs_only_within_same_category_and_with_counts():
+    # S0, S1 aynı kişilerce sevilir ama farklı kategoride (ör. bralet ve külot): çift olmamalı.
+    # S2, S3 aynı kategoride ve aynı kişilerce sevilir: çift olmalı, kişi sayılarıyla.
+    ans = {"S0": [90, 90, 90, 90, 20, 20], "S1": [90, 90, 90, 90, 20, 20],
+           "S2": [20, 20, 90, 90, 90, 90], "S3": [20, 20, 90, 90, 90, 90], "S4": [40, 40, 40, 40, 40, 40]}
+    cats = {"S0": "SUTYEN", "S1": "KULOT", "S2": "KULOT", "S3": "KULOT", "S4": "BODY"}
+    col = _col()
+    for it in col.items:
+        it.category = cats[it.sku]
+    # vitrinde herkes S0 ile S1'i "ikisinden biri" diyor: kategori farklı olduğu için yine çift sayılmaz
+    sc_recs = _showcase_recs(5, best="S2", worst="S4")
+    for r in sc_recs["TR"]:
+        inv = {v: k for k, v in r["letters"].items()}
+        r["answer"]["substitutes"] = [[inv["S0"], inv["S1"]]]
+    res = summarize(col, {s: _resp({"TR": a}) for s, a in ans.items()}, 42.0, showcase=sc_recs)
+    got = {tuple(sorted((p.a, p.b))) for p in res.summary.cannibal_pairs}
+    assert ("S0", "S1") not in got
+    assert ("S2", "S3") in got
+    p = next(p for p in res.summary.cannibal_pairs if {p.a, p.b} == {"S2", "S3"})
+    assert p.category == "KULOT" and p.source == "ilgi" and p.shared == 4 and p.base == 4 and p.panel_n == 6
+    assert "4" in p.why
+
+
+def test_cannibal_pair_needs_minimum_people():
+    # yalnızca 2 kişi ikisini de seviyor: %100 örtüşme olsa da tesadüf sayılır
+    ans = {"S0": [90, 90, 20, 20, 20, 20], "S1": [90, 90, 20, 20, 20, 20],
+           "S2": [50, 50, 50, 50, 50, 50], "S3": [40] * 6, "S4": [30] * 6}
+    res = summarize(_col(), {s: _resp({"TR": a}) for s, a in ans.items()}, 42.0)
+    assert not any({p.a, p.b} == {"S0", "S1"} for p in res.summary.cannibal_pairs)

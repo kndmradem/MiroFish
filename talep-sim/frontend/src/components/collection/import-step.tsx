@@ -17,6 +17,7 @@ import {
   type Collection, type CollectionItem, type CollectionMeta, type ImportPreview, type ItemPreview, type Kind,
 } from "@/lib/collection-api";
 import { cn } from "@/lib/utils";
+import { AUDIENCE_OPTIONS, AudienceChip } from "@/components/audience-card";
 
 const STATUS_ICON = {
   ok: <CheckCircle2 className="size-4 text-emerald-600" />,
@@ -217,6 +218,7 @@ function PreviewStep({ kind, preview, onSaved }: { kind: Kind; preview: ImportPr
                 <TableHead>SKU</TableHead>
                 <TableHead>Ürün</TableHead>
                 <TableHead>Kategori</TableHead>
+                <TableHead>Hedef kitle</TableHead>
                 <TableHead>Ürün içeriği</TableHead>
                 <TableHead className="text-right">Maliyet fiyatı</TableHead>
                 <TableHead>Eşleşme</TableHead>
@@ -250,6 +252,16 @@ function PreviewStep({ kind, preview, onSaved }: { kind: Kind; preview: ImportPr
                     <TableCell className={cn("font-mono text-xs", dup && "text-rose-600")}>{r.item.sku || "—"}</TableCell>
                     <TableCell><Input className="h-8 min-w-36" value={r.item.name} onChange={(e) => setItem(i, { name: e.target.value })} /></TableCell>
                     <TableCell><Input className="h-8 min-w-28" value={r.item.category} onChange={(e) => setItem(i, { category: e.target.value })} /></TableCell>
+                    <TableCell>
+                      <div className="grid gap-1">
+                        <select className="h-8 min-w-28 rounded-md border bg-background px-1 text-xs" value={r.item.target_audience ?? ""}
+                          onChange={(e) => setItem(i, { target_audience: e.target.value || null })}>
+                          {AUDIENCE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.value ? o.label : "Boş: tahmin"}</option>)}
+                          {r.item.target_audience && !AUDIENCE_OPTIONS.some((o) => o.value === r.item.target_audience) && <option value={r.item.target_audience}>{r.item.target_audience}</option>}
+                        </select>
+                        {!r.item.target_audience && r.audience && <AudienceChip a={r.audience} />}
+                      </div>
+                    </TableCell>
                     <TableCell><Input className="h-8 min-w-44" value={r.item.technical_specs} placeholder="kumaş / kompozisyon"
                       onChange={(e) => setItem(i, { technical_specs: e.target.value })} /></TableCell>
                     <TableCell><Input className={cn("h-8 w-24 text-right", r.include && !r.item.unit_cost && "border-rose-400")} type="number" value={r.item.unit_cost ?? ""}

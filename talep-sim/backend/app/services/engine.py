@@ -143,6 +143,14 @@ class MockSimulationEngine:
             "region_factor": round(region_factor, 2), "sensitivity_adj": sens_adj,
             "matched_features": [f for f, w in persona.likes.items() if features.get(f)],
         }
+        if card.get("target_audience"):
+            from .. import audience as audlib
+            try:
+                plan = audlib.plan_for(audlib.AudienceInfo.model_validate(card["target_audience"]), region)
+                meta["audience"] = audlib.describe(plan, audlib.quota_people(plan, self.agents_per_region), "gösterim",
+                                                   "Örnek (mock) motor: cevaplar kişiye göre üretilmez; hedef dağılım yalnızca gösteriliyor.")
+            except (OSError, ValueError):
+                pass
 
         triggered = [
             (abs(persona.likes.get(feat, 0.3)), text)

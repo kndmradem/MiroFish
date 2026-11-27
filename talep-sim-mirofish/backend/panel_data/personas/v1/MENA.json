@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "region": "MENA",
+  "version": "v1",
+  "as_of": "2026-10-26",
+  "review_by": "2027-01-31",
+  "source": "Başlangıç taslağı: genel pazar bilgisinden yazıldı, ölçülmüş veri değil. ERP/CRM müşteri verisi ve pazar araştırmasıyla güncellenmeli.",
+  "owner": "talep-sim varsayılanı (müşteri kendi sahibini yazmalı)",
+  "verified": false,
+  "price_level": 3.2,
+  "segments": [
+    {
+      "id": "mena-luxury",
+      "label": "Lüks ve statü odaklı",
+      "city": "Dubai",
+      "weight": 0.25,
+      "age_range": [
+        25,
+        45
+      ],
+      "female_share": 0.6,
+      "income_band": "yüksek",
+      "style_affinity": [
+        "lüks",
+        "parlak kumaş",
+        "gösterişli detay"
+      ],
+      "price_sensitivity": 0.2,
+      "trend_affinity": 0.7,
+      "channel_habits": [
+        "AVM",
+        "marka mağazası",
+        "online"
+      ],
+      "climate": "sıcak, klimalı iç mekan",
+      "dress_norms": "muhafazakâr kesim yaygın, şıklık önemli",
+      "notes": ""
+    },
+    {
+      "id": "mena-modest",
+      "label": "Muhafazakâr şık",
+      "city": "Riyad",
+      "weight": 0.25,
+      "age_range": [
+        22,
+        45
+      ],
+      "female_share": 0.75,
+      "income_band": "orta-üst",
+      "style_affinity": [
+        "modest fashion",
+        "uzun kesim",
+        "ipek/saten"
+      ],
+      "price_sensitivity": 0.4,
+      "trend_affinity": 0.5,
+      "channel_habits": [
+        "AVM",
+        "Instagram butikleri"
+      ],
+      "climate": "çok sıcak, kuru",
+      "dress_norms": "örtünen, bol ve uzun kesim",
+      "notes": ""
+    },
+    {
+      "id": "mena-young-social",
+      "label": "Genç sosyal medya kullanıcısı",
+      "city": "Doha",
+      "weight": 0.2,
+      "age_range": [
+        18,
+        28
+      ],
+      "female_share": 0.6,
+      "income_band": "orta-üst",
+      "style_affinity": [
+        "trend",
+        "fotoğrafta iyi duran"
+      ],
+      "price_sensitivity": 0.5,
+      "trend_affinity": 0.85,
+      "channel_habits": [
+        "Instagram",
+        "TikTok",
+        "online"
+      ],
+      "climate": "sıcak",
+      "dress_norms": "dikkat çekici ama mütevazı",
+      "notes": ""
+    },
+    {
+      "id": "mena-value",
+      "label": "Fiyat/performans arayan",
+      "city": "Kahire",
+      "weight": 0.2,
+      "age_range": [
+        25,
+        50
+      ],
+      "female_share": 0.55,
+      "income_band": "orta-alt",
+      "style_affinity": [
+        "markalı ama indirimli",
+        "rahat"
+      ],
+      "price_sensitivity": 0.8,
+      "trend_affinity": 0.4,
+      "channel_habits": [
+        "indirim",
+        "pazar",
+        "online"
+      ],
+      "climate": "sıcak",
+      "dress_norms": "mütevazı, rahat",
+      "notes": ""
+    },
+    {
+      "id": "mena-professional",
+      "label": "Profesyonel klasik",
+      "city": "Abu Dabi",
+      "weight": 0.1,
+      "age_range": [
+        30,
+        55
+      ],
+      "female_share": 0.4,
+      "income_band": "yüksek",
+      "style_affinity": [
+        "klasik",
+        "ince kaliteli kumaş"
+      ],
+      "price_sensitivity": 0.3,
+      "trend_affinity": 0.3,
+      "channel_habits": [
+        "marka mağazası"
+      ],
+      "climate": "sıcak, klimalı ofis",
+      "dress_norms": "resmi, muhafazakâr",
+      "notes": ""
+    }
+  ]
+}
